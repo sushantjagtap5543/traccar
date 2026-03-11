@@ -1,0 +1,50 @@
+name: GeoSurePath Core CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-admin-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: geosurepath-admin-api/package-lock.json
+      - name: Install dependencies
+        run: |
+          cd geosurepath-admin-api
+          npm ci
+      - name: Run Tests
+        env:
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY || 'test_key_32chars_minimum_here_must_be_long' }}
+        run: |
+          cd geosurepath-admin-api
+          npm test
+
+  build-docker:
+    needs: test-admin-api
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Build Admin API
+        uses: docker/build-push-action@v4
+        with:
+          context: ./geosurepath-admin-api
+          push: false
+      - name: Build Frontend
+        uses: docker/build-push-action@v4
+        with:
+          context: ./GeoSurePath
+          push: false

@@ -1,0 +1,14 @@
+node_modules/
+geosurepath-admin-api/node_modules/
+*.log
+.env
+!.env.example
+geosurepath-admin-api/error.log
+geosurepath-admin-api/combined.log
+logs/
+coverage/
+.nyc_output/
+dist/
+build/
+.DS_Store
+Thumbs.db

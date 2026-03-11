@@ -1,0 +1,9 @@
+node_modules/
+package-lock.json
+*.log
+.env
+.git/
+coverage/
+.nyc_output/
+*.md
+server.test.js
