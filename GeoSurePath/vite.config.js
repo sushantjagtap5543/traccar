@@ -28,7 +28,7 @@ export default defineConfig(() => ({
       manifest: {
         short_name: 'GeoSurePath',
         name: 'GeoSurePath GPS Tracking System',
-        theme_color: '#1a237e',
+        theme_color: '#0F2D5C',
         icons: [
           {
             src: 'pwa-64x64.png',

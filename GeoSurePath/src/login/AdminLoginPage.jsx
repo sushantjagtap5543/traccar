@@ -46,24 +46,47 @@ const AdminLoginPage = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [step, setStep] = useState(1); // 1: Credentials, 2: 2FA
+    const [step, setStep] = useState(1); // 1: Credentials, 2: 2FA (TOTP mockup)
 
-    const handleLogin = (e) => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+
+    const API_BASE = import.meta.env.VITE_ADMIN_API_URL || `http://${window.location.hostname}:8083`;
+
+    const handleLogin = async (e) => {
         e.preventDefault();
+        setError(null);
         setLoading(true);
-        setTimeout(() => {
+        try {
+            const response = await fetch(`${API_BASE}/api/admin/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                localStorage.setItem('adminToken', data.token);
+                setStep(2); // Proceed to mock 2FA
+            } else {
+                throw new Error(data.error || 'Authentication failed');
+            }
+        } catch (err) {
+            setError(err.message);
+        } finally {
             setLoading(false);
-            setStep(2);
-        }, 1500);
+        }
     };
 
     const handle2FA = (e) => {
         e.preventDefault();
         setLoading(true);
+        // TOTP is simulated as requested in the plan (Step 13)
         setTimeout(() => {
             setLoading(false);
             navigate('/admin/dashboard');
-        }, 1500);
+        }, 800);
     };
 
     return (
@@ -89,6 +112,8 @@ const AdminLoginPage = () => {
                         </Box>
                     </Box>
 
+                    {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
                     {step === 1 ? (
                         <Box component="form" onSubmit={handleLogin}>
                             <Stack spacing={2.5}>
@@ -96,6 +121,8 @@ const AdminLoginPage = () => {
                                     fullWidth
                                     label="Admin Email"
                                     variant="outlined"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
                                     required
                                 />
                                 <TextField
@@ -103,6 +130,8 @@ const AdminLoginPage = () => {
                                     label="Security Password"
                                     type={showPassword ? 'text' : 'password'}
                                     variant="outlined"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
                                     required
                                     InputProps={{
                                         endAdornment: (

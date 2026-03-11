@@ -70,6 +70,7 @@ const AdminDashboardPage = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [webhookUrl, setWebhookUrl] = useState('');
   const [networkHistory, setNetworkHistory] = useState([]);
+  const API_BASE = import.meta.env.VITE_ADMIN_API_URL || `http://${window.location.hostname}:8083`;
 
   // Access Control
   useEffect(() => {
@@ -80,14 +81,18 @@ const AdminDashboardPage = () => {
 
   const fetchStats = async () => {
     try {
-      const apiKey = import.meta.env.VITE_ADMIN_API_KEY || 'your_default_key_during_dev';
-      const headers = { 'x-api-key': apiKey };
+      const apiKey = import.meta.env.VITE_ADMIN_API_KEY;
+      const adminToken = localStorage.getItem('adminToken');
+      const headers = {
+        'x-api-key': apiKey,
+        ...(adminToken && { 'x-admin-token': adminToken })
+      };
 
       const [healthRes, logsRes, traccarRes, tablesRes] = await Promise.all([
-        fetch(`http://${window.location.hostname}:8083/api/admin/health`, { headers }),
-        fetch(`http://${window.location.hostname}:8083/api/admin/logs`, { headers }),
-        fetch(`http://${window.location.hostname}:8083/api/admin/traccar/status`, { headers }),
-        fetch(`http://${window.location.hostname}:8083/api/admin/db/tables`, { headers })
+        fetch(`${API_BASE}/api/admin/health`, { headers }),
+        fetch(`${API_BASE}/api/admin/logs`, { headers }),
+        fetch(`${API_BASE}/api/admin/traccar/status`, { headers }),
+        fetch(`${API_BASE}/api/admin/db/tables`, { headers })
       ]);
 
       if (healthRes.ok) {
@@ -135,9 +140,13 @@ const AdminDashboardPage = () => {
     setActionLoading(service);
     try {
       const apiKey = import.meta.env.VITE_ADMIN_API_KEY;
-      const response = await fetch(`http://${window.location.hostname}:8083/api/admin/restart/${service}`, {
+      const adminToken = localStorage.getItem('adminToken');
+      const response = await fetch(`${API_BASE}/api/admin/restart/${service}`, {
         method: 'POST',
-        headers: { 'x-api-key': apiKey }
+        headers: {
+          'x-api-key': apiKey,
+          ...(adminToken && { 'x-admin-token': adminToken })
+        }
       });
       if (response.ok) {
         setSnackbar({ open: true, message: `${service} restart signal sent.`, severity: 'success' });
@@ -157,9 +166,13 @@ const AdminDashboardPage = () => {
     setActionLoading('backup');
     try {
       const apiKey = import.meta.env.VITE_ADMIN_API_KEY;
-      const response = await fetch(`http://${window.location.hostname}:8083/api/admin/backup`, {
+      const adminToken = localStorage.getItem('adminToken');
+      const response = await fetch(`${API_BASE}/api/admin/backup`, {
         method: 'POST',
-        headers: { 'x-api-key': apiKey }
+        headers: {
+          'x-api-key': apiKey,
+          ...(adminToken && { 'x-admin-token': adminToken })
+        }
       });
       if (response.ok) {
         setSnackbar({ open: true, message: 'Database backup initiated.', severity: 'success' });
@@ -176,11 +189,13 @@ const AdminDashboardPage = () => {
     setActionLoading('webhook');
     try {
       const apiKey = import.meta.env.VITE_ADMIN_API_KEY;
-      const response = await fetch(`http://${window.location.hostname}:8083/api/admin/alerts/config`, {
+      const adminToken = localStorage.getItem('adminToken');
+      const response = await fetch(`${API_BASE}/api/admin/alerts/config`, {
         method: 'POST',
         headers: {
           'x-api-key': apiKey,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...(adminToken && { 'x-admin-token': adminToken })
         },
         body: JSON.stringify({ webhookUrl })
       });

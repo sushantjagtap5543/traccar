@@ -12,6 +12,8 @@ const redis = require('redis');
 const Redis = require('ioredis');
 const { RedisStore } = require('rate-limit-redis');
 const Joi = require('joi');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const swaggerJsDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const axios = require('axios');
@@ -159,22 +161,55 @@ app.use(cors({
 }));
 
 // --- AUTHENTICATION MIDDLEWARE ---
-const authenticate = (req, res, next) => {
-  const apiKey = req.headers['x-api-key'];
-  const expectedKey = process.env.ADMIN_API_KEY;
+const verifyAdminToken = (req, res, next) => {
+  const token = req.headers['x-admin-token'];
+  if (!token) return res.status(403).json({ error: 'No token provided' });
 
-  if (!expectedKey) {
-    logger.warn('ADMIN_API_KEY not set in environment. Access denied.');
+  jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret', (err, decoded) => {
+    if (err || decoded.role !== 'admin') {
+      logger.warn(`Invalid JWT attempt from ${req.ip}`);
+      return res.status(403).json({ error: 'Unauthorized session' });
+    }
+    req.admin = decoded;
+    next();
+  });
+};
+
+const adminAuth = (req, res, next) => {
+  const apiKey = req.headers['x-api-key'];
+  if (apiKey && apiKey === expectedKey) return next();
+  return verifyAdminToken(req, res, next);
+};
+
+// --- AUTH ENDPOINTS ---
+app.post('/api/admin/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@geosurepath.com';
+  const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
+
+  if (email !== adminEmail) {
+    logger.warn(`Failed login attempt for email: ${email}`);
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+
+  // If no hash is set, we block (prevents default login in production without config)
+  if (!adminPasswordHash && process.env.NODE_ENV === 'production') {
+    logger.error('ADMIN_PASSWORD_HASH not set in production. Login blocked.');
     return res.status(500).json({ error: 'Server configuration error' });
   }
 
-  if (apiKey && apiKey === expectedKey) {
-    next();
-  } else {
-    logger.warn(`Unauthorized access attempt from ${req.ip}`);
-    res.status(403).json({ error: 'Unauthorized' });
+  // Development fallback/Test support: if hash is missing in non-prod, we might have a problem or just use a default for dev?
+  // User instructions say use bcrypt.
+  const isValid = adminPasswordHash ? await bcrypt.compare(password, adminPasswordHash) : (password === 'admin123' && process.env.NODE_ENV !== 'production');
+
+  if (!isValid) {
+    logger.warn(`Invalid password for admin email: ${email}`);
+    return res.status(401).json({ error: 'Invalid credentials' });
   }
-};
+
+  const token = jwt.sign({ role: 'admin', email }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '30m' });
+  res.json({ token });
+});
 
 /**
  * @openapi
@@ -185,7 +220,7 @@ const authenticate = (req, res, next) => {
  *       200:
  *         description: System metrics and service status
  */
-app.get('/api/admin/health', authenticate, async (req, res) => {
+app.get('/api/admin/health', adminAuth, async (req, res) => {
   try {
     const cpu = await si.currentLoad();
     const mem = await si.mem();
@@ -261,7 +296,7 @@ app.get('/api/admin/health', authenticate, async (req, res) => {
  *   get:
  *     summary: Retrieve recent system logs
  */
-app.get('/api/admin/logs', authenticate, (req, res) => {
+app.get('/api/admin/logs', adminAuth, (req, res) => {
   const logPath = path.join(__dirname, 'combined.log');
   if (!fs.existsSync(logPath)) return res.json({ logs: ['No logs found.'] });
 
@@ -275,7 +310,7 @@ app.get('/api/admin/logs', authenticate, (req, res) => {
  *   get:
  *     summary: Get database table statistics
  */
-app.get('/api/admin/db/tables', authenticate, async (req, res) => {
+app.get('/api/admin/db/tables', adminAuth, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT table_name, 
@@ -299,7 +334,7 @@ app.get('/api/admin/db/tables', authenticate, async (req, res) => {
  *   get:
  *     summary: Get detailed Redis information
  */
-app.get('/api/admin/redis/info', authenticate, async (req, res) => {
+app.get('/api/admin/redis/info', adminAuth, async (req, res) => {
   try {
     const info = await redisClient.info();
     res.json({ info });
@@ -314,7 +349,7 @@ app.get('/api/admin/redis/info', authenticate, async (req, res) => {
  *   get:
  *     summary: Get detailed uptime metrics
  */
-app.get('/api/admin/uptime', authenticate, (req, res) => {
+app.get('/api/admin/uptime', adminAuth, (req, res) => {
   const processUptime = Math.floor(process.uptime());
   const systemUptime = si.time().uptime;
 
@@ -344,7 +379,7 @@ app.get('/api/admin/uptime', authenticate, (req, res) => {
  *   post:
  *     summary: Trigger a real database backup using pg_dump
  */
-app.post('/api/admin/backup', authenticate, (req, res) => {
+app.post('/api/admin/backup', adminAuth, (req, res) => {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const filename = `backup-${timestamp}.sql`;
   const backupDir = process.env.BACKUP_DIR || path.join(__dirname, 'backups');
@@ -394,7 +429,7 @@ app.get('/metrics', async (req, res) => {
  *   get:
  *     summary: Verify Traccar backend availability
  */
-app.get('/api/admin/traccar/status', authenticate, async (req, res) => {
+app.get('/api/admin/traccar/status', adminAuth, async (req, res) => {
   try {
     const traccarUrl = process.env.TRACCAR_URL || 'http://localhost:8082';
     const response = await axios.get(`${traccarUrl}/api/server`, { timeout: 3000 });
@@ -417,7 +452,7 @@ app.get('/api/admin/traccar/status', authenticate, async (req, res) => {
  *           type: string
  *           enum: [traccar, database, backend, cache]
  */
-app.post('/api/admin/restart/:service', authenticate, (req, res) => {
+app.post('/api/admin/restart/:service', adminAuth, (req, res) => {
   const { error } = restartSchema.validate(req.params);
   if (error) {
     return res.status(400).json({ error: error.details[0].message });
@@ -458,14 +493,65 @@ app.post('/api/admin/restart/:service', authenticate, (req, res) => {
  *   post:
  *     summary: Configure the emergency alert webhook
  */
-app.post('/api/admin/alerts/config', authenticate, (req, res) => {
+app.post('/api/admin/alerts/config', adminAuth, (req, res) => {
   const { webhookUrl } = req.body;
   if (!webhookUrl || !webhookUrl.startsWith('http')) {
     return res.status(400).json({ error: 'Invalid webhook URL' });
   }
   ALERT_WEBHOOK = webhookUrl;
   logger.info(`Emergency webhook configured: ${webhookUrl}`);
-  res.json({ message: 'Alerting system updated.' });
+  res.json({ message: 'Alerting system updated.', url: ALERT_WEBHOOK });
+});
+
+// --- OTP AUTHENTICATION (REDIS BACKED) ---
+/**
+ * @openapi
+ * /api/auth/send-otp:
+ *   post:
+ *     summary: Generate and send a verification OTP
+ */
+app.post('/api/auth/send-otp', async (req, res) => {
+  const { mobile } = req.body;
+  if (!mobile) return res.status(400).json({ error: 'Mobile number required' });
+
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  try {
+    // Store in Redis with 5 minute expiry
+    await redisClient.set(`otp:${mobile}`, code, { EX: 300 });
+
+    // In a real app, you would call Twilio/SendGrid here.
+    // For this implementation, we log it so the developer can see it.
+    logger.info(`[OTP] Verification code for ${mobile}: ${code}`);
+
+    res.json({ message: 'OTP sent successfully', mobile });
+  } catch (err) {
+    logger.error('Redis OTP Storage Failed:', err);
+    res.status(500).json({ error: 'Failed to generate OTP' });
+  }
+});
+
+/**
+ * @openapi
+ * /api/auth/verify-otp:
+ *   post:
+ *     summary: Verify an OTP code
+ */
+app.post('/api/auth/verify-otp', async (req, res) => {
+  const { mobile, code } = req.body;
+  if (!mobile || !code) return res.status(400).json({ error: 'Mobile and code required' });
+
+  try {
+    const storedCode = await redisClient.get(`otp:${mobile}`);
+    if (storedCode === code) {
+      await redisClient.del(`otp:${mobile}`);
+      res.json({ success: true, message: 'OTP verified' });
+    } else {
+      res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
+    }
+  } catch (err) {
+    logger.error('Redis OTP Retrieval Failed:', err);
+    res.status(500).json({ error: 'Verification failed' });
+  }
 });
 
 // --- EMERGENCY NOTIFICATION DISPATCHER ---

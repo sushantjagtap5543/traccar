@@ -60,6 +60,8 @@ const RegisterPage = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [vehicles, setVehicles] = useState([{ name: '', number: '', imei: '' }]);
 
+  const API_BASE = import.meta.env.VITE_ADMIN_API_URL || `http://${window.location.hostname}:8083`;
+
   const handleAddVehicle = () => {
     setVehicles([...vehicles, { name: '', number: '', imei: '' }]);
   };
@@ -76,10 +78,24 @@ const RegisterPage = () => {
     setVehicles(newVehicles);
   };
 
-  const handleSendOtp = () => {
+  const handleSendOtp = async () => {
     if (mobile.length >= 10) {
-      setOtpSent(true);
       setErrorMessage('');
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/send-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mobile })
+        });
+        if (res.ok) {
+          setOtpSent(true);
+        } else {
+          const data = await res.json();
+          throw new Error(data.error || 'Failed to send OTP');
+        }
+      } catch (err) {
+        setErrorMessage(err.message);
+      }
     } else {
       setErrorMessage('Enter valid mobile number for OTP');
     }
@@ -89,17 +105,29 @@ const RegisterPage = () => {
     event.preventDefault();
     setErrorMessage('');
 
-    if (otp !== '1234') {
-      setErrorMessage('Invalid OTP. Use 1234 for testing.');
+    // Real OTP verification
+    try {
+      const verifyRes = await fetch(`${API_BASE}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile, code: otp })
+      });
+      if (!verifyRes.ok) {
+        const data = await verifyRes.json();
+        setErrorMessage(data.error || 'Invalid OTP');
+        return;
+      }
+    } catch (err) {
+      setErrorMessage('Verification server unreachable');
       return;
     }
 
     const IndianPlateRegex = /^[A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{4}$/i;
     for (const v of vehicles) {
-       if (!IndianPlateRegex.test(v.number)) {
-         setErrorMessage(`Invalid Indian Vehicle Number format for ${v.number}. Eg: MH12AB1234`);
-         return;
-       }
+      if (!IndianPlateRegex.test(v.number)) {
+        setErrorMessage(`Invalid Indian Vehicle Number format for ${v.number}. Eg: MH12AB1234`);
+        return;
+      }
     }
 
     const name = `${firstName} ${lastName}`.trim();
@@ -150,21 +178,21 @@ const RegisterPage = () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-               deviceId: device.id,
-               type: 'custom',
-               attributes: { data: 'SERVER,0,3.108.114.12,5023,0#' }
+              deviceId: device.id,
+              type: 'custom',
+              attributes: { data: 'SERVER,0,3.108.114.12,5023,0#' }
             })
           }).catch(err => console.log('Mock/Real backend command routing not supported yet', err));
         } catch (err) {
-           console.warn(`Device linking failed for ${v.name}`, err);
-           setErrorMessage(`Failed to bind device ${v.name}. Proceeding with others...`);
+          console.warn(`Device linking failed for ${v.name}`, err);
+          setErrorMessage(`Failed to bind device ${v.name}. Proceeding with others...`);
         }
       }
     }
 
     setSnackbarOpen(true);
     setTimeout(() => {
-        window.location.replace('/');
+      window.location.replace('/');
     }, 1500);
   });
 
@@ -199,7 +227,7 @@ const RegisterPage = () => {
         </Box>
 
         <TextField required type="email" label="Email ID" value={email} onChange={(e) => setEmail(e.target.value)} />
-        
+
         <Box className={classes.row}>
           <TextField required label="Mobile Number" value={mobile} onChange={(e) => setMobile(e.target.value)} fullWidth />
           <Button variant="contained" onClick={handleSendOtp} disabled={otpSent || mobile.length < 10}>
@@ -213,18 +241,18 @@ const RegisterPage = () => {
 
         <Typography variant="subtitle2" sx={{ mt: 2 }}>Vehicle Information</Typography>
         {vehicles.map((v, index) => (
-           <Box key={index} sx={{ border: '1px solid #ddd', padding: 2, borderRadius: 1, mb: 2 }}>
-              <Box className={classes.row} sx={{ mb: 2 }}>
-                <TextField required label="Vehicle Model (e.g. Swift)" value={v.name} onChange={(e) => handleVehicleChange(index, 'name', e.target.value)} fullWidth />
-                <TextField required label="Vehicle Number" placeholder="MH12AB1234" value={v.number} onChange={(e) => handleVehicleChange(index, 'number', e.target.value.toUpperCase())} fullWidth />
-              </Box>
-              <Box className={classes.row} sx={{ alignItems: 'center' }}>
-                 <TextField required label="Device IMEI" value={v.imei} onChange={(e) => handleVehicleChange(index, 'imei', e.target.value)} fullWidth />
-                 {vehicles.length > 1 && (
-                    <Button variant="text" color="error" onClick={() => handleRemoveVehicle(index)}>Remove</Button>
-                 )}
-              </Box>
-           </Box>
+          <Box key={index} sx={{ border: '1px solid #ddd', padding: 2, borderRadius: 1, mb: 2 }}>
+            <Box className={classes.row} sx={{ mb: 2 }}>
+              <TextField required label="Vehicle Model (e.g. Swift)" value={v.name} onChange={(e) => handleVehicleChange(index, 'name', e.target.value)} fullWidth />
+              <TextField required label="Vehicle Number" placeholder="MH12AB1234" value={v.number} onChange={(e) => handleVehicleChange(index, 'number', e.target.value.toUpperCase())} fullWidth />
+            </Box>
+            <Box className={classes.row} sx={{ alignItems: 'center' }}>
+              <TextField required label="Device IMEI" value={v.imei} onChange={(e) => handleVehicleChange(index, 'imei', e.target.value)} fullWidth />
+              {vehicles.length > 1 && (
+                <Button variant="text" color="error" onClick={() => handleRemoveVehicle(index)}>Remove</Button>
+              )}
+            </Box>
+          </Box>
         ))}
 
         <Button variant="outlined" onClick={handleAddVehicle} sx={{ mb: 2 }}>
