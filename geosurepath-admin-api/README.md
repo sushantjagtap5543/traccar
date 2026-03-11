@@ -1,4 +1,4 @@
-# GeoSurePath Admin API v3.5
+# GeoSurePath Admin API v3.6
 
 High-performance, secure DevOps API for monitoring and managing GeoSurePath GPS infrastructure.
 
@@ -12,6 +12,9 @@ High-performance, secure DevOps API for monitoring and managing GeoSurePath GPS 
   - API Key Auth (Min 32 chars enforced).
   - Rate Limiting (Redis-backed for horizontal scaling).
   - Joi schema validation.
+- **Monitoring Stack**:
+  - Prometheus `/metrics` endpoint built-in.
+  - Grafana ready (Dockerized).
 
 ## API Endpoints (Auth Required)
 
@@ -22,11 +25,12 @@ High-performance, secure DevOps API for monitoring and managing GeoSurePath GPS 
 - **`GET /api/admin/redis/info`**: Detailed Redis engine metrics.
 - **`GET /api/admin/traccar/status`**: Core Traccar service reachability.
 - **`GET /api/admin/uptime`**: Process & System uptime.
+- **`GET /metrics`**: Prometheus-standard telemetry (CPU/RAM/DB).
 
 ### ⚙️ Management
 - **`POST /api/admin/restart/:service`**: Restart `traccar`, `database`, `backend`, or `cache`.
 - **`POST /api/admin/alerts/config`**: Set emergency webhook URL.
-- **`POST /api/admin/backup`**: (Coming soon) Trigger DB backup.
+- **`POST /api/admin/backup`**: Trigger real-time `pg_dump` snapshot.
 
 ## Setup
 1. `npm install`
@@ -40,3 +44,5 @@ High-performance, secure DevOps API for monitoring and managing GeoSurePath GPS 
 - `REDIS_URL`: Redis connection string.
 - `TRACCAR_URL`: URL to the Traccar instance.
 - `ALERT_WEBHOOK`: Optional Slack/Discord webhook for alerts.
+- `BACKUP_DIR`: Directory for DB snapshots (default: `/app/backups`).
+- `PUBLIC_URL`: Public-facing URL for Swagger docs.

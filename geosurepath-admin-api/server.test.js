@@ -11,6 +11,18 @@ jest.mock('child_process');
 jest.mock('systeminformation');
 jest.mock('axios');
 jest.mock('fs');
+jest.mock('morgan', () => () => (req, res, next) => next());
+jest.mock('prom-client', () => ({
+    Registry: jest.fn().mockImplementation(() => ({
+        registerMetric: jest.fn(),
+        metrics: jest.fn().mockResolvedValue('metrics'),
+        contentType: 'text/plain'
+    })),
+    collectDefaultMetrics: jest.fn(),
+    Gauge: jest.fn().mockImplementation(() => ({
+        set: jest.fn()
+    }))
+}));
 jest.mock('redis', () => ({
     createClient: jest.fn().mockReturnValue({
         on: jest.fn(),
@@ -26,16 +38,14 @@ jest.mock('ioredis', () => {
     }));
 });
 
+// Mock environment
+const API_KEY = 'test_key_32chars_minimum_here_must_be_long_entropy';
+process.env.ADMIN_API_KEY = API_KEY;
+process.env.NODE_ENV = 'test';
+
 const app = require('./server');
 
 describe('GeoSurePath Admin API', () => {
-    const API_KEY = 'test_key_32chars_minimum_here_must_be_long';
-
-    beforeAll(() => {
-        process.env.ADMIN_API_KEY = API_KEY;
-        process.env.NODE_ENV = 'test';
-    });
-
     describe('GET /api/admin/health', () => {
         it('should return 403 without API key', async () => {
             const res = await request(app).get('/api/admin/health');
@@ -57,7 +67,8 @@ describe('GeoSurePath Admin API', () => {
                 .set('x-api-key', API_KEY);
 
             expect(res.statusCode).toBe(200);
-            expect(res.body).toHaveProperty('cpu');
+            expect(res.body.cpu).toBe('10.00');
+            expect(res.body.database.storage).toBe('10 MB');
         });
     });
 
@@ -71,25 +82,57 @@ describe('GeoSurePath Admin API', () => {
     });
 
     describe('GET /api/admin/uptime', () => {
-        it('should return process and system uptime', async () => {
+        it('should return process and system uptime with correct formatting', async () => {
             const res = await request(app).get('/api/admin/uptime').set('x-api-key', API_KEY);
-            expect(res.body.process).toHaveProperty('formatted');
+            expect(res.statusCode).toBe(200);
+            expect(res.body.process).toHaveProperty('uptime');
+            expect(typeof res.body.process.uptime).toBe('number');
+            expect(res.body.process.formatted).toMatch(/\d+h \d+m \d+s/);
+            expect(res.body.system).toHaveProperty('uptime');
+            expect(typeof res.body.system.uptime).toBe('number');
         });
     });
 
     describe('POST /api/admin/backup', () => {
-        it('should trigger backup script', async () => {
+        it('should trigger backup script and return filename', async () => {
             exec.mockImplementation((cmd, cb) => cb(null, 'ok', ''));
             const res = await request(app).post('/api/admin/backup').set('x-api-key', API_KEY);
+            expect(res.statusCode).toBe(200);
             expect(res.body.message).toContain('successfully');
+            expect(res.body.filename).toMatch(/backup-.*\.sql/);
+        });
+    });
+
+    describe('POST /api/admin/alerts/config', () => {
+        it('should update webhook URL with valid input', async () => {
+            const validUrl = 'https://hooks.slack.com/services/123';
+            const res = await request(app)
+                .post('/api/admin/alerts/config')
+                .set('x-api-key', API_KEY)
+                .send({ webhookUrl: validUrl });
+
+            expect(res.statusCode).toBe(200);
+            expect(res.body.message).toContain('updated');
+            expect(res.body.url).toBe(validUrl);
+        });
+
+        it('should return 400 for invalid URL', async () => {
+            const res = await request(app)
+                .post('/api/admin/alerts/config')
+                .set('x-api-key', API_KEY)
+                .send({ webhookUrl: 'not-a-url' });
+
+            expect(res.statusCode).toBe(400);
         });
     });
 
     describe('GET /api/admin/traccar/status', () => {
         it('should check traccar version', async () => {
-            axios.get.mockResolvedValue({ data: { version: '5' } });
+            axios.get.mockResolvedValue({ data: { version: '5.12' } });
             const res = await request(app).get('/api/admin/traccar/status').set('x-api-key', API_KEY);
+            expect(res.statusCode).toBe(200);
             expect(res.body.status).toBe('REACHABLE');
+            expect(res.body.version).toBe('5.12');
         });
     });
 
@@ -97,7 +140,8 @@ describe('GeoSurePath Admin API', () => {
         it('should restart backend services', async () => {
             exec.mockImplementation((cmd, cb) => cb(null, 'ok', ''));
             const res = await request(app).post('/api/admin/restart/traccar').set('x-api-key', API_KEY);
-            expect(res.body.message).toContain('Successfully restarted');
+            expect(res.statusCode).toBe(200);
+            expect(res.body.message).toContain('Successfully restarted traccar');
         });
     });
 });

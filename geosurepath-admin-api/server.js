@@ -43,13 +43,18 @@ const restartSchema = Joi.object({
 // --- SWAGGER CONFIGURATION ---
 const swaggerOptions = {
   swaggerDefinition: {
-    openapi: '3.0.0',
+    openapi: '3.1.0',
     info: {
       title: 'GeoSurePath Admin API',
-      version: '3.0.0',
-      description: 'Enterprise Ops API for GeoSurePath Infrastructure',
+      version: '3.6.0',
+      description: 'Enterprise API for GeoSurePath Infrastructure Monitoring',
     },
-    servers: [{ url: process.env.PUBLIC_URL || `http://localhost:${PORT}` }],
+    servers: [
+      {
+        url: process.env.PUBLIC_URL || `http://localhost:${PORT}`,
+        description: 'Production Admin Server',
+      },
+    ],
     components: {
       securitySchemes: {
         ApiKeyAuth: {
@@ -342,7 +347,7 @@ app.get('/api/admin/uptime', authenticate, (req, res) => {
 app.post('/api/admin/backup', authenticate, (req, res) => {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const filename = `backup-${timestamp}.sql`;
-  const backupDir = path.join(__dirname, 'backups');
+  const backupDir = process.env.BACKUP_DIR || path.join(__dirname, 'backups');
   if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir);
   const filePath = path.join(backupDir, filename);
 

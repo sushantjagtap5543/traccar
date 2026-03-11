@@ -3,14 +3,16 @@ services:
     image: postgres:15-alpine
     restart: always
     environment:
-      POSTGRES_DB: traccar
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      - POSTGRES_DB=traccar
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
+    ports:
+      - "5432:5432"
 
   redis:
     image: redis:7-alpine
@@ -54,12 +56,24 @@ services:
       - ./geosurepath-admin-api/logs:/app/logs
       - ./backups:/app/backups
     environment:
-      DATABASE_URL: postgres://postgres:${DB_PASSWORD}@db:5432/traccar
+      - DATABASE_URL=postgres://postgres:${DB_PASSWORD}@db:5432/traccar
 
   frontend:
     build:
       context: ./GeoSurePath
     ports:
-      - "80:80"
+      - "3000:3000"
+    environment:
+      - VITE_ADMIN_API_KEY=${ADMIN_API_KEY}
+    depends_on:
+      - admin-api
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    restart: always
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${DB_PASSWORD}
     depends_on:
       - admin-api
