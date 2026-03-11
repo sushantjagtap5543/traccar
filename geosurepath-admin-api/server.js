@@ -12,6 +12,11 @@ const Joi = require('joi');
 const app = express();
 const PORT = process.env.PORT || 8083;
 
+// --- Joi Validation Schemas ---
+const restartSchema = Joi.object({
+  service: Joi.string().valid('traccar', 'database', 'backend', 'cache').required()
+});
+
 // --- LOGGING CONFIGURATION ---
 const logger = winston.createLogger({
   level: 'info',
@@ -88,11 +93,13 @@ app.get('/api/admin/health', authenticate, async (req, res) => {
     const start = Date.now();
     let dbStatus = 'OFFLINE';
     let dbLatency = 0;
+    let dbSize = 'Unknown';
     try {
-      const dbRes = await pool.query('SELECT 1');
+      const dbRes = await pool.query('SELECT pg_size_pretty(pg_database_size(current_database())) as size');
       if (dbRes.rowCount === 1) {
         dbStatus = 'ONLINE';
         dbLatency = Date.now() - start;
+        dbSize = dbRes.rows[0].size;
       }
     } catch (err) {
       logger.error('Database Health Check Failed:', err);
@@ -119,7 +126,7 @@ app.get('/api/admin/health', authenticate, async (req, res) => {
       database: {
         status: dbStatus,
         latency: dbLatency,
-        storage: 'Connected'
+        storage: dbSize
       },
       timestamp: new Date().toISOString()
     });
@@ -130,14 +137,13 @@ app.get('/api/admin/health', authenticate, async (req, res) => {
 });
 
 // --- ONE-CLICK FIXES (SANITIZED) ---
-const allowedServices = ['traccar', 'database', 'backend', 'cache'];
-
 app.post('/api/admin/restart/:service', authenticate, (req, res) => {
-  const { service } = req.params;
-
-  if (!allowedServices.includes(service)) {
-    return res.status(400).json({ error: 'Invalid service specified' });
+  const { error } = restartSchema.validate(req.params);
+  if (error) {
+    return res.status(400).json({ error: error.details[0].message });
   }
+
+  const { service } = req.params;
 
   let command = '';
   switch (service) {
@@ -172,6 +178,23 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   logger.info(`GeoSurePath Admin API running on port ${PORT}`);
 });
+
+// --- GRACEFUL SHUTDOWN ---
+const gracefulShutdown = () => {
+  logger.info('Shutting down gracefully...');
+  server.close(() => {
+    logger.info('HTTP server closed.');
+    pool.end(() => {
+      logger.info('Database pool closed.');
+      process.exit(0);
+    });
+  });
+};
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+
+module.exports = app;
