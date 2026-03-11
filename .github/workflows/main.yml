@@ -1,0 +1,43 @@
+name: GeoSurePath CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-admin-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: |
+          cd geosurepath-admin-api
+          npm install
+      - name: Run Tests
+        run: |
+          cd geosurepath-admin-api
+          npm test
+          
+  build-and-push:
+    needs: test-admin-api
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push Admin API
+        uses: docker/build-push-action@v4
+        with:
+          context: ./geosurepath-admin-api
+          push: true
+          tags: user/geosurepath-admin-api:latest
