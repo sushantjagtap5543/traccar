@@ -1,11 +1,11 @@
 node_modules/
 geosurepath-admin-api/node_modules/
+GeoSurePath/node_modules/
 *.log
 .env
 !.env.example
-geosurepath-admin-api/error.log
-geosurepath-admin-api/combined.log
 logs/
+backups/
 coverage/
 .nyc_output/
 dist/

@@ -1,11 +1,14 @@
 #!/bin/sh
+set -e
+
 # Substitute environment variables in traccar.xml template
-# We expect traccar.xml to have ${VAR} placeholders
-# In a real setup, we might copy a template to the final location
-# For this task, we assume traccar.xml is the template or used directly if environment supports it.
+# traccar.xml.template should be at /app/traccar.xml.template
+# output will be at /opt/traccar/conf/traccar.xml
 
-# If we were using envsubst, it would look like this:
-# envsubst < /app/traccar.xml > /opt/traccar/conf/traccar.xml
+if [ -f "/app/traccar.xml.template" ]; then
+    echo "⚙️ Substituting environment variables in traccar.xml.template..."
+    envsubst < /app/traccar.xml.template > /app/traccar.xml
+    # If this is for the traccar container specifically, it might need to go to /opt/traccar/conf/
+fi
 
-# For now, we'll just start the app as requested by the user's logic
 exec "$@"

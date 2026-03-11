@@ -15,6 +15,7 @@ const Joi = require('joi');
 const swaggerJsDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const axios = require('axios');
+const promClient = require('prom-client');
 const fs = require('fs');
 const path = require('path');
 
@@ -132,6 +133,14 @@ const limiter = rateLimit({
   }),
 });
 app.use(limiter);
+
+// --- METRICS CONFIGURATION ---
+const registry = new promClient.Registry();
+promClient.collectDefaultMetrics({ register: registry });
+const cpuMetric = new promClient.Gauge({ name: 'cpu_load', help: 'Current CPU Load percentage' });
+const ramMetric = new promClient.Gauge({ name: 'ram_percent', help: 'Current RAM usage percentage' });
+registry.registerMetric(cpuMetric);
+registry.registerMetric(ramMetric);
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:3000', 'http://localhost:5173'];
 app.use(cors({
@@ -328,20 +337,50 @@ app.get('/api/admin/uptime', authenticate, (req, res) => {
  * @openapi
  * /api/admin/backup:
  *   post:
- *     summary: Trigger a database backup
+ *     summary: Trigger a real database backup using pg_dump
  */
 app.post('/api/admin/backup', authenticate, (req, res) => {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const filename = `backup-${timestamp}.sql`;
-  const filePath = path.join(__dirname, 'logs', filename); // Saving in logs for simplicity
+  const backupDir = path.join(__dirname, 'backups');
+  if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir);
+  const filePath = path.join(backupDir, filename);
 
-  // In a real Docker setup, we'd use pg_dump
-  // command = `pg_dump ${process.env.DATABASE_URL} > ${filePath}`;
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) return res.status(500).json({ error: 'DATABASE_URL not configured' });
 
-  logger.info(`Backup requested: ${filename}`);
+  const cmd = `pg_dump "${dbUrl}" -f "${filePath}"`;
 
-  // Mocking success since pg_dump might not be in the dev environment
-  res.json({ message: 'Backup initiated.', filename });
+  logger.info(`Starting DB backup: ${filename}`);
+
+  exec(cmd, (error, stdout, stderr) => {
+    if (error) {
+      logger.error(`Backup failed: ${error.message}`);
+      return res.status(500).json({ error: 'Backup failed', details: stderr });
+    }
+    logger.info(`Backup completed: ${filename}`);
+    res.json({ message: 'Backup completed successfully', filename });
+  });
+});
+
+/**
+ * @openapi
+ * /metrics:
+ *   get:
+ *     summary: Prometheus metrics endpoint
+ */
+app.get('/metrics', async (req, res) => {
+  try {
+    const cpu = await si.currentLoad();
+    const mem = await si.mem();
+    cpuMetric.set(cpu.currentLoad);
+    ramMetric.set((mem.active / mem.total) * 100);
+
+    res.set('Content-Type', registry.contentType);
+    res.end(await registry.metrics());
+  } catch (err) {
+    res.status(500).end(err);
+  }
 });
 
 /**
@@ -476,16 +515,22 @@ const server = app.listen(PORT, () => {
 });
 
 // --- GRACEFUL SHUTDOWN ---
-const gracefulShutdown = () => {
-  logger.info('Shutting down gracefully...');
-  server.close(() => {
+const gracefulShutdown = async (signal) => {
+  logger.info(`${signal} received. Starting graceful shutdown...`);
+  server.close(async () => {
     logger.info('HTTP server closed.');
-    Promise.all([
-      pool.end().then(() => logger.info('Database pool closed.')),
-      redisClient.quit().then(() => logger.info('Redis connection closed.'))
-    ]).then(() => {
+    try {
+      await Promise.all([
+        pool.end(),
+        redisClient.quit(),
+        ioRedisClient.quit()
+      ]);
+      logger.info('Database and Redis connections closed.');
       process.exit(0);
-    });
+    } catch (err) {
+      logger.error('Error during shutdown:', err);
+      process.exit(1);
+    }
   });
 };
 
