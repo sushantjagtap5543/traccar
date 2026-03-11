@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  traccar:
+    image: traccar/traccar:latest
+    ports:
+      - "8082:8082"
+      - "5000-5150:5000-5150"
+    volumes:
+      - ./traccar.xml:/opt/traccar/conf/traccar.xml:ro
+    depends_on:
+      - db
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: traccar
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  admin-api:
+    build: ./geosurepath-admin-api
+    ports:
+      - "8083:8083"
+    environment:
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/traccar
+    depends_on:
+      - db
+
+  frontend:
+    build: ./GeoSurePath
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_ADMIN_API_KEY=${ADMIN_API_KEY}
+
+volumes:
+  postgres_data:
