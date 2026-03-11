@@ -3,5 +3,5 @@ datasources:
   - name: Prometheus
     type: prometheus
     access: proxy
-    url: http://admin-api:8083
+    url: http://prometheus:9090
     isDefault: true

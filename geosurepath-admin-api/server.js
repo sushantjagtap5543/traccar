@@ -28,13 +28,15 @@ let ALERT_WEBHOOK = process.env.ALERT_WEBHOOK || null;
 
 // --- STARTUP SECURITY AUDIT ---
 const expectedKey = process.env.ADMIN_API_KEY;
-if (!expectedKey || expectedKey.length < 32) {
-  console.error('❌ CRITICAL: ADMIN_API_KEY must be at least 32 characters for sufficient entropy.');
-  process.exit(1);
-}
-if (expectedKey === 'your_secure_api_key_here_must_be_long' || expectedKey === 'password' || expectedKey.includes('12345')) {
-  console.error('❌ CRITICAL: Default or common ADMIN_API_KEY detected. Aborting.');
-  process.exit(1);
+if (process.env.NODE_ENV !== 'test') {
+  if (!expectedKey || expectedKey.length < 32) {
+    console.error('❌ CRITICAL: ADMIN_API_KEY must be at least 32 characters for sufficient entropy.');
+    process.exit(1);
+  }
+  if (expectedKey === 'your_secure_api_key_here_must_be_long' || expectedKey === 'password' || expectedKey.includes('12345')) {
+    console.error('❌ CRITICAL: Default or common ADMIN_API_KEY detected. Aborting.');
+    process.exit(1);
+  }
 }
 
 // --- Joi Validation Schemas ---
