@@ -29,7 +29,7 @@ const getRazorpayClient = async () => {
 // 1. Create Order
 router.post('/orders', async (req, res) => {
     const { planId, userId } = req.body;
-    // planId expected: '1month', '6month', '12month'
+    // planId expected: '1month', '6month', '12month', 'enterprise'
 
     try {
         const client = await getRazorpayClient();
@@ -70,7 +70,7 @@ router.post('/verify', async (req, res) => {
         razorpay_payment_id,
         razorpay_signature,
         userId,
-        planId // '1month', '6month', '12month'
+        planId // '1month', '6month', '12month', 'enterprise'
     } = req.body;
 
     try {

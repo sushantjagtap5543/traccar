@@ -284,8 +284,12 @@ const SubscriptionPage = () => {
                                             <TableCell>
                                                 <Chip label={item.plan_id.toUpperCase()} size="small" variant="outlined" sx={{ fontWeight: 'bold', fontSize: 9 }} />
                                             </TableCell>
-                                            <TableCell fontWeight="bold">
-                                                ₹{(parseFloat(item.amount_paid) || (item.plan_id === '1month' ? 236 : (item.plan_id === '6month' ? 1121 : 1770))).toLocaleString('en-IN')}
+                                            <TableCell sx={{ color: '#0F2D5C', fontWeight: 'bold' }}>
+                                                ₹{(parseFloat(item.amount_paid) || (
+                                                item.plan_id === '1month' ? 236 :
+                                                item.plan_id === '6month' ? 1121 :
+                                                item.plan_id === 'enterprise' ? 5310 : 1770
+                                                )).toLocaleString('en-IN')}
                                             </TableCell>
                                             <TableCell>
                                                 <Typography variant="caption" fontWeight="bold" sx={{ color: item.status === 'active' ? 'success.main' : 'text.secondary' }}>
