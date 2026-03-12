@@ -88,7 +88,7 @@ const SubscriptionPage = () => {
 
     const handleDownloadPDF = (data) => {
         const doc = new jsPDF();
-        const total = parseFloat(data.amount_paid) || (data.plan_id === '1month' ? 236 : (data.plan_id === '6month' ? 1121 : 1770));
+        const total = parseFloat(data.amount_paid) || (data.plan_id === '1month' ? 236 : (data.plan_id === 'enterprise' ? 5310 : 1770));
         const base = Math.round(total / 1.18);
         const gst = total - base;
 

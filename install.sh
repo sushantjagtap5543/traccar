@@ -106,7 +106,13 @@ success "Core dependencies installed."
 
 # --- Step 3: Repository Deployment ---
 log "[Step 3/11] Deploying codebase to $APP_DIR..."
-if [ -d "$APP_DIR" ]; then
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [ -d "$SCRIPT_DIR/GeoSurePath" ] && [ -d "$SCRIPT_DIR/geosurepath-admin-api" ]; then
+    log "Using local files from $SCRIPT_DIR..."
+    mkdir -p "$APP_DIR"
+    cp -r "$SCRIPT_DIR/." "$APP_DIR/"
+elif [ -d "$APP_DIR" ]; then
     log "Deployment directory $APP_DIR already exists. Preserving local files."
     cd "$APP_DIR"
     if [ -d ".git" ]; then
@@ -119,7 +125,31 @@ else
     git clone https://github.com/sushantjagtap5543/traccar.git "$APP_DIR"
     cd "$APP_DIR"
 fi
-success "Codebase deployed."
+
+# Bug #8: Generate .env file if it doesn't exist
+if [ ! -f "$APP_DIR/.env" ]; then
+    log "Generating .env file with secure secrets..."
+    cp "$APP_DIR/.env.example" "$APP_DIR/.env" 2>/dev/null || touch "$APP_DIR/.env"
+    
+    # Generate secure random values
+    DB_PASS=$(openssl rand -hex 16)
+    ADMIN_KEY=$(openssl rand -hex 32)
+    JWT_SECRET=$(openssl rand -hex 32)
+    ENCRYPT_KEY=$(openssl rand -hex 16)
+    
+    sed -i "s/your_super_secure_db_password_here/$DB_PASS/" "$APP_DIR/.env"
+    sed -i "s/your_secure_admin_api_key_here_must_be_long_32_chars/$ADMIN_KEY/" "$APP_DIR/.env"
+    sed -i "s/your_random_jwt_secret_here_at_least_64_chars/$JWT_SECRET/" "$APP_DIR/.env"
+    sed -i "s/your_32byte_hex_key_here_replace_now/$ENCRYPT_KEY/" "$APP_DIR/.env"
+    
+    # Bug #5: Create Prometheus API key file
+    mkdir -p "$APP_DIR/prometheus"
+    echo "$ADMIN_KEY" > "$APP_DIR/prometheus/api_key.txt"
+    
+    warn ".env created with auto-generated secrets. Update RAZORPAY_KEY and TWILIO_* manually."
+fi
+
+success "Codebase deployed and environment initialized."
 
 # --- Step 4: Traccar Backend Installation ---
 log "[Step 4/11] Downloading and Installing Traccar ${TRACCAR_VERSION}..."
@@ -130,10 +160,10 @@ rm -rf traccar-installer traccar-linux-64-${TRACCAR_VERSION}.zip
 
 # Configure Traccar to use local Postgres
 sudo -u postgres psql -c "CREATE DATABASE traccar;" 2>/dev/null || true
-sudo -u postgres psql -c "CREATE USER traccar WITH PASSWORD 'traccar';" 2>/dev/null || true
+sudo -u postgres psql -c "CREATE USER traccar WITH PASSWORD '${DB_PASS:-traccar}';" 2>/dev/null || true
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE traccar TO traccar;" 2>/dev/null || true
 
-# Update traccar.xml (simplified for demo)
+# Update traccar.xml
 cat > /opt/traccar/conf/traccar.xml <<EOF
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE properties SYSTEM 'http://java.sun.com/dtd/properties.dtd'>
@@ -141,7 +171,7 @@ cat > /opt/traccar/conf/traccar.xml <<EOF
     <entry key='database.driver'>org.postgresql.Driver</entry>
     <entry key='database.url'>jdbc:postgresql://localhost:5432/traccar</entry>
     <entry key='database.user'>traccar</entry>
-    <entry key='database.password'>traccar</entry>
+    <entry key='database.password'>${DB_PASS:-traccar}</entry>
     <entry key='web.port'>8082</entry>
 </properties>
 EOF
@@ -153,6 +183,7 @@ success "Traccar Core initialized on port 8082."
 log "[Step 5/11] Building React Frontend..."
 cd "$APP_DIR/GeoSurePath"
 npm install --legacy-peer-deps
+export VITE_ADMIN_API_KEY="$ADMIN_KEY"
 export NODE_OPTIONS="--max-old-space-size=2048"
 npm run build
 success "Frontend built successfully."
@@ -160,6 +191,12 @@ success "Frontend built successfully."
 # --- Step 6: Nginx Reverse Proxy ---
 log "[Step 6/11] Configuring Nginx Reverse Proxy..."
 cat > /etc/nginx/sites-available/geosurepath <<EOF
+# Bug #4 Harmony: Use mapping for device creation intercepted by Admin API
+map \$request_method \$devices_upstream_bm {
+    POST    http://localhost:8083/api/devices;
+    default http://localhost:8082/api/devices;
+}
+
 server {
     listen 80;
     server_name _;
@@ -171,8 +208,29 @@ server {
         try_files \$uri \$uri/ /index.html;
     }
 
+    # Bug #4 Harmony: Intercept Device creation
+    location = /api/devices {
+        proxy_pass \$devices_upstream_bm;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
+    # Bug #1: WebSocket headers for live tracking
     location /api/ {
         proxy_pass http://localhost:8082/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_read_timeout 3600s;
+    }
+
+    # Bug #2: Auth and Admin API routing
+    location /api/auth/ {
+        proxy_pass http://localhost:8083/api/auth/;
         proxy_set_header Host \$host;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     }

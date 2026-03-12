@@ -37,6 +37,7 @@ services:
     restart: always
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/api_key.txt:/etc/prometheus/api_key.txt:ro
       - prometheus_data:/prometheus
     networks:
       - internal
@@ -101,9 +102,11 @@ services:
         - VITE_API_URL=/api
         - VITE_ADMIN_API_URL=/api/admin
         - VITE_ADMIN_API_KEY=${ADMIN_API_KEY}
+        - VITE_RAZORPAY_KEY=${RAZORPAY_KEY}
     environment:
       - VITE_ADMIN_API_KEY=${ADMIN_API_KEY}
       - VITE_ADMIN_API_URL=/api/admin
+      - VITE_RAZORPAY_KEY=${RAZORPAY_KEY}
     depends_on:
       admin-api:
         condition: service_healthy

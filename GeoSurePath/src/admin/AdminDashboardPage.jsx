@@ -79,18 +79,25 @@ const AdminDashboardPage = () => {
 
   // Access Control & Session Expiry
   useEffect(() => {
-    const sessionActive = localStorage.getItem('adminSessionActive');
-    if (!sessionActive) {
-      navigate('/admin');
-      return;
-    }
+    fetch(`${API_BASE}/api/admin/health`, { credentials: 'include' })
+      .then(r => { 
+        if (!r.ok) {
+          sessionStorage.removeItem('adminSessionActive');
+          navigate('/admin'); 
+        }
+      })
+      .catch(() => {
+        sessionStorage.removeItem('adminSessionActive');
+        navigate('/admin');
+      });
+  }, [API_BASE, navigate]);
 
     // Inactivity Logout (30 mins)
     let timeout;
     const resetTimer = () => {
       clearTimeout(timeout);
       timeout = setTimeout(() => {
-        localStorage.removeItem('adminSessionActive');
+        sessionStorage.removeItem('adminSessionActive');
         navigate('/admin');
       }, 1800000); // 30 minutes
     };

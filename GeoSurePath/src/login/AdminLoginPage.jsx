@@ -97,8 +97,8 @@ const AdminLoginPage = () => {
             });
             const data = await response.json();
             if (response.ok) {
-                // Move from localStorage (XSS vulnerable) to session indicator
-                localStorage.setItem('adminSessionActive', 'true');
+                // Session indicator for UI state (Real auth handled by HttpOnly cookie)
+                sessionStorage.setItem('adminSessionActive', 'true');
                 navigate('/admin/dashboard');
             } else {
                 throw new Error(data.error || 'Invalid 2FA code');

@@ -84,8 +84,7 @@ router.post('/verify', async (req, res) => {
         if (expectedSignature === razorpay_signature) {
             // Determine duration and device limit
             let months = 1;
-            if (planId === '6month') months = 6;
-            if (planId === '12month') months = 12;
+            if (planId === 'enterprise' || planId === '12month') months = 12;
 
             const expiryDate = new Date();
             expiryDate.setMonth(expiryDate.getMonth() + months);
@@ -99,8 +98,8 @@ router.post('/verify', async (req, res) => {
                 pool.query("SELECT value FROM geosurepath_settings WHERE key = $1", [priceKey])
             ]);
 
-            const deviceLimit = limitRes.rowCount > 0 ? parseInt(limitRes.rows[0].value) : 10;
-            const basePrice = priceRes.rowCount > 0 ? parseInt(priceRes.rows[0].value) : 0;
+            const deviceLimit = limitRes.rowCount > 0 ? parseInt(limitRes.rows[0].value) : (planId === 'enterprise' ? 100 : 25);
+            const basePrice = priceRes.rowCount > 0 ? parseInt(priceRes.rows[0].value) : (planId === 'enterprise' ? 4500 : 1500);
             const gst = Math.round(basePrice * 0.18);
             const totalAmount = basePrice + gst;
 
@@ -200,7 +199,7 @@ router.get('/invoice/:paymentId', async (req, res) => {
         if (result.rowCount === 0) return res.send('<h1>Invoice Not Found</h1>');
 
         const sub = result.rows[0];
-        const total = parseFloat(sub.amount_paid) || (sub.plan_id === '1month' ? 236 : (sub.plan_id === '6month' ? 1121 : 1770));
+        const total = parseFloat(sub.amount_paid) || (sub.plan_id === '1month' ? 236 : (sub.plan_id === 'enterprise' ? 5310 : 1770));
         const baseAmount = Math.round(total / 1.18);
         const gst = total - baseAmount;
 
