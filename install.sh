@@ -159,7 +159,7 @@ server {
     listen 80;
     server_name _;
 
-    root $APP_DIR/GeoSurePath/dist;
+    root $APP_DIR/GeoSurePath/build;
     index index.html;
 
     location / {
