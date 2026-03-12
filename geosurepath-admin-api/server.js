@@ -83,7 +83,7 @@ logger.info('All required environment variables are configured and validated.');
 // --- RATE LIMITING ---
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 50, // decreased from 100 for better security
   store: new RedisStore({
     sendCommand: (...args) => ioRedisClient.call(...args),
   }),
@@ -290,11 +290,14 @@ const startServer = async () => {
     logger.error('Cannot proceed with inconsistent database schema. Exiting immediately.');
     process.exit(1);
   }
+  // --- INITIALIZE EXTERNAL SERVICES ---
+  const { init } = require('./services/db');
+  await init();
 
-  // 2. Start core services
-  startMonitor();
+  // --- START BACKGROUND TASKS ---
   const { startAlertEngine } = require('./services/alertEngine');
   startAlertEngine();
+  startMonitor();
   backupService.startCron();
 
   // 3. Listen
@@ -311,13 +314,24 @@ const startServer = async () => {
     stopAlertEngine();
     backupService.stopCron();
 
+    // Set a timeout for the entire shutdown process
+    const shutdownTimeout = setTimeout(() => {
+        logger.error('Could not close connections in time, forceful shutdown');
+        process.exit(1);
+    }, 15000);
+
     server.close(async () => {
       try {
-        await Promise.all([
+        logger.info('HTTP server closed. Closing database and cache connections...');
+        
+        // Use Promise.allSettled to ensure we try to close everything even if one fails
+        await Promise.allSettled([
           pool.end(),
-          redisClient.quit(),
-          ioRedisClient.quit()
+          redisClient.quit().catch(() => redisClient.disconnect()),
+          ioRedisClient.quit().catch(() => ioRedisClient.disconnect())
         ]);
+
+        clearTimeout(shutdownTimeout);
         logger.info('Connections closed. Process exiting.');
         process.exit(0);
       } catch (err) {
@@ -325,12 +339,6 @@ const startServer = async () => {
         process.exit(1);
       }
     });
-
-    // Forced exit after 10s if graceful shutdown hangs
-    setTimeout(() => {
-        logger.error('Could not close connections in time, forceful shutdown');
-        process.exit(1);
-    }, 10000);
   };
 
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

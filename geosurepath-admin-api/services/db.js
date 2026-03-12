@@ -54,9 +54,9 @@ if (process.env.NODE_ENV !== 'production') {
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
-    max: 20, // maximum pool size
+    max: 100, // increased from 20
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    connectionTimeoutMillis: 5000, // increased from 2000
 });
 
 const connectWithRetry = async (retries = 5) => {
@@ -69,37 +69,27 @@ const connectWithRetry = async (retries = 5) => {
             await new Promise(resolve => setTimeout(resolve, 5000));
             return connectWithRetry(retries - 1);
         } else {
-            logger.error('Could not connect to database after several attempts. Exiting...');
-            process.exit(1);
+            logger.error('Could not connect to database after several attempts.');
+            throw err;
         }
     }
 };
 
-if (process.env.NODE_ENV !== 'test') {
-    (async () => {
-        try {
-            await connectWithRetry();
-            logger.info('Database initialization complete');
-        } catch (err) {
-            logger.error('Database initialization failed:', err);
-            process.exit(1);
-        }
-    })();
-}
-
 // --- REDIS (Cache) ---
 const redisClient = redis.createClient({ url: process.env.REDIS_URL });
 redisClient.on('error', (err) => logger.error('Redis Client Error:', err));
-if (process.env.NODE_ENV !== 'test') {
-    (async () => {
-        try {
-            await redisClient.connect();
-            logger.info('Redis connected successfully');
-        } catch (err) {
-            logger.error('Redis Connection Failed:', err);
-        }
-    })();
-}
+
+const init = async () => {
+    if (process.env.NODE_ENV === 'test') return;
+    try {
+        await connectWithRetry();
+        await redisClient.connect();
+        logger.info('External services initialization complete');
+    } catch (err) {
+        logger.error('Initialization failed:', err);
+        process.exit(1);
+    }
+};
 
 // --- IOREDIS (Rate Limiter) ---
 const ioRedisClient = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
@@ -107,4 +97,4 @@ const ioRedisClient = new IORedis(process.env.REDIS_URL || 'redis://localhost:63
     enableReadyCheck: false
 });
 
-module.exports = { pool, redisClient, ioRedisClient, logger };
+module.exports = { pool, redisClient, ioRedisClient, logger, init };

@@ -132,7 +132,7 @@ Ensure `UFW` allows the range `5000-5150`.
 
 ## 🔐 Maintenance & Backups
 Daily backups are stored in `/opt/geosurepath/backups`.
-- Retention: 30 days automtically.
+- Retention: 30 days automatically.
 - Manual Backup: `POST /api/admin/backup` with Master Key.
 
 ---

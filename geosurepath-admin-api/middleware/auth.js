@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { logger } = require('../services/db');
+const { logger, pool } = require('../services/db');
 
 const expectedKey = process.env.ADMIN_API_KEY;
 

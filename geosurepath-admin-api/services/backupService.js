@@ -17,6 +17,12 @@ class BackupService {
         if (!fs.existsSync(BACKUP_DIR)) {
             fs.mkdirSync(BACKUP_DIR, { recursive: true });
         }
+        try {
+            fs.accessSync(BACKUP_DIR, fs.constants.W_OK);
+            logger.info(`Backup Service initialized. Directory: ${BACKUP_DIR}`);
+        } catch (err) {
+            logger.error(`FATAL: Backup directory ${BACKUP_DIR} is not writable!`);
+        }
     }
 
     startCron() {

@@ -26,22 +26,26 @@ const getClient = () => {
         config.headers['Cookie'] = sessionCookie;
     } else {
         config.auth = {
-            username: process.env.ADMIN_EMAIL || 'admin@geosurepath.com',
-            password: process.env.TRACCAR_ADMIN_PASSWORD || 'admin'
+            username: process.env.TRACCAR_ADMIN_EMAIL || process.env.ADMIN_EMAIL,
+            password: process.env.TRACCAR_ADMIN_PASSWORD
         };
     }
 
     return axios.create(config);
 };
 
+let isRefreshing = false;
+
 const refreshSession = async () => {
+    if (isRefreshing) return;
+    isRefreshing = true;
     try {
         const client = axios.create({
             baseURL: process.env.TRACCAR_URL || 'http://traccar:8082',
             timeout: 10000,
             auth: {
-                username: process.env.ADMIN_EMAIL || 'admin@geosurepath.com',
-                password: process.env.TRACCAR_ADMIN_PASSWORD || 'admin'
+                username: process.env.TRACCAR_ADMIN_EMAIL || process.env.ADMIN_EMAIL,
+                password: process.env.TRACCAR_ADMIN_PASSWORD
             }
         });
 
@@ -58,6 +62,8 @@ const refreshSession = async () => {
         sessionCookie = null;
         sessionExpiry = null;
         return false;
+    } finally {
+        isRefreshing = false;
     }
 };
 
@@ -73,68 +79,85 @@ const processAlerts = async () => {
 
         // 1. Fetch Config
         let config;
-        const dbRes = await pool.query("SELECT value FROM geosurepath_settings WHERE key = 'alert_rules_config' LIMIT 1");
-        if (dbRes.rowCount > 0) {
-            config = JSON.parse(dbRes.rows[0].value);
-        } else {
-            const serverRes = await client.get('/api/server');
-            if (serverRes.data.attributes?.alertConfig) {
-                config = JSON.parse(serverRes.data.attributes.alertConfig);
+        try {
+            const dbRes = await pool.query("SELECT value FROM geosurepath_settings WHERE key = 'alert_rules_config' LIMIT 1");
+            if (dbRes.rowCount > 0) {
+                config = JSON.parse(dbRes.rows[0].value);
+            } else {
+                const serverRes = await client.get('/api/server');
+                if (serverRes.data.attributes?.alertConfig) {
+                    config = JSON.parse(serverRes.data.attributes.alertConfig);
+                }
             }
+        } catch (configErr) {
+            logger.error('Alert Engine: Failed to fetch rules config', configErr.message);
+            return;
         }
 
         if (!config) return;
 
         // 2. Fetch Devices & Positions (Batch)
-        const [devicesRes, positionsRes] = await Promise.all([
-            client.get('/api/devices'),
-            client.get('/api/positions')
-        ]);
+        let devicesData, positionsData;
+        try {
+            const [devicesRes, positionsRes] = await Promise.all([
+                client.get('/api/devices'),
+                client.get('/api/positions')
+            ]);
+            devicesData = devicesRes.data;
+            positionsData = positionsRes.data;
+        } catch (fetchErr) {
+            logger.error('Alert Engine: Data fetch error', fetchErr.message);
+            return;
+        }
 
-        const positionMap = new Map(positionsRes.data.map(p => [p.deviceId, p]));
+        const positionMap = new Map(positionsData.map(p => [p.deviceId, p]));
 
-        for (const device of devicesRes.data) {
-            const pos = positionMap.get(device.id);
-            if (!pos) continue;
+        for (const device of devicesData) {
+            try {
+                const pos = positionMap.get(device.id);
+                if (!pos) continue;
 
-            const alarm = pos.attributes?.alarm;
+                const alarm = pos.attributes?.alarm;
 
-            // Rule evaluation
-            if (config.overSpeed?.enabled) {
-                const speedKph = pos.speed * 1.852;
-                if (speedKph > config.overSpeed.threshold) {
-                    await sendAlert('VEHICLE_OVERSPEED', `Vehicle ${device.name} is traveling at ${speedKph.toFixed(1)} km/h.`, 'WARNING', device.id);
+                // Rule evaluation
+                if (config.overSpeed?.enabled) {
+                    const speedKph = pos.speed * 1.852;
+                    if (speedKph > config.overSpeed.threshold) {
+                        await sendAlert('VEHICLE_OVERSPEED', `Vehicle ${device.name} is traveling at ${speedKph.toFixed(1)} km/h.`, 'WARNING', device.id);
+                    }
                 }
-            }
 
-            if (config.batteryLow?.enabled && pos.attributes?.batteryLevel !== undefined) {
-                if (pos.attributes.batteryLevel < config.batteryLow.threshold) {
-                    await sendAlert('LOW_BATTERY', `Vehicle ${device.name} battery is at ${pos.attributes.batteryLevel}%.`, 'WARNING', device.id);
+                if (config.batteryLow?.enabled && pos.attributes?.batteryLevel !== undefined) {
+                    if (pos.attributes.batteryLevel < config.batteryLow.threshold) {
+                        await sendAlert('LOW_BATTERY', `Vehicle ${device.name} battery is at ${pos.attributes.batteryLevel}%.`, 'WARNING', device.id);
+                    }
                 }
-            }
 
-            if (config.powerCut?.enabled && alarm === 'powerCut') {
-                await sendAlert('POWER_CUT', `External power disconnected for vehicle ${device.name}!`, 'CRITICAL', device.id);
-            }
-
-            if (config.deviceDisconnected?.enabled && device.status === 'offline') {
-                const lastUpdate = new Date(device.lastUpdate).getTime();
-                const threshold = (config.deviceDisconnected.thresholdMinutes || 10) * 60000;
-                if (Date.now() - lastUpdate > threshold) {
-                    await sendAlert('DEVICE_OFFLINE', `Telemetry lost for vehicle ${device.name}.`, 'WARNING', device.id);
+                if (config.powerCut?.enabled && alarm === 'powerCut') {
+                    await sendAlert('POWER_CUT', `External power disconnected for vehicle ${device.name}!`, 'CRITICAL', device.id);
                 }
-            }
 
-            if (alarm === 'sos') {
-                await sendAlert('SOS_ALERT', `EMERGENCY: ${device.name} panic button activated!`, 'CRITICAL', device.id);
-            }
-            
-            // Geofence events
-            if (alarm === 'geofenceExit') {
-                await sendAlert('GEOFENCE_EXIT', `Vehicle ${device.name} exited geofence.`, 'WARNING', device.id);
-            }
-            if (alarm === 'geofenceEnter') {
-                await sendAlert('GEOFENCE_ENTER', `Vehicle ${device.name} entered geofence.`, 'INFO', device.id);
+                if (config.deviceDisconnected?.enabled && device.status === 'offline') {
+                    const lastUpdate = new Date(device.lastUpdate).getTime();
+                    const threshold = (config.deviceDisconnected.thresholdMinutes || 10) * 60000;
+                    if (Date.now() - lastUpdate > threshold) {
+                        await sendAlert('DEVICE_OFFLINE', `Telemetry lost for vehicle ${device.name}.`, 'WARNING', device.id);
+                    }
+                }
+
+                if (alarm === 'sos') {
+                    await sendAlert('SOS_ALERT', `EMERGENCY: ${device.name} panic button activated!`, 'CRITICAL', device.id);
+                }
+                
+                // Geofence events
+                if (alarm === 'geofenceExit') {
+                    await sendAlert('GEOFENCE_EXIT', `Vehicle ${device.name} exited geofence.`, 'WARNING', device.id);
+                }
+                if (alarm === 'geofenceEnter') {
+                    await sendAlert('GEOFENCE_ENTER', `Vehicle ${device.name} entered geofence.`, 'INFO', device.id);
+                }
+            } catch (deviceErr) {
+                logger.error(`Alert Engine: Failed to process device ${device.id}`, deviceErr.message);
             }
         }
 

@@ -20,7 +20,11 @@ router.post('/admin/auth/login', async (req, res) => {
     if (error) return res.status(400).json({ error: error.details[0].message });
 
     const { email, password } = value;
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@geosurepath.com';
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (!adminEmail) {
+        logger.error('ADMIN_EMAIL environment variable not set');
+        return res.status(500).json({ error: 'Server authentication configuration missing' });
+    }
     const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
     if (!adminPasswordHash || !process.env.JWT_SECRET) {
