@@ -127,7 +127,6 @@ services:
   frontend:
     build:
       context: ./GeoSurePath
-      args:
     environment:
       - VITE_ADMIN_API_URL=/api/admin
       - VITE_RAZORPAY_KEY=${RAZORPAY_KEY_ID}
