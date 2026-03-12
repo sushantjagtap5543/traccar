@@ -28,10 +28,26 @@ test.describe('GeoSurePath Unified E2E Suite', () => {
         await expect(page.locator('label:has-text("Default Speed Limit")')).toBeVisible();
     });
 
-    test('Admin Dashboard 2FA UI Flow', async ({ page }) => {
-        // This requires a mock session since we added sessionStorage protection
-        await page.goto('/admin');
-        // We'll trust the unit tests for session injection, here we verify structure
-        await expect(page.locator('text=GeoSurePath Enterprise')).toBeVisible();
+    test('Subscription Page UI', async ({ page }) => {
+        await page.goto('/settings/subscription');
+        await expect(page.locator('text=Subscription & Usage')).toBeVisible();
+        await expect(page.locator('text=Standard')).toBeVisible();
+        await expect(page.locator('text=₹999')).toBeVisible();
+    });
+
+    test('Central Config Panel Access', async ({ page }) => {
+        // This requires admin session
+        await page.goto('/admin/config');
+        await expect(page.locator('text=Central Config Panel')).toBeVisible();
+        await expect(page.locator('text=SMS & Notify')).toBeVisible();
+    });
+
+    test('Video Demo Dialog Verification', async ({ page }) => {
+        await page.goto('/');
+        await page.click('text=Watch Demo');
+        const iframe = page.locator('iframe[title="Product Demo"]');
+        await expect(iframe).toBeVisible();
+        await page.click('button:has([data-testid="CloseIcon"])');
+        await expect(iframe).not.toBeVisible();
     });
 });

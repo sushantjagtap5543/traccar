@@ -2,8 +2,10 @@ import React, { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Box, Container, Typography, Button, AppBar, Toolbar, Stack,
-    Grid, Card, CardContent, Divider, useMediaQuery, useTheme
+    Grid, Card, CardContent, Divider, useMediaQuery, useTheme,
+    Dialog, DialogContent, IconButton
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import { makeStyles } from 'tss-react/mui';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -89,6 +91,8 @@ const LandingPage = () => {
         ref.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
+    const [demoOpen, setDemoOpen] = React.useState(false);
+
     return (
         <Box className={classes.root}>
             {/* Navigation Bar */}
@@ -150,6 +154,7 @@ const LandingPage = () => {
                                     variant="outlined"
                                     size="large"
                                     startIcon={<PlayArrowIcon />}
+                                    onClick={() => setDemoOpen(true)}
                                     sx={{ borderColor: '#D0DAE8', color: '#0F2D5C', py: 1.5, px: 4, fontWeight: 'bold', borderRadius: 2 }}
                                 >
                                     Watch Demo
@@ -334,8 +339,8 @@ const LandingPage = () => {
                         <Grid item xs={6} md={2}>
                             <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 3 }}>Resources</Typography>
                             <Stack spacing={2}>
-                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }}>Documentation</Typography>
-                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }}>API Reference</Typography>
+                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }} onClick={() => window.open('/api-docs', '_blank')}>Documentation</Typography>
+                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }} onClick={() => window.open('/api-docs', '_blank')}>API Reference</Typography>
                                 <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }} onClick={() => navigate('/admin/login')}>Admin Portal</Typography>
                             </Stack>
                         </Grid>
@@ -350,6 +355,34 @@ const LandingPage = () => {
                     </Stack>
                 </Container>
             </Box>
+
+            {/* Demo Video Dialog */}
+            <Dialog
+                open={demoOpen}
+                onClose={() => setDemoOpen(false)}
+                maxWidth="lg"
+                fullWidth
+                PaperProps={{ sx: { bgcolor: 'transparent', boxShadow: 'none' } }}
+            >
+                <DialogContent sx={{ p: 0, position: 'relative' }}>
+                    <IconButton
+                        onClick={() => setDemoOpen(false)}
+                        sx={{ position: 'absolute', top: -40, right: 0, color: 'white' }}
+                    >
+                        <CloseIcon />
+                    </IconButton>
+                    <Box sx={{ position: 'relative', pt: '56.25%', borderRadius: 4, overflow: 'hidden', bgcolor: 'black' }}>
+                        <iframe
+                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                            src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1"
+                            title="Product Demo"
+                            frameBorder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                        ></iframe>
+                    </Box>
+                </DialogContent>
+            </Dialog>
         </Box>
     );
 };

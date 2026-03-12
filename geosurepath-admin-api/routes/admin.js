@@ -234,4 +234,35 @@ router.post('/admin/alerts/config', adminAuth, async (req, res) => {
     }
 });
 
+// --- PLATFORM CONFIGURATION (CENTRAL PANEL) ---
+router.get('/admin/config', adminAuth, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT key, value FROM geosurepath_settings');
+        const config = {};
+        result.rows.forEach(row => {
+            config[row.key] = row.value;
+        });
+        res.json(config);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch platform config' });
+    }
+});
+
+router.post('/admin/config', adminAuth, async (req, res) => {
+    const updates = req.body; // Map of key -> value
+    try {
+        for (const [key, value] of Object.entries(updates)) {
+            await pool.query(
+                'INSERT INTO geosurepath_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
+                [key, String(value)]
+            );
+        }
+        logger.info('Platform configuration updated bulk-style.');
+        res.json({ message: 'Configuration synchronized successfully' });
+    } catch (err) {
+        logger.error('Bulk config error:', err);
+        res.status(500).json({ error: 'Failed to update configuration' });
+    }
+});
+
 module.exports = router;

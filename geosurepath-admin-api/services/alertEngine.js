@@ -50,25 +50,55 @@ const startAlertEngine = () => {
 
                 // Check Overspeed
                 if (config.overSpeed?.enabled) {
-                    const speedKph = pos.speed * 1.852; // knots to kph
+                    const speedKph = pos.speed * 1.852;
                     if (speedKph > config.overSpeed.threshold) {
-                        await sendAlert(
-                            'VEHICLE_OVERSPEED',
-                            `Vehicle ${device.name} (ID: ${device.id}) is traveling at ${speedKph.toFixed(1)} km/h, exceeding limit of ${config.overSpeed.threshold} km/h.`,
-                            'WARNING'
-                        );
+                        await sendAlert('VEHICLE_OVERSPEED', `Vehicle ${device.name} is traveling at ${speedKph.toFixed(1)} km/h.`, 'WARNING', device.id);
                     }
                 }
 
                 // Check Battery
                 if (config.batteryLow?.enabled && pos.attributes?.batteryLevel !== undefined) {
                     if (pos.attributes.batteryLevel < config.batteryLow.threshold) {
-                        await sendAlert(
-                            'LOW_BATTERY',
-                            `Vehicle ${device.name} battery is at ${pos.attributes.batteryLevel}%, below threshold of ${config.batteryLow.threshold}%.`,
-                            'WARNING'
-                        );
+                        await sendAlert('LOW_BATTERY', `Vehicle ${device.name} battery is at ${pos.attributes.batteryLevel}%.`, 'WARNING', device.id);
                     }
+                }
+
+                // Check Engine Status
+                if (config.engineOn?.enabled && pos.attributes?.ignition) {
+                    await sendAlert('ENGINE_ON', `Vehicle ${device.name} engine started.`, 'INFO', device.id);
+                }
+                if (config.engineOff?.enabled && pos.attributes?.ignition === false) {
+                    await sendAlert('ENGINE_OFF', `Vehicle ${device.name} engine stopped.`, 'INFO', device.id);
+                }
+
+                // Check Security / Tampering
+                if (config.powerCut?.enabled && pos.attributes?.alarm === 'powerCut') {
+                    await sendAlert('POWER_CUT', `External power disconnected for vehicle ${device.name}!`, 'CRITICAL', device.id);
+                }
+                if (config.ignitionTampering?.enabled && pos.attributes?.alarm === 'vibration') {
+                    await sendAlert('VIBRATION_ALARM', `Structural vibration detected on vehicle ${device.name}.`, 'WARNING', device.id);
+                }
+                if (config.towAlert?.enabled && pos.attributes?.alarm === 'tow') {
+                    await sendAlert('TOW_ALERT', `Vehicle ${device.name} is being moved without ignition!`, 'CRITICAL', device.id);
+                }
+
+                // Check Operational / Behavior
+                if (config.harshBraking?.enabled && pos.attributes?.alarm === 'hardBraking') {
+                    await sendAlert('HARSH_BRAKING', `Aggressive braking detected on ${device.name}.`, 'WARNING', device.id);
+                }
+                if (config.harshAcceleration?.enabled && pos.attributes?.alarm === 'hardAcceleration') {
+                    await sendAlert('HARSH_ACCEL', `Aggressive acceleration detected on ${device.name}.`, 'WARNING', device.id);
+                }
+                if (config.sharpTurning?.enabled && pos.attributes?.alarm === 'hardCornering') {
+                    await sendAlert('SHARP_TURNING', `Dangerous cornering detected on ${device.name}.`, 'WARNING', device.id);
+                }
+
+                // Device Connectivity
+                if (config.deviceDisconnected?.enabled && device.status === 'offline') {
+                    await sendAlert('DEVICE_OFFLINE', `Telemetry lost for vehicle ${device.name}.`, 'WARNING', device.id);
+                }
+                if (config.gpsLost?.enabled && pos.valid === false) {
+                    await sendAlert('GPS_SIGNAL_LOST', `GPS fix lost for vehicle ${device.name}.`, 'WARNING', device.id);
                 }
             }
 

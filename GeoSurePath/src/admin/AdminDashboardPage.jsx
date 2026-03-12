@@ -16,6 +16,7 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import BackupIcon from '@mui/icons-material/Backup';
 import TimerIcon from '@mui/icons-material/Timer';
+import SettingsApplicationsIcon from '@mui/icons-material/SettingsApplications';
 
 import {
   RadialBarChart, RadialBar, ResponsiveContainer,
@@ -463,16 +464,27 @@ const AdminDashboardPage = () => {
               <CardContent>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
                   <Typography variant="h6" fontWeight="bold">Enterprise Recovery Actions</Typography>
-                  <Button
-                    variant="contained"
-                    startIcon={<BackupIcon />}
-                    size="small"
-                    onClick={handleBackup}
-                    disabled={actionLoading === 'backup'}
-                    sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#333' } }}
-                  >
-                    {actionLoading === 'backup' ? <CircularProgress size={16} color="inherit" /> : 'Backup SQL Engine'}
-                  </Button>
+                  <Stack direction="row" spacing={2}>
+                    <Button
+                      variant="outlined"
+                      startIcon={<SettingsApplicationsIcon />}
+                      size="small"
+                      onClick={() => navigate('/admin/config')}
+                      sx={{ borderRadius: 1.5, textTransform: 'none', fontWeight: 'bold' }}
+                    >
+                      Central Config
+                    </Button>
+                    <Button
+                      variant="contained"
+                      startIcon={<BackupIcon />}
+                      size="small"
+                      onClick={handleBackup}
+                      disabled={actionLoading === 'backup'}
+                      sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#333' } }}
+                    >
+                      {actionLoading === 'backup' ? <CircularProgress size={16} color="inherit" /> : 'Backup SQL Engine'}
+                    </Button>
+                  </Stack>
                 </Stack>
                 <Divider sx={{ mb: 2 }} />
                 <Grid container spacing={2}>

@@ -78,6 +78,7 @@ app.use(cors({
 // --- ROUTES ---
 app.use('/api', authRoutes);
 app.use('/api', adminRoutes);
+app.use('/api/payments', require('./routes/payments'));
 
 // Protected metrics
 app.get('/metrics', adminAuth, async (req, res) => {
@@ -111,8 +112,19 @@ app.use((err, req, res, next) => {
 });
 
 // --- STARTUP ---
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   logger.info(`GeoSurePath Admin API v7.2 modular running on port ${PORT}`);
+
+  // Run migrations
+  try {
+    const knex = require('knex')(require('./knexfile'));
+    await knex.migrate.latest();
+    logger.info('Database migrations completed.');
+    await knex.destroy();
+  } catch (err) {
+    logger.error('Migration failure:', err);
+  }
+
   startMonitor();
   const { startAlertEngine } = require('./services/alertEngine');
   startAlertEngine();

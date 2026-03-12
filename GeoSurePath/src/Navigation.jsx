@@ -63,6 +63,8 @@ import AdminDashboardPage from './admin/AdminDashboardPage';
 import AlertConfigPage from './settings/AlertConfigPage';
 import LandingPage from './LandingPage';
 import AdminLoginPage from './login/AdminLoginPage';
+import CentralConfigPage from './admin/CentralConfigPage';
+import SubscriptionPage from './settings/SubscriptionPage';
 
 const Navigation = () => {
   const dispatch = useDispatch();
@@ -173,6 +175,7 @@ const Navigation = () => {
           <Route path="user/:id/connections" element={<UserConnectionsPage />} />
           <Route path="user/:id" element={<UserPage />} />
           <Route path="user" element={<UserPage />} />
+          <Route path="subscription" element={<SubscriptionPage />} />
         </Route>
 
         <Route path="reports">
@@ -192,6 +195,7 @@ const Navigation = () => {
 
         <Route path="admin">
           <Route path="dashboard" element={<AdminDashboardPage />} />
+          <Route path="config" element={<CentralConfigPage />} />
         </Route>
         <Route path="settings/alerts" element={<AlertConfigPage />} />
       </Route>
