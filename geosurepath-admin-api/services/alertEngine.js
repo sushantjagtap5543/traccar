@@ -100,6 +100,38 @@ const startAlertEngine = () => {
                 if (config.gpsLost?.enabled && pos.valid === false) {
                     await sendAlert('GPS_SIGNAL_LOST', `GPS fix lost for vehicle ${device.name}.`, 'WARNING', device.id);
                 }
+
+                // NEW: Idle & Stop (Simplified logic based on attributes)
+                if (config.excessIdle?.enabled && pos.attributes?.motion === false) {
+                    // Traccar 'idle' is usually when ignition is on but motion is false
+                    // Here we check if it has been stationary
+                    const idleTimeRes = await axios.get(`${traccarUrl}/api/reports/summary?deviceId=${device.id}&from=${new Date(Date.now() - config.excessIdle.threshold * 60000).toISOString()}&to=${new Date().toISOString()}`, {
+                        auth: { username: adminEmail, password: process.env.TRACCAR_ADMIN_PASSWORD || 'admin' }
+                    });
+                    if (idleTimeRes.data.length > 0 && idleTimeRes.data[0].engineHours > 0 && idleTimeRes.data[0].distance === 0) {
+                        await sendAlert('EXCESS_IDLE', `Vehicle ${device.name} has been idling for over ${config.excessIdle.threshold} minutes.`, 'WARNING', device.id);
+                    }
+                }
+
+                if (config.unexpectedStop?.enabled && pos.attributes?.alarm === 'stop') {
+                    await sendAlert('UNEXPECTED_STOP', `Unexpected stop detected for vehicle ${device.name}.`, 'WARNING', device.id);
+                }
+
+                // NEW: Route & Geofence (Intercepting alarms from Traccar)
+                if (config.routeViolation?.enabled && pos.attributes?.alarm === 'geofenceExit') {
+                    await sendAlert('ROUTE_VIOLATION', `Vehicle ${device.name} deviated from assigned route/geofence.`, 'CRITICAL', device.id);
+                }
+                if (config.routeCompleted?.enabled && pos.attributes?.alarm === 'geofenceEnter') {
+                    await sendAlert('ROUTE_COMPLETED', `Vehicle ${device.name} reached destination.`, 'INFO', device.id);
+                }
+                if (config.routeStart?.enabled && pos.attributes?.alarm === 'geofenceExit') {
+                    // Note: You might want more specific logic for route start
+                    await sendAlert('ROUTE_STARTED', `Vehicle ${device.name} has started its journey.`, 'INFO', device.id);
+                }
+                if (config.routeDelay?.enabled && device.status === 'online' && pos.speed < 5) {
+                    // Simple delay logic: vehicle is online but not moving much
+                    await sendAlert('ROUTE_DELAY', `Vehicle ${device.name} is experiencing delays in transit.`, 'WARNING', device.id);
+                }
             }
 
         } catch (err) {

@@ -23,8 +23,6 @@ const SubscriptionPage = () => {
 
     const fetchSubscription = async () => {
         try {
-            // In a real system, we'd have an endpoint like GET /api/payments/subscription/:userId
-            // Mock for now or use the DB if reachable
             const res = await fetch(`${API_BASE}/api/payments/subscription/${user.id}`);
             if (res.ok) {
                 setSub(await res.json());
@@ -37,7 +35,6 @@ const SubscriptionPage = () => {
     };
 
     const handleUpgrade = async (planId) => {
-        // 1. Create Order
         try {
             const orderRes = await fetch(`${API_BASE}/api/payments/orders`, {
                 method: 'POST',
@@ -46,13 +43,12 @@ const SubscriptionPage = () => {
             });
             const order = await orderRes.json();
 
-            // 2. Open Razorpay Checkout
             const options = {
                 key: import.meta.env.VITE_RAZORPAY_KEY || 'rzp_test_placeholder',
                 amount: order.amount,
                 currency: "INR",
                 name: "GeoSurePath",
-                description: `${planId.toUpperCase()} Plan Subscription`,
+                description: `${planId} Plan Subscription`,
                 order_id: order.id,
                 handler: async (response) => {
                     const verifyRes = await fetch(`${API_BASE}/api/payments/verify`, {
@@ -88,25 +84,27 @@ const SubscriptionPage = () => {
     const deviceLimit = sub?.device_limit || 2;
 
     const plans = [
-        { id: 'basic', name: 'Basic', price: '₹499', limit: 5, features: ['5 Devices', '30 Day History', 'Basic Email Alerts'] },
-        { id: 'standard', name: 'Standard', price: '₹999', limit: 20, features: ['20 Devices', '90 Day History', 'SMS & WhatsApp Alerts', 'Geofence Reports'] },
-        { id: 'enterprise', name: 'Enterprise', price: '₹2499', limit: 100, features: ['100 Devices', '1 Year History', 'White-label Support', 'API Access', 'Dedicated Account Manager'] },
+        { id: '1month', name: 'Standard (1 Mo)', price: '₹200', limit: 5, features: ['5 Devices', '365 Day History', 'Email Alerts'] },
+        { id: '6month', name: 'Premium (6 Mo)', price: '₹950', limit: 20, features: ['20 Devices', '365 Day History', 'SMS & WhatsApp Alerts', 'Geofence Reports'] },
+        { id: '12month', name: 'Enterprise (1 Yr)', price: '₹1500', limit: 100, features: ['100 Devices', '1 Year History', 'White-label Support', 'API Access', 'Dedicated Manager'] },
     ];
 
     return (
         <Container maxWidth="lg" sx={{ py: 6 }}>
             <Box mb={6}>
                 <Typography variant="h3" fontWeight="900" gutterBottom>Subscription & Usage</Typography>
-                <Typography color="textSecondary">Manage your plan and track vehicle limits.</Typography>
+                <Typography color="textSecondary">Manage your plan, track vehicle limits, and renew your service.</Typography>
             </Box>
 
             <Grid container spacing={4}>
-                {/* Current Plan Overview */}
                 <Grid item xs={12} md={4}>
                     <Card sx={{ height: '100%', borderRadius: 4, bgcolor: '#0f2d5c', color: 'white' }}>
                         <CardContent sx={{ p: 4 }}>
                             <Typography variant="overline" sx={{ opacity: 0.8 }}>Current Status</Typography>
-                            <Typography variant="h4" fontWeight="bold" sx={{ mb: 3 }}>{currentPlan.toUpperCase()}</Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 3 }}>
+                                <Typography variant="h4" fontWeight="bold">{currentPlan.toUpperCase()}</Typography>
+                                {sub?.status === 'active' && <Chip label="ACTIVE" size="small" sx={{ bgcolor: '#0b7a75', color: 'white', fontWeight: 'bold' }} />}
+                            </Box>
 
                             <Box sx={{ mb: 4 }}>
                                 <Stack direction="row" justifyContent="space-between" mb={1}>
@@ -115,24 +113,58 @@ const SubscriptionPage = () => {
                                 </Stack>
                                 <LinearProgress
                                     variant="determinate"
-                                    value={(deviceCount / deviceLimit) * 100}
+                                    value={Math.min(100, (deviceCount / deviceLimit) * 100)}
                                     sx={{ height: 8, borderRadius: 4, bgcolor: 'rgba(255,255,255,0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#0b7a75' } }}
                                 />
+                            </Box>
+
+                            <Box sx={{ mb: 4, p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                <Typography variant="caption" sx={{ opacity: 0.7, display: 'block', mb: 1 }}>LIFE LEFT</Typography>
+                                <Stack direction="row" alignItems="baseline" spacing={1}>
+                                    <Typography variant="h3" fontWeight="900" sx={{ color: '#0b7a75' }}>{sub?.days_remaining || 0}</Typography>
+                                    <Typography variant="body2">Days Remaining</Typography>
+                                </Stack>
+                                {sub?.expiry_date && <Typography variant="caption" sx={{ mt: 1, display: 'block', opacity: 0.6 }}>Expires on: {new Date(sub.expiry_date).toLocaleDateString()}</Typography>}
                             </Box>
 
                             <Button
                                 variant="contained"
                                 fullWidth
+                                disabled={!sub?.razorpay_payment_id}
                                 startIcon={<ReceiptIcon />}
-                                sx={{ bgcolor: 'white', color: '#0f2d5c', '&:hover': { bgcolor: '#f0f0f0' }, fontWeight: 'bold' }}
+                                onClick={() => window.open(`${API_BASE}/api/payments/invoice/${sub.razorpay_payment_id}`, '_blank')}
+                                sx={{ bgcolor: 'white', color: '#0f2d5c', '&:hover': { bgcolor: '#f0f0f0' }, fontWeight: 'bold', mb: 2 }}
                             >
                                 Download Invoice
                             </Button>
+
+                            {sub?.status === 'active' && (
+                                <Button
+                                    variant="outlined"
+                                    fullWidth
+                                    color="inherit"
+                                    onClick={async () => {
+                                        if (window.confirm('Are you sure you want to cancel your active plan?')) {
+                                            const res = await fetch(`${API_BASE}/api/payments/cancel`, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ userId: user.id })
+                                            });
+                                            if (res.ok) {
+                                                setSnackbar({ open: true, message: 'Subscription cancelled. It will remain active until expiry.', severity: 'info' });
+                                                fetchSubscription();
+                                            }
+                                        }
+                                    }}
+                                    sx={{ borderColor: 'rgba(255,255,255,0.3)', color: 'white', '&:hover': { borderColor: 'white' } }}
+                                >
+                                    Cancel Plan
+                                </Button>
+                            )}
                         </CardContent>
                     </Card>
                 </Grid>
 
-                {/* Plan Selection */}
                 <Grid item xs={12} md={8}>
                     <Grid container spacing={2}>
                         {plans.map((p) => (
@@ -141,23 +173,16 @@ const SubscriptionPage = () => {
                                     height: '100%',
                                     borderRadius: 3,
                                     border: currentPlan === p.id ? '2px solid #0b7a75' : '1px solid #e0e0e0',
-                                    position: 'relative',
-                                    overflow: 'visible'
+                                    position: 'relative'
                                 }}>
-                                    {currentPlan === p.id && (
-                                        <Chip
-                                            label="ACTIVE"
-                                            size="small"
-                                            sx={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', bgcolor: '#0b7a75', color: 'white', fontWeight: 'bold' }}
-                                        />
-                                    )}
                                     <CardContent sx={{ textAlign: 'center', p: 3 }}>
                                         <Typography variant="h6" fontWeight="bold">{p.name}</Typography>
-                                        <Typography variant="h4" fontWeight="900" sx={{ my: 2 }}>{p.price}</Typography>
+                                        <Typography variant="h4" fontWeight="900" sx={{ mt: 2 }}>{p.price}</Typography>
+                                        <Typography variant="caption" color="textSecondary" sx={{ mb: 2, display: 'block' }}>+ 18% GST / Renewal</Typography>
                                         <List dense sx={{ mb: 2 }}>
-                                            {p.features.slice(0, 3).map((f) => (
+                                            {p.features.map((f) => (
                                                 <ListItem key={f} sx={{ px: 0 }}>
-                                                    <ListItemIcon sx={{ minWidth: 32 }}><CheckCircleIcon sx={{ fontSize: 16, color: '#0b7a75' }} /></ListItemIcon>
+                                                    <ListItemIcon sx={{ minWidth: 24 }}><CheckCircleIcon sx={{ fontSize: 16, color: '#0b7a75' }} /></ListItemIcon>
                                                     <ListItemText primary={<Typography variant="caption">{f}</Typography>} />
                                                 </ListItem>
                                             ))}
@@ -165,11 +190,10 @@ const SubscriptionPage = () => {
                                         <Button
                                             variant={currentPlan === p.id ? "outlined" : "contained"}
                                             fullWidth
-                                            disabled={currentPlan === p.id}
                                             onClick={() => handleUpgrade(p.id)}
                                             sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 'bold' }}
                                         >
-                                            {currentPlan === p.id ? 'Active Plan' : 'Select Plan'}
+                                            {currentPlan === p.id ? 'Renew Now' : 'Select Plan'}
                                         </Button>
                                     </CardContent>
                                 </Card>

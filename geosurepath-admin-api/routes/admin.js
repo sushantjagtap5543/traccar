@@ -235,12 +235,19 @@ router.post('/admin/alerts/config', adminAuth, async (req, res) => {
 });
 
 // --- PLATFORM CONFIGURATION (CENTRAL PANEL) ---
+const SENSITIVE_KEYS = ['razorpay_secret', 'twilio_auth_token', 'jwt_secret', 'admin_api_key', 'traccar_admin_password'];
+
 router.get('/admin/config', adminAuth, async (req, res) => {
     try {
         const result = await pool.query('SELECT key, value FROM geosurepath_settings');
         const config = {};
         result.rows.forEach(row => {
-            config[row.key] = row.value;
+            // Mask sensitive keys: only show last 4 chars
+            if (SENSITIVE_KEYS.includes(row.key) && row.value && row.value.length > 8) {
+                config[row.key] = `****${row.value.slice(-4)}`;
+            } else {
+                config[row.key] = row.value;
+            }
         });
         res.json(config);
     } catch (err) {
@@ -249,16 +256,21 @@ router.get('/admin/config', adminAuth, async (req, res) => {
 });
 
 router.post('/admin/config', adminAuth, async (req, res) => {
-    const updates = req.body; // Map of key -> value
+    const updates = req.body;
     try {
         for (const [key, value] of Object.entries(updates)) {
+            // If the user didn't change a masked value (it starts with ****), skip it
+            if (SENSITIVE_KEYS.includes(key) && String(value).startsWith('****')) {
+                continue;
+            }
+
             await pool.query(
                 'INSERT INTO geosurepath_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
                 [key, String(value)]
             );
         }
-        logger.info('Platform configuration updated bulk-style.');
-        res.json({ message: 'Configuration synchronized successfully' });
+        logger.info('Platform configuration updated securely.');
+        res.json({ message: 'Configuration synchronized. Note: Security changes (JWT, API Key) require a server restart.' });
     } catch (err) {
         logger.error('Bulk config error:', err);
         res.status(500).json({ error: 'Failed to update configuration' });

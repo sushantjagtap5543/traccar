@@ -2,17 +2,17 @@ export const pricingConfig = [
     {
         name: 'Starter',
         price: 'Free',
-        features: ['1 Device', 'Basic Tracking', 'Email Support']
+        features: ['1 Device', 'Real-time Tracking', 'Email Support']
     },
     {
-        name: 'Pro',
-        price: '₹999/mo',
+        name: 'Standard',
+        price: '₹1500/yr',
         popular: true,
-        features: ['Up to 25 Devices', 'All Features', 'Priority Support']
+        features: ['Up to 20 Devices', '365 Day History', 'SMS & WhatsApp Alerts', 'Priority Support']
     },
     {
         name: 'Enterprise',
-        price: 'Custom',
-        features: ['Unlimited Devices', 'Dedicated Onboarding', 'SLA Guarantee']
+        price: '₹4500/yr',
+        features: ['Up to 100 Devices', 'White-label Support', 'API Access', 'Performance Dashboard']
     }
 ];

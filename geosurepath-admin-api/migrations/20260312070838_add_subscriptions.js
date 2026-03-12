@@ -7,22 +7,23 @@ exports.up = function (knex) {
         .createTable('geosurepath_subscriptions', function (table) {
             table.increments('id');
             table.integer('user_id').notNullable(); // Links to Traccar tc_users.id
-            table.string('plan_id').notNullable(); // basic, standard, enterprise
-            table.string('status').notNullable().defaultTo('active'); // active, expired, cancelled
+            table.string('plan_id').notNullable(); // 1month, 6month, 12month
+            table.string('status').notNullable().defaultTo('active');
             table.string('razorpay_order_id').nullable();
             table.string('razorpay_payment_id').nullable();
             table.timestamp('start_date').defaultTo(knex.fn.now());
             table.timestamp('expiry_date').notNullable();
-            table.integer('device_limit').defaultTo(5);
+            table.integer('device_limit').defaultTo(10);
             table.timestamps(true, true);
         })
         .then(() => {
-            // Add a constraint to geosurepath_settings for subscription prices?
-            // For now we'll store them in pricingConfig in frontend but we need them in backend for verification
             return knex('geosurepath_settings').insert([
-                { key: 'plan_price_basic', value: '499' },
-                { key: 'plan_price_standard', value: '999' },
-                { key: 'plan_price_enterprise', value: '2499' }
+                { key: 'plan_price_1month', value: '200' },
+                { key: 'plan_price_6month', value: '950' },
+                { key: 'plan_price_12month', value: '1500' },
+                { key: 'plan_limit_1month', value: '5' },
+                { key: 'plan_limit_6month', value: '20' },
+                { key: 'plan_limit_12month', value: '100' }
             ]);
         });
 };

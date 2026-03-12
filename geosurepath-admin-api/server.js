@@ -78,6 +78,7 @@ app.use(cors({
 // --- ROUTES ---
 app.use('/api', authRoutes);
 app.use('/api', adminRoutes);
+app.use('/api', require('./routes/devices')); // Limit enforcement proxy
 app.use('/api/payments', require('./routes/payments'));
 
 // Protected metrics
@@ -112,10 +113,8 @@ app.use((err, req, res, next) => {
 });
 
 // --- STARTUP ---
-const server = app.listen(PORT, async () => {
-  logger.info(`GeoSurePath Admin API v7.2 modular running on port ${PORT}`);
-
-  // Run migrations
+const startServer = async () => {
+  // 1. Run migrations first
   try {
     const knex = require('knex')(require('./knexfile'));
     await knex.migrate.latest();
@@ -123,29 +122,39 @@ const server = app.listen(PORT, async () => {
     await knex.destroy();
   } catch (err) {
     logger.error('Migration failure:', err);
+    // In many production cases, you might want process.exit(1) here 
+    // if migrations fail, as the DB is in an inconsistent state.
   }
 
+  // 2. Start core services
   startMonitor();
   const { startAlertEngine } = require('./services/alertEngine');
   startAlertEngine();
-});
 
-// --- GRACEFUL SHUTDOWN ---
-const gracefulShutdown = async (signal) => {
-  logger.info(`${signal} received. Starting graceful shutdown...`);
-  server.close(async () => {
-    try {
-      await Promise.all([pool.end(), redisClient.quit(), ioRedisClient.quit()]);
-      logger.info('Connections closed.');
-      process.exit(0);
-    } catch (err) {
-      logger.error('Error during shutdown:', err);
-      process.exit(1);
-    }
+  // 3. Listen
+  const server = app.listen(PORT, () => {
+    logger.info(`GeoSurePath Admin API v14.1 running on port ${PORT}`);
   });
+
+  // --- GRACEFUL SHUTDOWN ---
+  const gracefulShutdown = async (signal) => {
+    logger.info(`${signal} received. Starting graceful shutdown...`);
+    server.close(async () => {
+      try {
+        await Promise.all([pool.end(), redisClient.quit(), ioRedisClient.quit()]);
+        logger.info('Connections closed.');
+        process.exit(0);
+      } catch (err) {
+        logger.error('Error during shutdown:', err);
+        process.exit(1);
+      }
+    });
+  };
+
+  process.on('SIGTERM', gracefulShutdown);
+  process.on('SIGINT', gracefulShutdown);
 };
 
-process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown);
+startServer();
 
 module.exports = app;

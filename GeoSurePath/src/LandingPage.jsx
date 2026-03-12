@@ -337,11 +337,19 @@ const LandingPage = () => {
                             </Stack>
                         </Grid>
                         <Grid item xs={6} md={2}>
-                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 3 }}>Resources</Typography>
+                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 3 }}>Company</Typography>
                             <Stack spacing={2}>
-                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }} onClick={() => window.open('/api-docs', '_blank')}>Documentation</Typography>
-                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }} onClick={() => window.open('/api-docs', '_blank')}>API Reference</Typography>
-                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }} onClick={() => navigate('/admin/login')}>Admin Portal</Typography>
+                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }}>About Us</Typography>
+                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }}>Contact</Typography>
+                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }}>Careers</Typography>
+                            </Stack>
+                        </Grid>
+                        <Grid item xs={6} md={2}>
+                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 3 }}>Legal</Typography>
+                            <Stack spacing={2}>
+                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }}>Privacy Policy</Typography>
+                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }}>Terms of Service</Typography>
+                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }}>SLA</Typography>
                             </Stack>
                         </Grid>
                     </Grid>
@@ -374,7 +382,7 @@ const LandingPage = () => {
                     <Box sx={{ position: 'relative', pt: '56.25%', borderRadius: 4, overflow: 'hidden', bgcolor: 'black' }}>
                         <iframe
                             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-                            src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1"
+                            src="https://www.youtube.com/embed/v_0E7D2qExo?autoplay=1"
                             title="Product Demo"
                             frameBorder="0"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
