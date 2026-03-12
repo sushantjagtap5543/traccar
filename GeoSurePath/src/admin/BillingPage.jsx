@@ -12,6 +12,8 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import PeopleIcon from '@mui/icons-material/People';
 import SpeedIcon from '@mui/icons-material/Speed';
 import TimerIcon from '@mui/icons-material/Timer';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import PageLayout from '../common/components/PageLayout';
 
 const SummaryCard = ({ title, value, icon, color }) => (
@@ -90,6 +92,67 @@ const BillingPage = () => {
         return matchesSearch && matchesStatus;
     });
 
+    const handleExportCSV = () => {
+        if (filtered.length === 0) return;
+        const headers = ["Subscriber", "Email", "Plan", "Status", "Devices", "Amount Paid", "Transaction ID", "Expiry"];
+        const rows = filtered.map(s => [
+            `"${s.user_name || ''}"`,
+            `"${s.user_email || ''}"`,
+            `"${s.plan_id.toUpperCase()}"`,
+            `"${s.status.toUpperCase()}"`,
+            s.device_limit,
+            `"INR ${parseFloat(s.amount_paid || 0).toFixed(2)}"`,
+            `"${s.razorpay_payment_id || 'N/A'}"`,
+            `"${new Date(s.expiry_date).toLocaleDateString()}"`
+        ]);
+        const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Revenue_Report_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleDownloadPDF = (data) => {
+        const doc = new jsPDF();
+        const total = parseFloat(data.amount_paid) || (data.plan_id === '1month' ? 236 : (data.plan_id === '6month' ? 1121 : 1770));
+        const base = Math.round(total / 1.18);
+        const gst = total - base;
+
+        doc.setFontSize(22);
+        doc.setTextColor(11, 122, 117);
+        doc.text('GeoSurePath', 14, 20);
+
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text('ADMINISTRATIVE INVOICE RECORD', 14, 28);
+        doc.text(`DateGenerated: ${new Date().toLocaleDateString()}`, 140, 20);
+
+        doc.setFontSize(11);
+        doc.setTextColor(50);
+        doc.text(`Subscriber: ${data.user_name}`, 14, 40);
+        doc.text(`Email: ${data.user_email}`, 14, 46);
+        doc.text(`Payment ID: ${data.razorpay_payment_id}`, 14, 52);
+
+        doc.autoTable({
+            startY: 60,
+            head: [['Description', 'Qty', 'Amount']],
+            body: [
+                [`GPS Fleet Subscription - ${data.plan_id.toUpperCase()}`, '1', `INR ${base.toFixed(2)}`],
+                ['Integrated GST (18%)', '1', `INR ${gst.toFixed(2)}`]
+            ],
+            theme: 'grid',
+            headStyles: { fillColor: [15, 45, 92] }
+        });
+
+        const finalY = doc.lastAutoTable.finalY + 10;
+        doc.setFontSize(14);
+        doc.text(`Total Paid: INR ${total.toFixed(2)}`, 140, finalY);
+        doc.save(`Invoice_ADMIN_${data.razorpay_payment_id}.pdf`);
+    };
+
     const getStatusColor = (status) => {
         switch (status) {
             case 'active': return 'success';
@@ -110,6 +173,7 @@ const BillingPage = () => {
                     <Button
                         startIcon={<TrendingUpIcon />}
                         variant="contained"
+                        onClick={handleExportCSV}
                         sx={{ bgcolor: '#0B7A75', '&:hover': { bgcolor: '#08635F' }, textTransform: 'none', fontWeight: 'bold' }}
                     >
                         Export Revenue Report
@@ -232,7 +296,7 @@ const BillingPage = () => {
                                             <TableCell align="right">
                                                 <IconButton
                                                     size="small"
-                                                    onClick={() => window.open(`${API_BASE}/api/payments/invoice/${sub.razorpay_payment_id}`, '_blank')}
+                                                    onClick={() => handleDownloadPDF(sub)}
                                                     disabled={!sub.razorpay_payment_id}
                                                     sx={{ color: '#0B7A75' }}
                                                 >

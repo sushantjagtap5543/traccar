@@ -10,18 +10,7 @@ const crypto = require('crypto');
 const { pool, redisClient, logger } = require('../services/db');
 const { adminAuth } = require('../middleware/auth');
 
-// --- SECRETS ENCRYPTION HELPERS ---
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default_32_byte_key_please_change_it_!!!';
-const IV_LENGTH = 16;
-
-const encrypt = (text) => {
-    if (!text) return text;
-    const iv = crypto.randomBytes(IV_LENGTH);
-    const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY.padEnd(32).slice(0, 32)), iv);
-    let encrypted = cipher.update(text);
-    encrypted = Buffer.concat([encrypted, cipher.final()]);
-    return iv.toString('hex') + ':' + encrypted.toString('hex');
-};
+const { encrypt } = require('../utils/crypto');
 
 const restartSchema = Joi.object({
     service: Joi.string().valid('traccar', 'database', 'backend', 'cache').required()
@@ -265,7 +254,7 @@ router.post('/admin/alerts/config', adminAuth, async (req, res) => {
 });
 
 // --- PLATFORM CONFIGURATION (CENTRAL PANEL) ---
-const SENSITIVE_KEYS = ['razorpay_secret', 'twilio_auth_token', 'jwt_secret', 'admin_api_key', 'traccar_admin_password', 'razorpay_webhook_secret'];
+const SENSITIVE_KEYS = ['razorpay_secret', 'twilio_auth_token', 'jwt_secret', 'admin_api_key', 'traccar_admin_password', 'razorpay_webhook_secret', 'twilio_sid', 'twilio_number'];
 
 router.get('/admin/config', adminAuth, async (req, res) => {
     try {

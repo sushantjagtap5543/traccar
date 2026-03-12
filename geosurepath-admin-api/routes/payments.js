@@ -3,6 +3,7 @@ const router = express.Router();
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const { pool, logger } = require('../services/db');
+const { decrypt } = require('../utils/crypto');
 
 /**
  * Razorpay Payment Integration
@@ -13,7 +14,7 @@ const { pool, logger } = require('../services/db');
 const getRazorpayClient = async () => {
     const res = await pool.query("SELECT key, value FROM geosurepath_settings WHERE key IN ('razorpay_key_id', 'razorpay_secret')");
     const config = {};
-    res.rows.forEach(r => config[r.key] = r.value);
+    res.rows.forEach(r => config[r.key] = decrypt(r.value));
 
     const keyId = config.razorpay_key_id || process.env.RAZORPAY_KEY_ID;
     const secret = config.razorpay_secret || process.env.RAZORPAY_SECRET;
@@ -74,7 +75,7 @@ router.post('/verify', async (req, res) => {
 
     try {
         const resSettings = await pool.query("SELECT value FROM geosurepath_settings WHERE key = 'razorpay_secret' LIMIT 1");
-        const secret = resSettings.rows[0]?.value || process.env.RAZORPAY_SECRET;
+        const secret = decrypt(resSettings.rows[0]?.value) || process.env.RAZORPAY_SECRET;
 
         const hmac = crypto.createHmac('sha256', secret);
         hmac.update(razorpay_order_id + "|" + razorpay_payment_id);
