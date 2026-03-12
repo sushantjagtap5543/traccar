@@ -106,9 +106,14 @@ success "Core dependencies installed."
 
 # --- Step 3: Repository Deployment ---
 log "[Step 3/11] Deploying codebase to $APP_DIR..."
-if [ -d "$APP_DIR/.git" ]; then
-    log "Existing repository detected in $APP_DIR. Refreshing..."
-    cd "$APP_DIR" && git pull
+if [ -d "$APP_DIR" ]; then
+    log "Deployment directory $APP_DIR already exists. Preserving local files."
+    cd "$APP_DIR"
+    if [ -d ".git" ]; then
+        log "Refreshing repository (preserving local changes)..."
+        git stash save "Install script auto-stash" || true
+        git pull || warn "Git pull failed. Proceeding with current local files."
+    fi
 else
     log "Cloning GeoSurePath from GitHub..."
     git clone https://github.com/sushantjagtap5543/traccar.git "$APP_DIR"

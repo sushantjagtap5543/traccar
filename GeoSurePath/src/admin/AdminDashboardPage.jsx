@@ -75,11 +75,11 @@ const AdminDashboardPage = () => {
   const [webhookUrl, setWebhookUrl] = useState('');
   const [networkHistory, setNetworkHistory] = useState([]);
   const [totpDialog, setTotpDialog] = useState({ open: false, qrCode: '', secret: '' });
-  const API_BASE = import.meta.env.VITE_ADMIN_API_URL || `http://${window.location.hostname}:8083`;
+  const API_BASE = import.meta.env.VITE_ADMIN_API_URL || window.location.origin;
 
   // Access Control & Session Expiry
   useEffect(() => {
-    const sessionActive = sessionStorage.getItem('adminSessionActive');
+    const sessionActive = localStorage.getItem('adminSessionActive');
     if (!sessionActive) {
       navigate('/admin');
       return;
@@ -90,7 +90,7 @@ const AdminDashboardPage = () => {
     const resetTimer = () => {
       clearTimeout(timeout);
       timeout = setTimeout(() => {
-        sessionStorage.removeItem('adminSessionActive');
+        localStorage.removeItem('adminSessionActive');
         navigate('/admin');
       }, 1800000); // 30 minutes
     };

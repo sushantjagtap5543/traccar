@@ -39,7 +39,7 @@ const BillingPage = () => {
     const [statusFilter, setStatusFilter] = useState('all');
     const [anchorEl, setAnchorEl] = useState(null);
 
-    const API_BASE = import.meta.env.VITE_ADMIN_API_URL || `http://${window.location.hostname}:8083`;
+    const API_BASE = import.meta.env.VITE_ADMIN_API_URL || window.location.origin;
 
     useEffect(() => {
         const fetchBilling = async () => {

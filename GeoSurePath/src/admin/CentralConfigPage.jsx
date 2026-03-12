@@ -17,7 +17,7 @@ const CentralConfigPage = () => {
     const [config, setConfig] = useState({});
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
-    const API_BASE = import.meta.env.VITE_ADMIN_API_URL || `http://${window.location.hostname}:8083`;
+    const API_BASE = import.meta.env.VITE_ADMIN_API_URL || window.location.origin;
 
     useEffect(() => {
         fetchConfig();

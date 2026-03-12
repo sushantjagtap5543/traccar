@@ -52,7 +52,7 @@ const AdminLoginPage = () => {
     const [password, setPassword] = useState('');
     const [intermediateToken, setIntermediateToken] = useState(null);
 
-    const API_BASE = import.meta.env.VITE_ADMIN_API_URL || `http://${window.location.hostname}:8083`;
+    const API_BASE = import.meta.env.VITE_ADMIN_API_URL || window.location.origin;
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -98,7 +98,7 @@ const AdminLoginPage = () => {
             const data = await response.json();
             if (response.ok) {
                 // Move from localStorage (XSS vulnerable) to session indicator
-                sessionStorage.setItem('adminSessionActive', 'true');
+                localStorage.setItem('adminSessionActive', 'true');
                 navigate('/admin/dashboard');
             } else {
                 throw new Error(data.error || 'Invalid 2FA code');

@@ -109,6 +109,11 @@ services:
         condition: service_healthy
     networks:
       - internal
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   nginx:
     build:
@@ -132,11 +137,11 @@ services:
       retries: 3
     depends_on:
       frontend:
-        condition: service_started
+        condition: service_healthy
       admin-api:
         condition: service_healthy
       traccar:
-        condition: service_started
+        condition: service_healthy
 
   certbot:
     image: certbot/certbot:latest

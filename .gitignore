@@ -10,10 +10,10 @@ coverage/
 dist/
 build/
 .vscode/
-package-lock.json
-GeoSurePath/package-lock.json
-geosurepath-admin-api/package-lock.json
+# package-lock.json removed from ignore to ensure CI stability
 mock-backend.cjs
 geosurepath-admin-api/mock-backend.cjs
 .DS_Store
 Thumbs.db
+*.pem
+*.ppk

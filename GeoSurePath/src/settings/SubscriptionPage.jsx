@@ -131,9 +131,9 @@ const SubscriptionPage = () => {
     const deviceLimit = sub?.device_limit || 2;
 
     const plans = [
-        { id: '1month', name: 'Standard (1 Mo)', price: '₹200', limit: 10, features: ['10 Devices', '365 Day History', 'Email Alerts'] },
-        { id: '6month', name: 'Premium (6 Mo)', price: '₹950', limit: 25, features: ['25 Devices', '365 Day History', 'SMS & WhatsApp Alerts', 'Geofence Reports'] },
-        { id: '12month', name: 'Enterprise (1 Yr)', price: '₹1500', limit: 50, features: ['50 Devices', '1 Year History', 'White-label Support', 'API Access', 'Dedicated Manager'] },
+        { id: '1month', name: 'Standard (Monthly)', price: '₹200', limit: 25, features: ['25 Devices', '365 Day History', 'SMS & WhatsApp Alerts', 'Geofence Reports'] },
+        { id: '12month', name: 'Standard (Annual)', price: '₹1500', limit: 25, features: ['25 Devices', '365 Day History', 'SMS & WhatsApp Alerts', 'Geofence Reports', '2 Months FREE!'] },
+        { id: 'enterprise', name: 'Enterprise (Annual)', price: '₹4500', limit: 100, features: ['100 Devices', 'White-label Support', 'API Access', 'Dedicated Manager', 'Custom Reports'] },
     ];
 
     return (

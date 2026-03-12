@@ -1,6 +1,6 @@
 # dependencies
 node_modules/
-package-lock.json
+# package-lock.json included for build consistency
 
 # production
 /dist

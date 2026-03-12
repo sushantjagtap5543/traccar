@@ -60,7 +60,7 @@ const RegisterPage = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [vehicles, setVehicles] = useState([{ name: '', number: '', imei: '' }]);
 
-  const API_BASE = import.meta.env.VITE_ADMIN_API_URL || `http://${window.location.hostname}:8083`;
+  const API_BASE = import.meta.env.VITE_ADMIN_API_URL || window.location.origin;
 
   const handleAddVehicle = () => {
     setVehicles([...vehicles, { name: '', number: '', imei: '' }]);
@@ -180,7 +180,7 @@ const RegisterPage = () => {
             body: JSON.stringify({
               deviceId: device.id,
               type: 'custom',
-              attributes: { data: 'SERVER,0,3.108.114.12,5023,0#' }
+              attributes: { data: `SERVER,0,${window.location.hostname},5023,0#` }
             })
           }).catch(err => console.error('Post-registration device command failed:', err));
         } catch (err) {
