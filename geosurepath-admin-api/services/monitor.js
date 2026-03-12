@@ -46,11 +46,39 @@ const syncWebhook = async () => {
     }
 };
 
+const DAILY_TASKS_INTERVAL = 24 * 60 * 60 * 1000; // Once a day
+
+const runDailyTasks = async () => {
+    logger.info('Running GS-ADMIN Daily Maintenance Tasks...');
+    try {
+        // 1. Subscription Renewal Reminders (Expiring in 3 days)
+        const expiringSubRes = await pool.query(
+            "SELECT s.*, u.phone, u.name FROM geosurepath_subscriptions s JOIN tc_users u ON s.user_id = u.id WHERE s.status = 'active' AND s.expiry_date BETWEEN NOW() AND NOW() + INTERVAL '3 days'"
+        );
+
+        for (const sub of expiringSubRes.rows) {
+            logger.info(`Sending renewal reminder to ${sub.name} (User ${sub.user_id})`);
+            // In a real system, send SMS via Twilio or Email here
+            await sendAlert('RENEWAL_REMINDER', `Subscription for ${sub.name} expires in 3 days (Plan: ${sub.plan_id}). Renewal required.`, 'INFO', `user_${sub.user_id}`);
+        }
+
+        // 2. Clean up old sessions or logs if needed...
+
+    } catch (err) {
+        logger.error('Daily tasks failed:', err.message);
+    }
+};
+
 const startMonitor = () => {
     if (process.env.NODE_ENV === 'test') return;
 
     // Load webhook immediately on startup
     syncWebhook();
+
+    // Schedule Daily Tasks
+    setInterval(runDailyTasks, DAILY_TASKS_INTERVAL);
+    // Also run once 1 minute after startup
+    setTimeout(runDailyTasks, 60000);
 
     setInterval(async () => {
         try {

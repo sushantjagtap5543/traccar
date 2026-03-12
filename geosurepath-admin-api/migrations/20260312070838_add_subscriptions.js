@@ -21,9 +21,9 @@ exports.up = function (knex) {
                 { key: 'plan_price_1month', value: '200' },
                 { key: 'plan_price_6month', value: '950' },
                 { key: 'plan_price_12month', value: '1500' },
-                { key: 'plan_limit_1month', value: '5' },
-                { key: 'plan_limit_6month', value: '20' },
-                { key: 'plan_limit_12month', value: '100' }
+                { key: 'plan_limit_1month', value: '10' },
+                { key: 'plan_limit_6month', value: '25' },
+                { key: 'plan_limit_12month', value: '50' }
             ]);
         });
 };

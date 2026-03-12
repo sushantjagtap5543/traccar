@@ -64,7 +64,9 @@ import AlertConfigPage from './settings/AlertConfigPage';
 import LandingPage from './LandingPage';
 import AdminLoginPage from './login/AdminLoginPage';
 import CentralConfigPage from './admin/CentralConfigPage';
+import BillingPage from './admin/BillingPage';
 import SubscriptionPage from './settings/SubscriptionPage';
+import LegalPage from './LegalPage';
 
 const Navigation = () => {
   const dispatch = useDispatch();
@@ -120,6 +122,7 @@ const Navigation = () => {
   return (
     <Routes>
       <Route path="/welcome" element={<LandingPage />} />
+      <Route path="/legal/:type" element={<LegalPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/admin/login" element={<AdminLoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
@@ -196,6 +199,7 @@ const Navigation = () => {
         <Route path="admin">
           <Route path="dashboard" element={<AdminDashboardPage />} />
           <Route path="config" element={<CentralConfigPage />} />
+          <Route path="billing" element={<BillingPage />} />
         </Route>
         <Route path="settings/alerts" element={<AlertConfigPage />} />
       </Route>

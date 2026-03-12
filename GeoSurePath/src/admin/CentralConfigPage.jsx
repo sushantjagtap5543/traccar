@@ -68,7 +68,7 @@ const CentralConfigPage = () => {
 
     return (
         <Container maxWidth="lg" sx={{ py: 4 }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                 <Box>
                     <Typography variant="h4" fontWeight="bold">Central Config Panel</Typography>
                     <Typography variant="body2" color="textSecondary">Manage platform secrets, API keys, and global parameters</Typography>
@@ -83,6 +83,10 @@ const CentralConfigPage = () => {
                     Save All Changes
                 </Button>
             </Stack>
+
+            <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
+                <b>Security Notice:</b> Changes to <b>JWT Secret</b>, <b>Master API Key</b>, or <b>Database Credentials</b> require a graceful server restart to take effect. Masked values (starting with ****) are preserved unless overwritten.
+            </Alert>
 
             <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
                 <Tabs value={tab} onChange={(e, v) => setTab(v)}>

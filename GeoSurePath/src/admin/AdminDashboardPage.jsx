@@ -17,6 +17,8 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import BackupIcon from '@mui/icons-material/Backup';
 import TimerIcon from '@mui/icons-material/Timer';
 import SettingsApplicationsIcon from '@mui/icons-material/SettingsApplications';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import SecurityIcon from '@mui/icons-material/Security';
 
 import {
   RadialBarChart, RadialBar, ResponsiveContainer,
@@ -465,6 +467,15 @@ const AdminDashboardPage = () => {
                 <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
                   <Typography variant="h6" fontWeight="bold">Enterprise Recovery Actions</Typography>
                   <Stack direction="row" spacing={2}>
+                    <Button
+                      variant="outlined"
+                      startIcon={<ReceiptIcon />}
+                      size="small"
+                      onClick={() => navigate('/admin/billing')}
+                      sx={{ borderRadius: 1.5, textTransform: 'none', fontWeight: 'bold' }}
+                    >
+                      Billing Oversight
+                    </Button>
                     <Button
                       variant="outlined"
                       startIcon={<SettingsApplicationsIcon />}

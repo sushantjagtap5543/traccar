@@ -9,46 +9,78 @@ const { sendAlert } = require('./monitor');
  */
 
 let isRunning = false;
+let sessionCookie = null;
 const POLL_INTERVAL = 30000; // 30 seconds
+
+const getClient = () => {
+    const traccarUrl = process.env.TRACCAR_URL || 'http://traccar:8082';
+    const config = {
+        baseURL: traccarUrl,
+        headers: {}
+    };
+
+    if (sessionCookie) {
+        config.headers['Cookie'] = sessionCookie;
+    } else {
+        config.auth = {
+            username: process.env.ADMIN_EMAIL || 'admin@geosurepath.com',
+            password: process.env.TRACCAR_ADMIN_PASSWORD || 'admin'
+        };
+    }
+
+    return axios.create(config);
+};
 
 const startAlertEngine = () => {
     if (isRunning) return;
     isRunning = true;
-    logger.info('GeoSurePath Alert Engine started.');
+    logger.info('GeoSurePath Alert Engine started with Session Cache.');
 
     setInterval(async () => {
         try {
-            const traccarUrl = process.env.TRACCAR_URL || 'http://traccar:8082';
-            const adminEmail = process.env.ADMIN_EMAIL || 'admin@geosurepath.com';
-            // Note: In a real system, we'd use a service account or master token
-            // For now, we'll try to get the server config first
+            let client = getClient();
 
-            const serverRes = await axios.get(`${traccarUrl}/api/server`, {
-                auth: { username: adminEmail, password: process.env.TRACCAR_ADMIN_PASSWORD || 'admin' }
-            });
+            // 1. Ensure session
+            if (!sessionCookie) {
+                try {
+                    const authRes = await client.get('/api/session');
+                    if (authRes.headers['set-cookie']) {
+                        sessionCookie = authRes.headers['set-cookie'][0].split(';')[0];
+                        logger.info('Alert Engine: Traccar Session Established.');
+                        client = getClient(); // Refresh client with cookie
+                    }
+                } catch (err) {
+                    logger.error('Alert Engine Auth Failed:', err.message);
+                    return;
+                }
+            }
 
-            const server = serverRes.data;
+            // 2. Fetch Config from Traccar Server Attributes
+            let server;
+            try {
+                const serverRes = await client.get('/api/server');
+                server = serverRes.data;
+            } catch (err) {
+                if (err.response?.status === 401) sessionCookie = null; // Reset session on 401
+                throw err;
+            }
+
             if (!server.attributes?.alertConfig) return;
-
             const config = JSON.parse(server.attributes.alertConfig);
 
-            // Fetch devices and positions
-            const devicesRes = await axios.get(`${traccarUrl}/api/devices`, {
-                auth: { username: adminEmail, password: process.env.TRACCAR_ADMIN_PASSWORD || 'admin' }
-            });
+            // 3. Fetch Devices
+            const devicesRes = await client.get('/api/devices');
 
             for (const device of devicesRes.data) {
                 if (!device.lastUpdate) continue;
 
-                // Get latest position
-                const posRes = await axios.get(`${traccarUrl}/api/positions?deviceId=${device.id}`, {
-                    auth: { username: adminEmail, password: process.env.TRACCAR_ADMIN_PASSWORD || 'admin' }
-                });
-
+                // 4. Get Latest Position
+                const posRes = await client.get(`/api/positions?deviceId=${device.id}`);
                 if (posRes.data.length === 0) continue;
                 const pos = posRes.data[0];
+                const alarm = pos.attributes?.alarm;
 
-                // Check Overspeed
+                // Overspeed
                 if (config.overSpeed?.enabled) {
                     const speedKph = pos.speed * 1.852;
                     if (speedKph > config.overSpeed.threshold) {
@@ -56,14 +88,14 @@ const startAlertEngine = () => {
                     }
                 }
 
-                // Check Battery
+                // Battery
                 if (config.batteryLow?.enabled && pos.attributes?.batteryLevel !== undefined) {
                     if (pos.attributes.batteryLevel < config.batteryLow.threshold) {
                         await sendAlert('LOW_BATTERY', `Vehicle ${device.name} battery is at ${pos.attributes.batteryLevel}%.`, 'WARNING', device.id);
                     }
                 }
 
-                // Check Engine Status
+                // Engine
                 if (config.engineOn?.enabled && pos.attributes?.ignition) {
                     await sendAlert('ENGINE_ON', `Vehicle ${device.name} engine started.`, 'INFO', device.id);
                 }
@@ -71,29 +103,18 @@ const startAlertEngine = () => {
                     await sendAlert('ENGINE_OFF', `Vehicle ${device.name} engine stopped.`, 'INFO', device.id);
                 }
 
-                // Check Security / Tampering
-                if (config.powerCut?.enabled && pos.attributes?.alarm === 'powerCut') {
+                // Security Alarms
+                if (config.powerCut?.enabled && alarm === 'powerCut') {
                     await sendAlert('POWER_CUT', `External power disconnected for vehicle ${device.name}!`, 'CRITICAL', device.id);
                 }
-                if (config.ignitionTampering?.enabled && pos.attributes?.alarm === 'vibration') {
+                if (config.ignitionTampering?.enabled && alarm === 'vibration') {
                     await sendAlert('VIBRATION_ALARM', `Structural vibration detected on vehicle ${device.name}.`, 'WARNING', device.id);
                 }
-                if (config.towAlert?.enabled && pos.attributes?.alarm === 'tow') {
+                if (config.towAlert?.enabled && alarm === 'tow') {
                     await sendAlert('TOW_ALERT', `Vehicle ${device.name} is being moved without ignition!`, 'CRITICAL', device.id);
                 }
 
-                // Check Operational / Behavior
-                if (config.harshBraking?.enabled && pos.attributes?.alarm === 'hardBraking') {
-                    await sendAlert('HARSH_BRAKING', `Aggressive braking detected on ${device.name}.`, 'WARNING', device.id);
-                }
-                if (config.harshAcceleration?.enabled && pos.attributes?.alarm === 'hardAcceleration') {
-                    await sendAlert('HARSH_ACCEL', `Aggressive acceleration detected on ${device.name}.`, 'WARNING', device.id);
-                }
-                if (config.sharpTurning?.enabled && pos.attributes?.alarm === 'hardCornering') {
-                    await sendAlert('SHARP_TURNING', `Dangerous cornering detected on ${device.name}.`, 'WARNING', device.id);
-                }
-
-                // Device Connectivity
+                // Connectivity
                 if (config.deviceDisconnected?.enabled && device.status === 'offline') {
                     await sendAlert('DEVICE_OFFLINE', `Telemetry lost for vehicle ${device.name}.`, 'WARNING', device.id);
                 }
@@ -101,41 +122,43 @@ const startAlertEngine = () => {
                     await sendAlert('GPS_SIGNAL_LOST', `GPS fix lost for vehicle ${device.name}.`, 'WARNING', device.id);
                 }
 
-                // NEW: Idle & Stop (Simplified logic based on attributes)
+                // Idle & Stop
                 if (config.excessIdle?.enabled && pos.attributes?.motion === false) {
-                    // Traccar 'idle' is usually when ignition is on but motion is false
-                    // Here we check if it has been stationary
-                    const idleTimeRes = await axios.get(`${traccarUrl}/api/reports/summary?deviceId=${device.id}&from=${new Date(Date.now() - config.excessIdle.threshold * 60000).toISOString()}&to=${new Date().toISOString()}`, {
-                        auth: { username: adminEmail, password: process.env.TRACCAR_ADMIN_PASSWORD || 'admin' }
-                    });
-                    if (idleTimeRes.data.length > 0 && idleTimeRes.data[0].engineHours > 0 && idleTimeRes.data[0].distance === 0) {
+                    const idleRes = await client.get(`/api/reports/summary?deviceId=${device.id}&from=${new Date(Date.now() - config.excessIdle.threshold * 60000).toISOString()}&to=${new Date().toISOString()}`);
+                    if (idleRes.data.length > 0 && idleRes.data[0].engineHours > 0 && idleRes.data[0].distance === 0) {
                         await sendAlert('EXCESS_IDLE', `Vehicle ${device.name} has been idling for over ${config.excessIdle.threshold} minutes.`, 'WARNING', device.id);
                     }
                 }
-
-                if (config.unexpectedStop?.enabled && pos.attributes?.alarm === 'stop') {
+                if (config.unexpectedStop?.enabled && alarm === 'stop') {
                     await sendAlert('UNEXPECTED_STOP', `Unexpected stop detected for vehicle ${device.name}.`, 'WARNING', device.id);
                 }
 
-                // NEW: Route & Geofence (Intercepting alarms from Traccar)
-                if (config.routeViolation?.enabled && pos.attributes?.alarm === 'geofenceExit') {
-                    await sendAlert('ROUTE_VIOLATION', `Vehicle ${device.name} deviated from assigned route/geofence.`, 'CRITICAL', device.id);
+                // Geofence / Route Logistics (FIXED COLLISION)
+                if (alarm === 'geofenceExit') {
+                    const geoType = pos.attributes?.geofenceType || 'unknown';
+                    if (config.routeStart?.enabled && geoType === 'depot') {
+                        await sendAlert('ROUTE_STARTED', `Vehicle ${device.name} has departed from the depot.`, 'INFO', device.id);
+                    } else if (config.routeViolation?.enabled) {
+                        // If not a depot exit, it's a route violation (corridor/zone exit)
+                        await sendAlert('ROUTE_VIOLATION', `Vehicle ${device.name} deviated from assigned route/geofence.`, 'CRITICAL', device.id);
+                    }
                 }
-                if (config.routeCompleted?.enabled && pos.attributes?.alarm === 'geofenceEnter') {
-                    await sendAlert('ROUTE_COMPLETED', `Vehicle ${device.name} reached destination.`, 'INFO', device.id);
+
+                if (config.routeCompleted?.enabled && alarm === 'geofenceEnter') {
+                    const geoType = pos.attributes?.geofenceType || 'unknown';
+                    if (geoType === 'destination' || geoType === 'depot') {
+                        await sendAlert('ROUTE_COMPLETED', `Vehicle ${device.name} reached destination.`, 'INFO', device.id);
+                    }
                 }
-                if (config.routeStart?.enabled && pos.attributes?.alarm === 'geofenceExit') {
-                    // Note: You might want more specific logic for route start
-                    await sendAlert('ROUTE_STARTED', `Vehicle ${device.name} has started its journey.`, 'INFO', device.id);
-                }
+
                 if (config.routeDelay?.enabled && device.status === 'online' && pos.speed < 5) {
-                    // Simple delay logic: vehicle is online but not moving much
                     await sendAlert('ROUTE_DELAY', `Vehicle ${device.name} is experiencing delays in transit.`, 'WARNING', device.id);
                 }
             }
 
         } catch (err) {
             logger.error('Alert Engine Error:', err.message);
+            if (err.response?.status === 401) sessionCookie = null;
         }
     }, POLL_INTERVAL);
 };

@@ -6,8 +6,22 @@ const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 const Joi = require('joi');
+const crypto = require('crypto');
 const { pool, redisClient, logger } = require('../services/db');
 const { adminAuth } = require('../middleware/auth');
+
+// --- SECRETS ENCRYPTION HELPERS ---
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default_32_byte_key_please_change_it_!!!';
+const IV_LENGTH = 16;
+
+const encrypt = (text) => {
+    if (!text) return text;
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY.padEnd(32).slice(0, 32)), iv);
+    let encrypted = cipher.update(text);
+    encrypted = Buffer.concat([encrypted, cipher.final()]);
+    return iv.toString('hex') + ':' + encrypted.toString('hex');
+};
 
 const restartSchema = Joi.object({
     service: Joi.string().valid('traccar', 'database', 'backend', 'cache').required()
@@ -214,6 +228,22 @@ router.post('/admin/restart/:service', adminAuth, (req, res) => {
     });
 });
 
+// --- BILLING DATA ---
+router.get('/admin/billing/overview', adminAuth, async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT s.*, u.name as user_name, u.email as user_email 
+            FROM geosurepath_subscriptions s 
+            LEFT JOIN tc_users u ON s.user_id = u.id 
+            ORDER BY s.created_at DESC
+        `);
+        res.json(result.rows);
+    } catch (err) {
+        logger.error('Billing Overview Error:', err);
+        res.status(500).json({ error: 'Failed to fetch billing data' });
+    }
+});
+
 router.post('/admin/alerts/config', adminAuth, async (req, res) => {
     const { webhookUrl } = req.body;
     if (!webhookUrl || !webhookUrl.startsWith('http')) {
@@ -235,16 +265,15 @@ router.post('/admin/alerts/config', adminAuth, async (req, res) => {
 });
 
 // --- PLATFORM CONFIGURATION (CENTRAL PANEL) ---
-const SENSITIVE_KEYS = ['razorpay_secret', 'twilio_auth_token', 'jwt_secret', 'admin_api_key', 'traccar_admin_password'];
+const SENSITIVE_KEYS = ['razorpay_secret', 'twilio_auth_token', 'jwt_secret', 'admin_api_key', 'traccar_admin_password', 'razorpay_webhook_secret'];
 
 router.get('/admin/config', adminAuth, async (req, res) => {
     try {
         const result = await pool.query('SELECT key, value FROM geosurepath_settings');
         const config = {};
         result.rows.forEach(row => {
-            // Mask sensitive keys: only show last 4 chars
-            if (SENSITIVE_KEYS.includes(row.key) && row.value && row.value.length > 8) {
-                config[row.key] = `****${row.value.slice(-4)}`;
+            if (SENSITIVE_KEYS.includes(row.key)) {
+                config[row.key] = '••••••••••••';
             } else {
                 config[row.key] = row.value;
             }
@@ -259,18 +288,22 @@ router.post('/admin/config', adminAuth, async (req, res) => {
     const updates = req.body;
     try {
         for (const [key, value] of Object.entries(updates)) {
-            // If the user didn't change a masked value (it starts with ****), skip it
-            if (SENSITIVE_KEYS.includes(key) && String(value).startsWith('****')) {
+            if (SENSITIVE_KEYS.includes(key) && value === '••••••••••••') {
                 continue;
+            }
+
+            let finalValue = String(value);
+            if (SENSITIVE_KEYS.includes(key)) {
+                finalValue = encrypt(finalValue);
             }
 
             await pool.query(
                 'INSERT INTO geosurepath_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
-                [key, String(value)]
+                [key, finalValue]
             );
         }
-        logger.info('Platform configuration updated securely.');
-        res.json({ message: 'Configuration synchronized. Note: Security changes (JWT, API Key) require a server restart.' });
+        logger.info('Platform configuration updated securely (encrypted).');
+        res.json({ message: 'Configuration synchronized. Note: Security changes require a server restart.' });
     } catch (err) {
         logger.error('Bulk config error:', err);
         res.status(500).json({ error: 'Failed to update configuration' });

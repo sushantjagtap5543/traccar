@@ -347,8 +347,8 @@ const LandingPage = () => {
                         <Grid item xs={6} md={2}>
                             <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 3 }}>Legal</Typography>
                             <Stack spacing={2}>
-                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }}>Privacy Policy</Typography>
-                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }}>Terms of Service</Typography>
+                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }} onClick={() => navigate('/legal/privacy')}>Privacy Policy</Typography>
+                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }} onClick={() => navigate('/legal/terms')}>Terms of Service</Typography>
                                 <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }}>SLA</Typography>
                             </Stack>
                         </Grid>
@@ -357,8 +357,8 @@ const LandingPage = () => {
                     <Stack direction="row" justifyContent="space-between" alignItems="center">
                         <Typography variant="caption" color="textSecondary">© 2026 GeoSurePath Global. All rights reserved.</Typography>
                         <Stack direction="row" spacing={3}>
-                            <Typography variant="caption" color="textSecondary">Privacy Policy</Typography>
-                            <Typography variant="caption" color="textSecondary">Terms of Service</Typography>
+                            <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }} onClick={() => navigate('/legal/privacy')}>Privacy Policy</Typography>
+                            <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }} onClick={() => navigate('/legal/terms')}>Terms of Service</Typography>
                         </Stack>
                     </Stack>
                 </Container>

@@ -180,29 +180,112 @@ router.post('/webhook', async (req, res) => {
     res.json({ status: 'ok' });
 });
 
-// 6. Simple Invoice Data
+// 6. Styled Invoice Generator
 router.get('/invoice/:paymentId', async (req, res) => {
     try {
         const result = await pool.query(
             "SELECT s.*, u.name as user_name, u.email as user_email FROM geosurepath_subscriptions s JOIN tc_users u ON s.user_id = u.id WHERE s.razorpay_payment_id = $1",
             [req.params.paymentId]
         );
-        if (result.rowCount === 0) return res.status(404).json({ error: 'Invoice not found' });
+        if (result.rowCount === 0) return res.send('<h1>Invoice Not Found</h1>');
 
         const sub = result.rows[0];
-        // In a real app, generate PDF here. For now, we return JSON meta-data
-        res.json({
-            invoiceNumber: `INV-${sub.id}-${Date.now()}`,
-            date: sub.created_at,
-            customer: { name: sub.user_name, email: sub.user_email },
-            plan: sub.plan_id,
-            amount: sub.plan_id === '1month' ? 236 : (sub.plan_id === '6month' ? 1121 : 1770), // Including 18% GST
-            currency: 'INR',
-            status: 'PAID',
-            paymentId: sub.razorpay_payment_id
-        });
+        const baseAmount = sub.plan_id === '1month' ? 200 : (sub.plan_id === '6month' ? 950 : 1500);
+        const gst = Math.round(baseAmount * 0.18);
+        const total = baseAmount + gst;
+
+        res.send(`
+            <html>
+            <head>
+                <style>
+                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; margin: 0; padding: 40px; }
+                    .invoice-box { max-width: 800px; margin: auto; padding: 30px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0, 0, 0, .15); font-size: 16px; line-height: 24px; color: #555; }
+                    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0B7A75; padding-bottom: 20px; margin-bottom: 20px; }
+                    .logo { color: #0B7A75; font-size: 28px; font-weight: bold; }
+                    .company-info { text-align: right; font-size: 12px; line-height: 18px; }
+                    .bill-to { margin-bottom: 40px; }
+                    table { width: 100%; line-height: inherit; text-align: left; border-collapse: collapse; }
+                    table th { background: #f8f9fa; padding: 12px; border-bottom: 1px solid #eee; }
+                    table td { padding: 12px; border-bottom: 1px solid #eee; }
+                    .totals { text-align: right; margin-top: 30px; }
+                    .totals div { margin-bottom: 10px; }
+                    .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #aaa; border-top: 1px solid #eee; padding-top: 20px; }
+                    .status-stamp { display: inline-block; padding: 5px 15px; border: 3px solid #4CAF50; color: #4CAF50; font-weight: bold; transform: rotate(-10deg); margin-top: 20px; text-transform: uppercase; }
+                </style>
+            </head>
+            <body>
+                <div class="invoice-box">
+                    <div class="header">
+                        <div class="logo">GeoSurePath</div>
+                        <div class="company-info">
+                            <b>GeoSurePath Solutions Ltd.</b><br>
+                            123 Tech Park, Whitefield<br>
+                            Bangalore, KA, India 560066<br>
+                            GSTIN: 29AAAAA0000A1Z5
+                        </div>
+                    </div>
+                    
+                    <div class="bill-to">
+                        <Typography variant="overline">BILL TO:</Typography><br>
+                        <b>${sub.user_name}</b><br>
+                        ${sub.user_email}<br>
+                        Payment ID: ${sub.razorpay_payment_id}
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Description</th>
+                                <th>Qty</th>
+                                <th style="text-align: right;">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>GPS Fleet Subscription - ${sub.plan_id.toUpperCase()} Tier</td>
+                                <td>1</td>
+                                <td style="text-align: right;">₹${baseAmount.toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td>Integrated GST (18%)</td>
+                                <td>1</td>
+                                <td style="text-align: right;">₹${gst.toFixed(2)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="totals">
+                        <div>Subtotal: ₹${baseAmount.toFixed(2)}</div>
+                        <div>Tax: ₹${gst.toFixed(2)}</div>
+                        <div style="font-size: 20px; font-weight: bold; color: #0B7A75;">Total Paid: ₹${total.toFixed(2)}</div>
+                        <div class="status-stamp">PAID</div>
+                    </div>
+
+                    <div class="footer">
+                        This is a computer generated invoice. No signature required.<br>
+                        © 2026 GeoSurePath Global Tracking.
+                    </div>
+                </div>
+                <script>window.print();</script>
+            </body>
+            </html>
+        `);
     } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch invoice' });
+        res.status(500).send('<h1>Internal Server Error</h1>');
+    }
+});
+
+// 7. Payment History for a specific User
+router.get('/history/:userId', async (req, res) => {
+    try {
+        const result = await pool.query(
+            "SELECT * FROM geosurepath_subscriptions WHERE user_id = $1 ORDER BY created_at DESC",
+            [req.params.userId]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        logger.error('Fetch Payment History Error:', err.message);
+        res.status(500).json({ error: 'Failed to fetch history' });
     }
 });
 
