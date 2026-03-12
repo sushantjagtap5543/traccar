@@ -27,9 +27,10 @@ services:
     image: prom/prometheus:latest
     restart: always
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
     depends_on:
       - admin-api
 
@@ -96,3 +97,4 @@ services:
 
 volumes:
   grafana_data:
+  prometheus_data:

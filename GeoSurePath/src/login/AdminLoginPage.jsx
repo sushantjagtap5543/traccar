@@ -79,14 +79,29 @@ const AdminLoginPage = () => {
         }
     };
 
-    const handle2FA = (e) => {
+    const handle2FA = async (e) => {
         e.preventDefault();
+        const code = e.target.querySelector('input').value;
+        setError(null);
         setLoading(true);
-        // TOTP is simulated as requested in the plan (Step 13)
-        setTimeout(() => {
+        try {
+            const response = await fetch(`${API_BASE}/api/admin/auth/verify-totp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: code, email })
+            });
+            const data = await response.json();
+            if (response.ok) {
+                localStorage.setItem('adminToken', data.token);
+                navigate('/admin/dashboard');
+            } else {
+                throw new Error(data.error || 'Invalid 2FA code');
+            }
+        } catch (err) {
+            setError(err.message);
+        } finally {
             setLoading(false);
-            navigate('/admin/dashboard');
-        }, 800);
+        }
     };
 
     return (

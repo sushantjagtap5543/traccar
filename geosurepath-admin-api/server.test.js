@@ -7,7 +7,14 @@ const fs = require('fs');
 const jwt = require('jsonwebtoken');
 
 // Mocks
-jest.mock('pg');
+jest.mock('pg', () => {
+    const mPool = {
+        query: jest.fn().mockResolvedValue({ rowCount: 1, rows: [] }),
+        end: jest.fn().mockResolvedValue(null),
+        on: jest.fn(),
+    };
+    return { Pool: jest.fn(() => mPool) };
+});
 jest.mock('child_process');
 jest.mock('systeminformation');
 jest.mock('axios');
@@ -24,20 +31,33 @@ jest.mock('prom-client', () => ({
         set: jest.fn()
     }))
 }));
+
 jest.mock('redis', () => ({
     createClient: jest.fn().mockReturnValue({
         on: jest.fn(),
         connect: jest.fn().mockResolvedValue(null),
         ping: jest.fn().mockResolvedValue('PONG'),
+        info: jest.fn().mockResolvedValue('redis_version:7.0.0'),
+        get: jest.fn().mockResolvedValue(null),
+        set: jest.fn().mockResolvedValue('OK'),
+        del: jest.fn().mockResolvedValue(1),
         quit: jest.fn().mockResolvedValue(null),
     }),
 }));
+
 jest.mock('ioredis', () => {
     return jest.fn().mockImplementation(() => ({
         call: jest.fn().mockResolvedValue('OK'),
         quit: jest.fn().mockResolvedValue(null),
     }));
 });
+
+// Setup default SI mocks
+si.currentLoad.mockResolvedValue({ currentLoad: 10 });
+si.mem.mockResolvedValue({ total: 16000000000, active: 8000000000 });
+si.fsSize.mockResolvedValue([{ size: 1000000000, used: 500000000, use: 50, mount: '/' }]);
+si.networkStats.mockResolvedValue([{ rx_sec: 1000, tx_sec: 2000 }]);
+si.time.mockReturnValue({ uptime: 3600 });
 
 // Mock environment
 const API_KEY = 'test_key_32chars_minimum_here_must_be_long_entropy';
@@ -49,10 +69,14 @@ const app = require('./server');
 
 describe('GeoSurePath Admin API', () => {
     describe('ADMIN AUTH (JWT)', () => {
-        it('should return a token for valid credentials in test mode', async () => {
+        it('should return a token for valid credentials', async () => {
+            const password = 'test_password';
+            const hash = require('bcryptjs').hashSync(password, 10);
+            process.env.ADMIN_PASSWORD_HASH = hash;
+
             const res = await request(app)
                 .post('/api/admin/auth/login')
-                .send({ email: 'admin@geosurepath.com', password: 'admin123' });
+                .send({ email: 'admin@geosurepath.com', password });
 
             expect(res.statusCode).toBe(200);
             expect(res.body).toHaveProperty('token');
@@ -68,6 +92,49 @@ describe('GeoSurePath Admin API', () => {
         });
     });
 
+    describe('POST /api/admin/backup', () => {
+        it('should complete backup successfully', async () => {
+            exec.mockImplementation((cmd, cb) => cb(null, '', ''));
+            process.env.DATABASE_URL = 'postgres://test:test@localhost/test';
+            const res = await request(app)
+                .post('/api/admin/backup')
+                .set('x-api-key', API_KEY);
+            expect(res.statusCode).toBe(200);
+            expect(res.body.filename).toMatch(/backup-.*\.sql/);
+        });
+    });
+
+    describe('GET /api/admin/db/tables', () => {
+        it('should return table statistics', async () => {
+            const mockPool = new Pool();
+            mockPool.query.mockResolvedValue({ rows: [{ table_name: 'devices', row_count: 42 }] });
+            const res = await request(app)
+                .get('/api/admin/db/tables')
+                .set('x-api-key', API_KEY);
+            expect(res.statusCode).toBe(200);
+            expect(Array.isArray(res.body.tables)).toBe(true);
+        });
+    });
+
+    describe('POST /api/auth/send-otp', () => {
+        it('should accept valid mobile number', async () => {
+            const res = await request(app)
+                .post('/api/auth/send-otp')
+                .send({ mobile: '9999999999' });
+            expect(res.statusCode).toBe(200);
+            expect(res.body.message).toContain('sent');
+        });
+    });
+
+    describe('POST /api/auth/verify-otp', () => {
+        it('should reject invalid or expired code', async () => {
+            const res = await request(app)
+                .post('/api/auth/verify-otp')
+                .send({ mobile: '9999999999', code: '000000' });
+            expect(res.statusCode).toBe(400);
+        });
+    });
+
     describe('GET /api/admin/health', () => {
         it('should return 403 without any auth', async () => {
             const res = await request(app).get('/api/admin/health');
@@ -75,12 +142,6 @@ describe('GeoSurePath Admin API', () => {
         });
 
         it('should return 200 with valid API key', async () => {
-            si.currentLoad.mockResolvedValue({ currentLoad: 10 });
-            si.mem.mockResolvedValue({ total: 16, active: 8 });
-            si.fsSize.mockResolvedValue([{ size: 100, used: 50, use: 50, mount: '/' }]);
-            si.networkStats.mockResolvedValue([{ rx_sec: 100, tx_sec: 200 }]);
-            si.time.mockReturnValue({ uptime: 3600 });
-
             const mockPool = new Pool();
             mockPool.query.mockResolvedValue({ rowCount: 1, rows: [{ size: '10 MB' }] });
 

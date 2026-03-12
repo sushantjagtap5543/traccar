@@ -5,7 +5,7 @@ WORKDIR /app
 # Enable legacy OpenSSL for compatibility with some Vite/Node versions if needed, 
 # but Node 20 usually handles this.
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 COPY . .
 RUN npm run build
