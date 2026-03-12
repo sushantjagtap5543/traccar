@@ -13,26 +13,36 @@ services:
       retries: 5
     ports:
       - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - internal
 
   redis:
     image: redis:7-alpine
     restart: always
+    command: redis-server --save 60 1 --loglevel warning --appendonly yes
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
 
   prometheus:
     image: prom/prometheus:latest
     restart: always
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
-    ports:
-      - "9090:9090"
+    networks:
+      - internal
     depends_on:
-      - admin-api
+      admin-api:
+        condition: service_healthy
 
   traccar:
     image: traccar/traccar:latest
@@ -42,22 +52,21 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ./traccar.xml.template:/app/traccar.xml.template
-      - ./entrypoint.sh:/app/entrypoint.sh
+      - ./traccar.xml.template:/app/traccar.xml.template:ro
+      - ./entrypoint.sh:/app/entrypoint.sh:ro
     entrypoint: [ "/bin/sh", "/app/entrypoint.sh" ]
     command: [ "java", "-Xms512m", "-Xmx512m", "-jar", "tracker-server.jar", "/app/traccar.xml" ]
     ports:
-      - "8082:8082"
       - "5000-5150:5000-5150"
       - "5000-5150:5000-5150/udp"
+    networks:
+      - internal
 
   admin-api:
     build:
       context: ./geosurepath-admin-api
     restart: always
     env_file: .env
-    ports:
-      - "8083:8083"
     depends_on:
       db:
         condition: service_healthy
@@ -69,17 +78,34 @@ services:
     environment:
       - DATABASE_URL=postgres://postgres:${DB_PASSWORD}@db:5432/traccar
       - REDIS_URL=redis://redis:6379
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
+    networks:
+      - internal
 
   frontend:
     build:
       context: ./GeoSurePath
-    ports:
-      - "3000:80"
     environment:
       - VITE_ADMIN_API_KEY=${ADMIN_API_KEY}
-      - VITE_ADMIN_API_URL=${VITE_ADMIN_API_URL:-http://localhost:8083}
+      - VITE_ADMIN_API_URL=/api/admin
     depends_on:
+      admin-api:
+        condition: service_healthy
+    networks:
+      - internal
+
+  nginx:
+    build:
+      context: ./nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - frontend
       - admin-api
+      - traccar
+    networks:
+      - internal
 
   grafana:
     image: grafana/grafana-oss:latest
@@ -91,10 +117,18 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - internal
     depends_on:
       - prometheus
 
+networks:
+  internal:
+    driver: bridge
+
 volumes:
+  db_data:
+  redis_data:
   grafana_data:
   prometheus_data:

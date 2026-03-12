@@ -86,10 +86,9 @@ const LandingPage = () => {
                 <Container maxWidth="lg">
                     <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
                         <Stack direction="row" alignItems="center" spacing={1}>
-                            <Box sx={{ bgcolor: '#0B7A75', p: 0.5, borderRadius: 1 }}>
-                                <NavigationIcon sx={{ color: 'white' }} />
+                            <Box sx={{ p: 0.5, borderRadius: 1 }}>
+                                <img src="/logo.png" alt="GeoSurePath Logo" style={{ height: 32 }} />
                             </Box>
-                            <Typography variant="h6" fontWeight="bold" color="#0F2D5C">GeoSurePath</Typography>
                         </Stack>
 
                         {!isMobile && (

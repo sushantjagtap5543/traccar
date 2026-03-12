@@ -7,8 +7,13 @@ GeoSurePath/node_modules/
 logs/
 backups/
 coverage/
-.nyc_output/
 dist/
 build/
+.vscode/
+package-lock.json
+GeoSurePath/package-lock.json
+geosurepath-admin-api/package-lock.json
+mock-backend.cjs
+geosurepath-admin-api/mock-backend.cjs
 .DS_Store
 Thumbs.db
