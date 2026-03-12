@@ -13,11 +13,10 @@ import { useTranslation } from '../../common/components/LocalizationProvider';
 import fetchOrThrow from '../../common/util/fetchOrThrow';
 import { Snackbar, Alert } from '@mui/material';
 
-import * as CircleModeNamespace from 'mapbox-gl-draw-circle';
+import { CircleMode } from 'mapbox-gl-draw-circle';
 import * as DrawRectangleNamespace from 'mapbox-gl-draw-rectangle-mode';
 
-const CircleMode = CircleModeNamespace['default'] || CircleModeNamespace;
-const DrawRectangle = DrawRectangleNamespace['default'] || DrawRectangleNamespace;
+const DrawRectangle = DrawRectangleNamespace.default || DrawRectangleNamespace;
 
 const MapGeofenceDirect = ({ onSelect }) => {
   const theme = useTheme();
