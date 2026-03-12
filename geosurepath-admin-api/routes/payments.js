@@ -73,18 +73,39 @@ router.post('/verify', async (req, res) => {
         planId // '1month', '6month', '12month', 'enterprise'
     } = req.body;
 
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !userId || !planId) {
+        return res.status(400).json({ error: 'Missing required payment verification fields' });
+    }
+
     try {
         const resSettings = await pool.query("SELECT value FROM geosurepath_settings WHERE key = 'razorpay_secret' LIMIT 1");
         const secret = decrypt(resSettings.rows[0]?.value) || process.env.RAZORPAY_SECRET;
+
+        if (!secret) return res.status(500).json({ error: 'Payment gateway secret not configured' });
 
         const hmac = crypto.createHmac('sha256', secret);
         hmac.update(razorpay_order_id + "|" + razorpay_payment_id);
         const expectedSignature = hmac.digest('hex');
 
-        if (expectedSignature === razorpay_signature) {
-            // Determine duration and device limit
+        // Timing-safe comparison
+        const isMatch = crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(razorpay_signature));
+
+        if (isMatch) {
+            // Determine duration
             let months = 1;
-            if (planId === 'enterprise' || planId === '12month') months = 12;
+            if (planId === '6month') months = 6;
+            else if (planId === '12month' || planId === 'enterprise') months = 12;
+
+            // Check for existing active subscription
+            const existingSub = await pool.query(
+                "SELECT id FROM geosurepath_subscriptions WHERE user_id = $1 AND plan_id = $2 AND status = 'active' AND expiry_date > NOW()",
+                [userId, planId]
+            );
+
+            if (existingSub.rowCount > 0) {
+                logger.warn(`User ${userId} already has an active ${planId} subscription. Attempting to extend or log as duplicate.`);
+                // For now, we'll allow it but log it. Business logic might differ.
+            }
 
             const expiryDate = new Date();
             expiryDate.setMonth(expiryDate.getMonth() + months);

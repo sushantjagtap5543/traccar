@@ -10,6 +10,7 @@ const { sendAlert } = require('./monitor');
 
 let isRunning = false;
 let sessionCookie = null;
+let engineInterval = null;
 const POLL_INTERVAL = 30000; // 30 seconds
 
 const getClient = () => {
@@ -36,7 +37,7 @@ const startAlertEngine = () => {
     isRunning = true;
     logger.info('GeoSurePath Alert Engine started with Session Cache.');
 
-    setInterval(async () => {
+    engineInterval = setInterval(async () => {
         try {
             let client = getClient();
 
@@ -66,7 +67,14 @@ const startAlertEngine = () => {
             }
 
             if (!server.attributes?.alertConfig) return;
-            const config = JSON.parse(server.attributes.alertConfig);
+            
+            let config;
+            try {
+                config = JSON.parse(server.attributes.alertConfig);
+            } catch (err) {
+                logger.error('Alert Engine: Invalid alertConfig JSON in server attributes:', { error: err.message });
+                return;
+            }
 
             // 3. Fetch Devices
             const devicesRes = await client.get('/api/devices');
@@ -163,4 +171,13 @@ const startAlertEngine = () => {
     }, POLL_INTERVAL);
 };
 
-module.exports = { startAlertEngine };
+const stopAlertEngine = () => {
+    if (engineInterval) {
+        clearInterval(engineInterval);
+        engineInterval = null;
+    }
+    isRunning = false;
+    logger.info('GeoSurePath Alert Engine stopped.');
+};
+
+module.exports = { startAlertEngine, stopAlertEngine };

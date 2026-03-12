@@ -145,20 +145,36 @@ const startServer = async () => {
   // --- GRACEFUL SHUTDOWN ---
   const gracefulShutdown = async (signal) => {
     logger.info(`${signal} received. Starting graceful shutdown...`);
+    
+    // Stop core services first
+    const { stopAlertEngine } = require('./services/alertEngine');
+    stopAlertEngine();
+    backupService.stopCron();
+
     server.close(async () => {
       try {
-        await Promise.all([pool.end(), redisClient.quit(), ioRedisClient.quit()]);
-        logger.info('Connections closed.');
+        await Promise.all([
+          pool.end(),
+          redisClient.quit(),
+          ioRedisClient.quit()
+        ]);
+        logger.info('Connections closed. Process exiting.');
         process.exit(0);
       } catch (err) {
         logger.error('Error during shutdown:', err);
         process.exit(1);
       }
     });
+
+    // Forced exit after 10s if graceful shutdown hangs
+    setTimeout(() => {
+        logger.error('Could not close connections in time, forceful shutdown');
+        process.exit(1);
+    }, 10000);
   };
 
-  process.on('SIGTERM', gracefulShutdown);
-  process.on('SIGINT', gracefulShutdown);
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 };
 
 startServer();

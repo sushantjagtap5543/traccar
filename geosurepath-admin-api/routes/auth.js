@@ -13,19 +13,23 @@ router.post('/admin/auth/login', async (req, res) => {
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@geosurepath.com';
     const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
-    if (!adminPasswordHash) {
-        logger.error('ADMIN_PASSWORD_HASH not configured. Login rejected.');
+    if (!adminPasswordHash || !process.env.JWT_SECRET) {
+        logger.error('Authentication environment variables missing. Login rejected.');
         return res.status(500).json({ error: 'Server authentication configuration missing' });
     }
 
-    const isValid = await bcrypt.compare(password, adminPasswordHash);
-
-    if (!isValid) {
-        logger.warn(`Invalid password for admin email: ${email}`);
+    if (email !== adminEmail) {
+        logger.warn(`Email mismatch for admin login: ${email}`);
         return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ role: 'admin', email }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '30m' });
+    const isValid = await bcrypt.compare(password, adminPasswordHash);
+    if (!isValid) {
+        logger.warn(`Invalid password for admin login: ${email}`);
+        return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign({ role: 'admin', email }, process.env.JWT_SECRET, { expiresIn: '30m' });
     res.json({ token });
 });
 
@@ -55,7 +59,7 @@ router.post('/admin/auth/verify-totp', async (req, res) => {
         });
 
         if (verified) {
-            const finalToken = jwt.sign({ role: 'admin', email: email || 'admin' }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '1h' });
+            const finalToken = jwt.sign({ role: 'admin', email: email || 'admin' }, process.env.JWT_SECRET, { expiresIn: '1h' });
             res.cookie('adminToken', finalToken, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
@@ -89,7 +93,8 @@ router.post('/auth/send-otp', async (req, res) => {
     const { mobile } = req.body;
     if (!mobile) return res.status(400).json({ error: 'Mobile number required' });
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const crypto = require('crypto');
+    const code = crypto.randomInt(100000, 999999).toString();
     try {
         await redisClient.set(`otp:${mobile}`, code, { EX: 300 });
         const { sendSMS } = require('../services/sms');
@@ -107,7 +112,12 @@ router.post('/auth/verify-otp', async (req, res) => {
 
     try {
         const storedCode = await redisClient.get(`otp:${mobile}`);
-        if (storedCode === code) {
+        if (!storedCode) return res.status(400).json({ error: 'OTP expired or not found' });
+
+        const crypto = require('crypto');
+        const isMatch = crypto.timingSafeEqual(Buffer.from(storedCode), Buffer.from(code));
+
+        if (isMatch) {
             await redisClient.del(`otp:${mobile}`);
             res.json({ success: true, message: 'OTP verified' });
         } else {

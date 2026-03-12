@@ -32,7 +32,7 @@ exports.up = function (knex) {
                 { key: 'google_drive_client_id', value: '' },
                 { key: 'google_drive_client_secret', value: '' },
                 { key: 'google_drive_refresh_token', value: '' },
-                { key: 'backup_encryption_key', value: 'your-secure-backup-key-32-chars-!!!' }
+                { key: 'backup_encryption_key', value: '' }
             ]);
         });
 };

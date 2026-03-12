@@ -39,18 +39,19 @@ const pool = new Pool({
     ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false
 });
 
-const connectWithRetry = (retries = 5) => {
-    pool.query('SELECT 1')
-        .then(() => logger.info('Database connected successfully'))
-        .catch((err) => {
-            if (retries > 0) {
-                logger.warn(`Database connection failed. Retrying in 5s... (${retries} retries left)`);
-                setTimeout(() => connectWithRetry(retries - 1), 5000);
-            } else {
-                logger.error('Could not connect to database after several attempts. Exiting...');
-                process.exit(1);
-            }
-        });
+const connectWithRetry = async (retries = 5) => {
+    try {
+        await pool.query('SELECT 1');
+        logger.info('Database connected successfully');
+    } catch (err) {
+        if (retries > 0) {
+            logger.warn(`Database connection failed. Retrying in 5s... (${retries} retries left)`);
+            setTimeout(() => connectWithRetry(retries - 1), 5000);
+        } else {
+            logger.error('Could not connect to database after several attempts. Exiting...');
+            process.exit(1);
+        }
+    }
 };
 
 if (process.env.NODE_ENV !== 'test') {
@@ -61,7 +62,14 @@ if (process.env.NODE_ENV !== 'test') {
 const redisClient = redis.createClient({ url: process.env.REDIS_URL });
 redisClient.on('error', (err) => logger.error('Redis Client Error:', err));
 if (process.env.NODE_ENV !== 'test') {
-    redisClient.connect().catch(err => logger.error('Redis Connection Failed:', err));
+    (async () => {
+        try {
+            await redisClient.connect();
+            logger.info('Redis connected successfully');
+        } catch (err) {
+            logger.error('Redis Connection Failed:', err);
+        }
+    })();
 }
 
 // --- IOREDIS (Rate Limiter) ---

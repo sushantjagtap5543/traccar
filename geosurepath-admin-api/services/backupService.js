@@ -13,6 +13,7 @@ const BACKUP_DIR = path.join(__dirname, '../../backups');
 class BackupService {
     constructor() {
         this.currentTask = null;
+        this.scheduledTasks = [];
         if (!fs.existsSync(BACKUP_DIR)) {
             fs.mkdirSync(BACKUP_DIR, { recursive: true });
         }
@@ -20,7 +21,7 @@ class BackupService {
 
     startCron() {
         // Run every minute to check if it's backup time
-        cron.schedule('* * * * *', async () => {
+        const checkTask = cron.schedule('* * * * *', async () => {
             const settings = await this.getSettings();
             if (settings.backup_enabled !== 'true') return;
 
@@ -34,9 +35,17 @@ class BackupService {
         });
 
         // Run retention cleanup daily at 01:00
-        cron.schedule('0 1 * * *', () => {
+        const cleanupTask = cron.schedule('0 1 * * *', () => {
             this.cleanupOldBackups();
         });
+
+        this.scheduledTasks.push(checkTask, cleanupTask);
+    }
+
+    stopCron() {
+        this.scheduledTasks.forEach(task => task.stop());
+        this.scheduledTasks = [];
+        logger.info('Backup cron tasks stopped.');
     }
 
     async getSettings() {
@@ -55,7 +64,8 @@ class BackupService {
         this.currentTask = 'BACKUP_' + Date.now();
         const settings = await this.getSettings();
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const backupName = `full_backup_${timestamp}`;
+        const randomSuffix = crypto.randomBytes(4).toString('hex');
+        const backupName = `full_backup_${timestamp}_${randomSuffix}`;
         const localPath = path.join(BACKUP_DIR, backupName + '.zip');
         const encryptedPath = localPath + '.enc';
 
@@ -64,10 +74,9 @@ class BackupService {
             const dbDumpPath = path.join(BACKUP_DIR, `db_${timestamp}.sql`);
             await this.dumpDatabase(dbDumpPath);
 
-            // 2. Create Archive
+            // 2. Create Archive (Only include database. Source code excluded for security)
             await this.createArchive(localPath, [
-                { path: dbDumpPath, name: 'database.sql' },
-                { path: path.join(__dirname, '../../'), name: 'platform', exclude: ['node_modules', 'backups', '.git', '.github'] }
+                { path: dbDumpPath, name: 'database.sql' }
             ]);
 
             // 3. Encrypt
