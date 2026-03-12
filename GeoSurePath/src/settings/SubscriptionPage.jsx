@@ -282,10 +282,15 @@ const SubscriptionPage = () => {
                                         <TableRow key={item.id} hover>
                                             <TableCell>{new Date(item.created_at).toLocaleDateString()}</TableCell>
                                             <TableCell>
-                                                <Chip label={item.plan_id.toUpperCase()} size="small" variant="outlined" sx={{ fontWeight: 'bold', fontSize: 9 }} />
+                                                <Stack direction="row" spacing={1} alignItems="center">
+                                                    <Chip label={item.plan_id.toUpperCase()} size="small" variant="outlined" sx={{ fontWeight: 'bold', fontSize: 9 }} />
+                                                    {item.razorpay_payment_id === 'INBUILT_PROMO' && (
+                                                        <Chip label="INBUILT" size="small" sx={{ fontWeight: 'bold', fontSize: 8, bgcolor: '#0B7A75', color: 'white' }} />
+                                                    )}
+                                                </Stack>
                                             </TableCell>
                                             <TableCell sx={{ color: '#0F2D5C', fontWeight: 'bold' }}>
-                                                ₹{(parseFloat(item.amount_paid) || (
+                                                ₹{( (item.amount_paid !== null && item.amount_paid !== undefined) ? parseFloat(item.amount_paid) : (
                                                 item.plan_id === '1month' ? 236 :
                                                 item.plan_id === '6month' ? 1121 :
                                                 item.plan_id === 'enterprise' ? 5310 : 1770

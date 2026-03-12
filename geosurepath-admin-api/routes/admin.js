@@ -225,7 +225,6 @@ router.post('/admin/restart/:service', adminAuth, (req, res) => {
     });
 });
 
-// --- BILLING DATA ---
 router.get('/admin/billing/overview', adminAuth, async (req, res) => {
     try {
         const result = await pool.query(`
@@ -238,6 +237,40 @@ router.get('/admin/billing/overview', adminAuth, async (req, res) => {
     } catch (err) {
         logger.error('Billing Overview Error:', err);
         res.status(500).json({ error: 'Failed to fetch billing data' });
+    }
+});
+
+// Record Manual Payment (Admin Only)
+router.post('/admin/billing/record-manual', adminAuth, async (req, res) => {
+    const { email, planId, amount, transactionId, months } = req.body;
+
+    try {
+        // 1. Find user by email
+        const userRes = await pool.query('SELECT id FROM tc_users WHERE email = $1', [email]);
+        if (userRes.rowCount === 0) return res.status(404).json({ error: 'User not found' });
+        const userId = userRes.rows[0].id;
+
+        // 2. Determine limits
+        const limitRes = await pool.query('SELECT value FROM geosurepath_settings WHERE key = $1', [`plan_limit_${planId}`]);
+        const deviceLimit = limitRes.rowCount > 0 ? parseInt(limitRes.rows[0].value) : 10;
+
+        // 3. Calculate expiry
+        const expiryDate = new Date();
+        expiryDate.setMonth(expiryDate.getMonth() + (parseInt(months) || 12));
+
+        // 4. Insert subscription
+        await pool.query(
+            `INSERT INTO geosurepath_subscriptions 
+            (user_id, plan_id, status, device_limit, amount_paid, razorpay_payment_id, expiry_date) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [userId, planId, 'active', deviceLimit, amount, transactionId || 'MANUAL_PAY', expiryDate]
+        );
+
+        logger.info(`Admin ${req.adminId} recorded manual payment for user ${userId} (${email})`);
+        res.json({ message: 'Subscription record successfully updated.' });
+    } catch (err) {
+        logger.error('Manual Billing Record Error:', err);
+        res.status(500).json({ error: 'System failed to record manual payment' });
     }
 });
 

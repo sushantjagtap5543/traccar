@@ -3,15 +3,16 @@ import {
     Container, Typography, Box, Card, CardContent, Table, TableBody,
     TableCell, TableContainer, TableHead, TableRow, Paper, Chip,
     IconButton, Stack, TextField, InputAdornment, Button, Grid,
-    Menu, MenuItem, Divider
+    Menu, MenuItem, Divider, Dialog, DialogTitle, DialogContent,
+    DialogActions, FormControl, InputLabel, Select, Alert, CircularProgress
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ReceiptIcon from '@mui/icons-material/Receipt';
-import FilterListIcon from '@mui/icons-material/FilterList';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import PeopleIcon from '@mui/icons-material/People';
 import SpeedIcon from '@mui/icons-material/Speed';
 import TimerIcon from '@mui/icons-material/Timer';
+import AddCardIcon from '@mui/icons-material/AddCard';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import PageLayout from '../common/components/PageLayout';
@@ -37,36 +38,86 @@ const BillingPage = () => {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
-    const [anchorEl, setAnchorEl] = useState(null);
+    
+    // Manual Payment State
+    const [manualOpen, setManualOpen] = useState(false);
+    const [manualLoading, setManualLoading] = useState(false);
+    const [manualError, setManualError] = useState('');
+    const [manualSuccess, setManualSuccess] = useState('');
+    const [manualData, setManualData] = useState({
+        email: '',
+        planId: '1month',
+        amount: '',
+        transactionId: '',
+        months: '12'
+    });
 
     const API_BASE = import.meta.env.VITE_ADMIN_API_URL || window.location.origin;
 
-    useEffect(() => {
-        const fetchBilling = async () => {
-            try {
-                const response = await fetch(`${API_BASE}/api/admin/billing/overview`, {
-                    credentials: 'include'
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    setSubscriptions(data);
-                }
-            } catch (err) {
-                console.error('Failed to fetch billing data', err);
-            } finally {
-                setLoading(false);
+    const fetchBilling = async () => {
+        setLoading(true);
+        try {
+            const response = await fetch(`${API_BASE}/api/admin/billing/overview`, {
+                credentials: 'include'
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setSubscriptions(data);
             }
-        };
+        } catch (err) {
+            console.error('Failed to fetch billing data', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
         fetchBilling();
     }, [API_BASE]);
+
+    const handleRecordManual = async () => {
+        if (!manualData.email || !manualData.amount) {
+            setManualError('Email and Amount are required.');
+            return;
+        }
+        setManualLoading(true);
+        setManualError('');
+        try {
+            const response = await fetch(`${API_BASE}/api/admin/billing/record-manual`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(manualData),
+                credentials: 'include'
+            });
+            const result = await response.json();
+            if (response.ok) {
+                setManualSuccess('Payment recorded successfully!');
+                setTimeout(() => {
+                    setManualOpen(false);
+                    setManualSuccess('');
+                    setManualData({ email: '', planId: '1month', amount: '', transactionId: '', months: '12' });
+                    fetchBilling();
+                }, 1500);
+            } else {
+                setManualError(result.error || 'Failed to record payment');
+            }
+        } catch (err) {
+            setManualError('Network error occurred.');
+        } finally {
+            setManualLoading(false);
+        }
+    };
 
     const metrics = useMemo(() => {
         const active = subscriptions.filter(s => s.status === 'active');
         const totalRevenue = subscriptions.reduce((acc, s) => acc + (parseFloat(s.amount_paid) || 0), 0);
         const mrr = active.reduce((acc, s) => {
-            const monthlyValue = s.plan_id === '1month' ? (parseFloat(s.amount_paid) || 236) :
-                s.plan_id === '6month' ? ((parseFloat(s.amount_paid) || 1121) / 6) :
-                    ((parseFloat(s.amount_paid) || 1770) / 12);
+            const amount = parseFloat(s.amount_paid);
+            if (isNaN(amount) || amount <= 0) return acc; // Exclude free/inbuilt from MRR
+            
+            const monthlyValue = s.plan_id === '1month' ? amount :
+                s.plan_id === '6month' ? (amount / 6) :
+                    (amount / 12);
             return acc + monthlyValue;
         }, 0);
 
@@ -117,7 +168,7 @@ const BillingPage = () => {
 
     const handleDownloadPDF = (data) => {
         const doc = new jsPDF();
-        const total = parseFloat(data.amount_paid) || (data.plan_id === '1month' ? 236 : (data.plan_id === '6month' ? 1121 : 1770));
+        const total = parseFloat(data.amount_paid) || (data.plan_id === '1month' ? 236 : (data.plan_id === 'enterprise' ? 5310 : 1770));
         const base = Math.round(total / 1.18);
         const gst = total - base;
 
@@ -165,19 +216,29 @@ const BillingPage = () => {
     return (
         <PageLayout breadcrumbs={['Admin', 'Billing Overview']}>
             <Container maxWidth="xl" sx={{ py: 4 }}>
-                <Box mb={4} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                <Box mb={4} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 2, flexWrap: 'wrap' }}>
                     <Box>
                         <Typography variant="h4" fontWeight="900" sx={{ color: '#0F2D5C' }}>Fleet Billing Hub</Typography>
                         <Typography color="textSecondary">Production-grade oversight for enterprise GPS revenue cycles.</Typography>
                     </Box>
-                    <Button
-                        startIcon={<TrendingUpIcon />}
-                        variant="contained"
-                        onClick={handleExportCSV}
-                        sx={{ bgcolor: '#0B7A75', '&:hover': { bgcolor: '#08635F' }, textTransform: 'none', fontWeight: 'bold' }}
-                    >
-                        Export Revenue Report
-                    </Button>
+                    <Stack direction="row" spacing={2}>
+                        <Button
+                            startIcon={<TrendingUpIcon />}
+                            variant="outlined"
+                            onClick={handleExportCSV}
+                            sx={{ borderColor: '#0B7A75', color: '#0B7A75', '&:hover': { borderColor: '#08635F' }, textTransform: 'none', fontWeight: 'bold' }}
+                        >
+                            Export Report
+                        </Button>
+                        <Button
+                            startIcon={<AddCardIcon />}
+                            variant="contained"
+                            onClick={() => setManualOpen(true)}
+                            sx={{ bgcolor: '#0B7A75', '&:hover': { bgcolor: '#08635F' }, textTransform: 'none', fontWeight: 'bold' }}
+                        >
+                            Record Manual Payment
+                        </Button>
+                    </Stack>
                 </Box>
 
                 <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -197,13 +258,13 @@ const BillingPage = () => {
 
                 <Card sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.05)' }}>
                     <CardContent sx={{ p: 0 }}>
-                        <Box sx={{ p: 3, display: 'flex', gap: 2, alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Box sx={{ p: 3, display: 'flex', gap: 2, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
                             <TextField
                                 size="small"
                                 placeholder="Search by subscriber or transaction ID..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                sx={{ width: 400 }}
+                                sx={{ width: { xs: '100%', md: 400 } }}
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
@@ -212,7 +273,7 @@ const BillingPage = () => {
                                     ),
                                 }}
                             />
-                            <Stack direction="row" spacing={1}>
+                            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
                                 <Chip
                                     label="ALL"
                                     size="small"
@@ -284,7 +345,7 @@ const BillingPage = () => {
                                             </TableCell>
                                             <TableCell>
                                                 <Typography variant="body2" fontWeight="900">
-                                                    ₹{(parseFloat(sub.amount_paid) || (sub.plan_id === '1month' ? 236 : (sub.plan_id === '6month' ? 1121 : 1770))).toLocaleString('en-IN')}
+                                                    ₹{( (sub.amount_paid !== null && sub.amount_paid !== undefined) ? parseFloat(sub.amount_paid) : (sub.plan_id === '1month' ? 236 : (sub.plan_id === '6month' ? 1121 : (sub.plan_id === 'enterprise' ? 5310 : 1770)))).toLocaleString('en-IN')}
                                                 </Typography>
                                             </TableCell>
                                             <TableCell>
@@ -317,6 +378,85 @@ const BillingPage = () => {
                         </TableContainer>
                     </CardContent>
                 </Card>
+
+                {/* Manual Payment Dialog */}
+                <Dialog open={manualOpen} onClose={() => !manualLoading && setManualOpen(false)} maxWidth="xs" fullWidth>
+                    <DialogTitle sx={{ fontWeight: 'bold', color: '#0F2D5C' }}>Record Manual Payment</DialogTitle>
+                    <DialogContent dividers>
+                        <Stack spacing={2.5} sx={{ mt: 1 }}>
+                            {manualError && <Alert severity="error">{manualError}</Alert>}
+                            {manualSuccess && <Alert severity="success">{manualSuccess}</Alert>}
+                            
+                            <TextField 
+                                label="Subscriber Email" 
+                                fullWidth 
+                                variant="outlined" 
+                                size="small"
+                                value={manualData.email}
+                                onChange={(e) => setManualData({...manualData, email: e.target.value})}
+                                placeholder="customer@example.com"
+                            />
+                            
+                            <Grid container spacing={2}>
+                                <Grid item xs={6}>
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>Plan Tier</InputLabel>
+                                        <Select
+                                            value={manualData.planId}
+                                            label="Plan Tier"
+                                            onChange={(e) => setManualData({...manualData, planId: e.target.value})}
+                                        >
+                                            <MenuItem value="1month">Basic (1M)</MenuItem>
+                                            <MenuItem value="6month">Pro (6M)</MenuItem>
+                                            <MenuItem value="12month">Business (12M)</MenuItem>
+                                            <MenuItem value="enterprise">Enterprise (12M+)</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <TextField 
+                                        label="Duration (Months)" 
+                                        type="number"
+                                        fullWidth 
+                                        size="small"
+                                        value={manualData.months}
+                                        onChange={(e) => setManualData({...manualData, months: e.target.value})}
+                                    />
+                                </Grid>
+                            </Grid>
+
+                            <TextField 
+                                label="Amount (incl. GST)" 
+                                type="number"
+                                fullWidth 
+                                size="small"
+                                value={manualData.amount}
+                                onChange={(e) => setManualData({...manualData, amount: e.target.value})}
+                                InputProps={{ startAdornment: <InputAdornment position="start">₹</InputAdornment> }}
+                            />
+
+                            <TextField 
+                                label="Notes / Transaction ID" 
+                                fullWidth 
+                                size="small"
+                                value={manualData.transactionId}
+                                onChange={(e) => setManualData({...manualData, transactionId: e.target.value})}
+                                placeholder="CASH / NEFT-12345"
+                            />
+                        </Stack>
+                    </DialogContent>
+                    <DialogActions sx={{ p: 2.5 }}>
+                        <Button onClick={() => setManualOpen(false)} sx={{ color: 'text.secondary', fontWeight: 'bold' }}>Cancel</Button>
+                        <Button 
+                            variant="contained" 
+                            disabled={manualLoading}
+                            onClick={handleRecordManual}
+                            sx={{ bgcolor: '#0B7A75', '&:hover': { bgcolor: '#08635F' }, fontWeight: 'bold', minWidth: 120 }}
+                        >
+                            {manualLoading ? <CircularProgress size={20} color="inherit" /> : 'Record Payment'}
+                        </Button>
+                    </DialogActions>
+                </Dialog>
             </Container>
         </PageLayout>
     );

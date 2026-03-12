@@ -138,7 +138,7 @@ if [ ! -f "$APP_DIR/.env" ]; then
     ENCRYPT_KEY=$(openssl rand -hex 16)
     
     sed -i "s/your_super_secure_db_password_here/$DB_PASS/" "$APP_DIR/.env"
-    sed -i "s/your_secure_admin_api_key_here_must_be_long_32_chars/$ADMIN_KEY/" "$APP_DIR/.env"
+    sed -i "s/^ADMIN_API_KEY=.*$/ADMIN_API_KEY=$ADMIN_KEY/" "$APP_DIR/.env"
     sed -i "s/your_random_jwt_secret_here_at_least_64_chars/$JWT_SECRET/" "$APP_DIR/.env"
     sed -i "s/your_32byte_hex_key_here_replace_now/$ENCRYPT_KEY/" "$APP_DIR/.env"
     
