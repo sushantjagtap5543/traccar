@@ -174,7 +174,7 @@ const RegisterPage = () => {
           });
           const device = await deviceRes.json();
 
-          fetchOrThrow('/api/commands/send', {
+          fetchOrThrow(`${API_BASE}/api/commands/send`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -182,7 +182,7 @@ const RegisterPage = () => {
               type: 'custom',
               attributes: { data: 'SERVER,0,3.108.114.12,5023,0#' }
             })
-          }).catch(err => console.log('Mock/Real backend command routing not supported yet', err));
+          }).catch(err => console.error('Post-registration device command failed:', err));
         } catch (err) {
           console.warn(`Device linking failed for ${v.name}`, err);
           setErrorMessage(`Failed to bind device ${v.name}. Proceeding with others...`);

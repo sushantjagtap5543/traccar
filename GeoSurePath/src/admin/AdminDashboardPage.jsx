@@ -82,17 +82,16 @@ const AdminDashboardPage = () => {
   const fetchStats = async () => {
     try {
       const apiKey = import.meta.env.VITE_ADMIN_API_KEY;
-      const adminToken = localStorage.getItem('adminToken');
       const headers = {
-        'x-api-key': apiKey,
-        ...(adminToken && { 'x-admin-token': adminToken })
+        'x-api-key': apiKey
       };
 
+      const fetchOptions = { headers, credentials: 'include' };
       const [healthRes, logsRes, traccarRes, tablesRes] = await Promise.all([
-        fetch(`${API_BASE}/api/admin/health`, { headers }),
-        fetch(`${API_BASE}/api/admin/logs`, { headers }),
-        fetch(`${API_BASE}/api/admin/traccar/status`, { headers }),
-        fetch(`${API_BASE}/api/admin/db/tables`, { headers })
+        fetch(`${API_BASE}/api/admin/health`, fetchOptions),
+        fetch(`${API_BASE}/api/admin/logs`, fetchOptions),
+        fetch(`${API_BASE}/api/admin/traccar/status`, fetchOptions),
+        fetch(`${API_BASE}/api/admin/db/tables`, fetchOptions)
       ]);
 
       if (healthRes.ok) {
@@ -140,13 +139,12 @@ const AdminDashboardPage = () => {
     setActionLoading(service);
     try {
       const apiKey = import.meta.env.VITE_ADMIN_API_KEY;
-      const adminToken = localStorage.getItem('adminToken');
       const response = await fetch(`${API_BASE}/api/admin/restart/${service}`, {
         method: 'POST',
         headers: {
-          'x-api-key': apiKey,
-          ...(adminToken && { 'x-admin-token': adminToken })
-        }
+          'x-api-key': apiKey
+        },
+        credentials: 'include'
       });
       if (response.ok) {
         setSnackbar({ open: true, message: `${service} restart signal sent.`, severity: 'success' });
@@ -166,13 +164,12 @@ const AdminDashboardPage = () => {
     setActionLoading('backup');
     try {
       const apiKey = import.meta.env.VITE_ADMIN_API_KEY;
-      const adminToken = localStorage.getItem('adminToken');
       const response = await fetch(`${API_BASE}/api/admin/backup`, {
         method: 'POST',
         headers: {
-          'x-api-key': apiKey,
-          ...(adminToken && { 'x-admin-token': adminToken })
-        }
+          'x-api-key': apiKey
+        },
+        credentials: 'include'
       });
       if (response.ok) {
         setSnackbar({ open: true, message: 'Database backup initiated.', severity: 'success' });
@@ -189,14 +186,13 @@ const AdminDashboardPage = () => {
     setActionLoading('webhook');
     try {
       const apiKey = import.meta.env.VITE_ADMIN_API_KEY;
-      const adminToken = localStorage.getItem('adminToken');
       const response = await fetch(`${API_BASE}/api/admin/alerts/config`, {
         method: 'POST',
         headers: {
           'x-api-key': apiKey,
-          'Content-Type': 'application/json',
-          ...(adminToken && { 'x-admin-token': adminToken })
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({ webhookUrl })
       });
       if (response.ok) {

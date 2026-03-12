@@ -5,3 +5,9 @@ scrape_configs:
     static_configs:
       - targets: [admin-api:8083]
     metrics_path: /metrics
+    # Auth for protected metrics endpoint
+    http_sd_configs: []
+    # Using basic static auth via headers
+    authorization:
+      type: ApiKey
+      credentials: ${ADMIN_API_KEY}

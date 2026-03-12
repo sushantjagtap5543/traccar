@@ -68,7 +68,7 @@ const AdminLoginPage = () => {
 
             if (response.ok) {
                 localStorage.setItem('adminToken', data.token);
-                setStep(2); // Proceed to mock 2FA
+                setStep(2); // Proceed to TOTP 2FA Verification
             } else {
                 throw new Error(data.error || 'Authentication failed');
             }
@@ -88,11 +88,13 @@ const AdminLoginPage = () => {
             const response = await fetch(`${API_BASE}/api/admin/auth/verify-totp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: code, email })
+                body: JSON.stringify({ token: code, email }),
+                credentials: 'include'
             });
             const data = await response.json();
             if (response.ok) {
-                localStorage.setItem('adminToken', data.token);
+                // Move from localStorage (XSS vulnerable) to session indicator
+                sessionStorage.setItem('adminSessionActive', 'true');
                 navigate('/admin/dashboard');
             } else {
                 throw new Error(data.error || 'Invalid 2FA code');

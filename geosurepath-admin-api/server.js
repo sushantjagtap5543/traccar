@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const si = require('systeminformation');
 const { exec } = require('child_process');
@@ -137,6 +138,7 @@ redisClient.connect().then(() => logger.info('Redis connected successfully'));
 
 // --- SECURITY & LOGGING MIDDLEWARE ---
 app.use(helmet());
+app.use(cookieParser());
 app.use(express.json());
 app.use(morgan('combined', { stream: { write: (message) => logger.info(message.trim()) } }));
 
@@ -167,13 +169,17 @@ app.use(cors({
     } else {
       callback(new Error('Not allowed by CORS'));
     }
-  }
+  },
+  credentials: true
 }));
 
 // --- AUTHENTICATION MIDDLEWARE ---
 const verifyAdminToken = (req, res, next) => {
-  const token = req.headers['x-admin-token'];
-  if (!token) return res.status(403).json({ error: 'No token provided' });
+  const token = req.cookies.adminToken || req.headers['x-admin-token'];
+  if (!token) {
+    logger.warn(`Auth failure: No token from ${req.ip}`);
+    return res.status(403).json({ error: 'No token provided' });
+  }
 
   jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret', (err, decoded) => {
     if (err || decoded.role !== 'admin') {
@@ -186,7 +192,7 @@ const verifyAdminToken = (req, res, next) => {
 };
 
 const adminAuth = (req, res, next) => {
-  const apiKey = req.headers['x-api-key'];
+  const apiKey = req.headers['x-api-key'] || (req.headers['authorization']?.startsWith('ApiKey ') ? req.headers['authorization'].split(' ')[1] : null);
   if (apiKey && apiKey === expectedKey) return next();
   return verifyAdminToken(req, res, next);
 };
@@ -253,6 +259,12 @@ app.post('/api/admin/auth/verify-totp', async (req, res) => {
 
     if (verified) {
       const finalToken = jwt.sign({ role: 'admin', email: email || 'admin' }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '1h' });
+      res.cookie('adminToken', finalToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 3600000
+      });
       res.json({ success: true, token: finalToken });
     } else {
       res.status(400).json({ error: 'Invalid or expired 2FA code' });
@@ -461,7 +473,7 @@ app.post('/api/admin/backup', adminAuth, (req, res) => {
  *   get:
  *     summary: Prometheus metrics endpoint
  */
-app.get('/metrics', async (req, res) => {
+app.get('/metrics', adminAuth, async (req, res) => {
   try {
     const cpu = await si.currentLoad();
     const mem = await si.mem();

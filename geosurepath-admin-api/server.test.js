@@ -182,4 +182,65 @@ describe('GeoSurePath Admin API', () => {
             expect(res.body).toHaveProperty('info');
         });
     });
+
+    describe('GET /api/admin/logs', () => {
+        it('should return logs array', async () => {
+            fs.existsSync.mockReturnValue(true);
+            fs.readFileSync.mockReturnValue('log line 1\nlog line 2');
+            const res = await request(app).get('/api/admin/logs').set('x-api-key', API_KEY);
+            expect(res.statusCode).toBe(200);
+            expect(Array.isArray(res.body.logs)).toBe(true);
+        });
+    });
+
+    describe('GET /api/admin/traccar/status', () => {
+        it('should return traccar status', async () => {
+            axios.get.mockResolvedValue({ data: { version: '5.12' } });
+            const res = await request(app).get('/api/admin/traccar/status').set('x-api-key', API_KEY);
+            expect(res.statusCode).toBe(200);
+            expect(res.body.status).toBe('REACHABLE');
+        });
+    });
+
+    describe('POST /api/admin/restart/:service', () => {
+        it('should restart service successfully', async () => {
+            exec.mockImplementation((cmd, cb) => cb(null, 'ok', ''));
+            const res = await request(app)
+                .post('/api/admin/restart/traccar')
+                .set('x-api-key', API_KEY);
+            expect(res.statusCode).toBe(200);
+            expect(res.body.message).toContain('Successfully');
+        });
+
+        it('should fail for invalid service', async () => {
+            const res = await request(app)
+                .post('/api/admin/restart/invalid_service')
+                .set('x-api-key', API_KEY);
+            expect(res.statusCode).toBe(400);
+        });
+    });
+
+    describe('COOKIE AUTH', () => {
+        it('should allow access via cookie', async () => {
+            const token = jwt.sign({ role: 'admin' }, 'test_secret');
+            const res = await request(app)
+                .get('/api/admin/health')
+                .set('Cookie', [`adminToken=${token}`]);
+            expect(res.statusCode).toBe(200);
+        });
+    });
+
+    describe('METRICS PROTECTION', () => {
+        it('should block metrics without auth', async () => {
+            const res = await request(app).get('/metrics');
+            expect(res.statusCode).toBe(403);
+        });
+
+        it('should allow metrics with API key in Authorization header', async () => {
+            const res = await request(app)
+                .get('/metrics')
+                .set('Authorization', `ApiKey ${API_KEY}`);
+            expect(res.statusCode).toBe(200);
+        });
+    });
 });
