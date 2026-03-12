@@ -29,7 +29,7 @@ const LogoImage = ({ color }) => {
     }
     return <img className={classes.image} src={logo} alt="" />;
   }
-  return <Logo className={classes.image} style={{ color }} />;
+  return <img className={classes.image} src="/logo.png" alt="GeoSurePath" style={{ filter: color === 'white' ? 'brightness(0) invert(1)' : 'none' }} />;
 };
 
 export default LogoImage;

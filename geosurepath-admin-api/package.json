@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "jest"
+    "test": "jest",
+    "migrate": "knex migrate:latest",
+    "seed": "knex seed:run"
   },
   "keywords": [],
   "author": "",
@@ -23,6 +25,7 @@
     "ioredis": "^5.10.0",
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.3",
+    "knex": "^3.1.0",
     "morgan": "^1.10.1",
     "pg": "^8.20.0",
     "prom-client": "^15.1.3",

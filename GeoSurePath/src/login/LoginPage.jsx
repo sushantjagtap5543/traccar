@@ -112,10 +112,9 @@ const LoginPage = () => {
     <Box className={classes.root}>
       {/* Left Panel */}
       <Box className={classes.leftPanel}>
-        <Stack direction="row" spacing={1} alignItems="center">
-          <NavigationIcon sx={{ color: '#0B7A75' }} />
-          <Typography variant="h6" fontWeight="bold">GeoSurePath</Typography>
-        </Stack>
+        <Box sx={{ mb: 4 }}>
+          <img src="/logo.png" alt="GeoSurePath Logo" style={{ height: 40, filter: 'brightness(0) invert(1)' }} />
+        </Box>
 
         <Box>
           <Typography variant="h2" fontWeight="800" sx={{ mb: 2, lineHeight: 1.2 }}>
@@ -150,6 +149,7 @@ const LoginPage = () => {
       <Box className={classes.rightPanel}>
         <Container maxWidth="xs" sx={{ p: 0 }}>
           <Box sx={{ mb: 4 }}>
+            <img src="/logo.png" alt="GeoSurePath Logo" style={{ height: 36, marginBottom: 16 }} />
             <Typography variant="h4" fontWeight="bold" color="#0F2D5C">Welcome Back</Typography>
             <Typography variant="body2" color="textSecondary">Sign in to your GeoSurePath account</Typography>
           </Box>

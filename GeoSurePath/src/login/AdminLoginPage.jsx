@@ -110,12 +110,8 @@ const AdminLoginPage = () => {
         <Box className={classes.root}>
             <Card className={classes.card}>
                 <CardContent sx={{ p: 4, textAlign: 'center' }}>
-                    <Box sx={{
-                        width: 48, height: 48, borderRadius: '50%',
-                        bgcolor: '#E0F2F1', display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', margin: '-10px auto 16px'
-                    }}>
-                        <LockIcon sx={{ color: '#0B7A75' }} />
+                    <Box sx={{ mb: 4, textAlign: 'center' }}>
+                        <img src="/logo.png" alt="GeoSurePath Logo" style={{ height: 40 }} />
                     </Box>
 
                     <Typography variant="h5" fontWeight="900" color="#0F2D5C" mb={1}>
