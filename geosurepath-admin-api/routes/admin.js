@@ -142,11 +142,31 @@ router.post('/admin/backup', adminAuth, (req, res) => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `backup-${timestamp}.sql`;
     const backupDir = process.env.BACKUP_DIR || path.join(__dirname, '../backups');
-    if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir);
+    if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
     const filePath = path.join(backupDir, filename);
 
     const dbUrl = process.env.DATABASE_URL;
     if (!dbUrl) return res.status(500).json({ error: 'DATABASE_URL not configured' });
+
+    // Retention: Delete files older than 30 days
+    const retentionDays = 30;
+    const now = Date.now();
+    try {
+        const files = fs.readdirSync(backupDir);
+        files.forEach(file => {
+            if (file.startsWith('backup-') && file.endsWith('.sql')) {
+                const fullPath = path.join(backupDir, file);
+                const stats = fs.statSync(fullPath);
+                const ageDays = (now - stats.mtimeMs) / (1000 * 60 * 60 * 24);
+                if (ageDays > retentionDays) {
+                    fs.unlinkSync(fullPath);
+                    logger.info(`Retention: Deleted old backup ${file}`);
+                }
+            }
+        });
+    } catch (err) {
+        logger.error(`Backup retention error: ${err.message}`);
+    }
 
     const cmd = `pg_dump "${dbUrl}" -f "${filePath}"`;
     logger.info(`Starting DB backup: ${filename}`);

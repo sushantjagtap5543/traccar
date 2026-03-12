@@ -35,6 +35,12 @@ const startMonitor = () => {
                 await sendAlert('CRITICAL_RAM', `Memory usage reached ${ramPercent.toFixed(2)}%`, 'CRITICAL');
             }
 
+            const disks = await si.fsSize();
+            const rootDisk = disks.find(d => d.mount === '/') || disks[0];
+            if (rootDisk && rootDisk.use > 85) {
+                await sendAlert('CRITICAL_DISK', `Disk usage reached ${rootDisk.use.toFixed(2)}% on ${rootDisk.mount}`, 'CRITICAL');
+            }
+
             try {
                 await pool.query('SELECT 1');
             } catch (err) {

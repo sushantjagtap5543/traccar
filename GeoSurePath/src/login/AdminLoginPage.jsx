@@ -50,6 +50,7 @@ const AdminLoginPage = () => {
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [intermediateToken, setIntermediateToken] = useState(null);
 
     const API_BASE = import.meta.env.VITE_ADMIN_API_URL || `http://${window.location.hostname}:8083`;
 
@@ -67,7 +68,7 @@ const AdminLoginPage = () => {
             const data = await response.json();
 
             if (response.ok) {
-                localStorage.setItem('adminToken', data.token);
+                setIntermediateToken(data.token);
                 setStep(2); // Proceed to TOTP 2FA Verification
             } else {
                 throw new Error(data.error || 'Authentication failed');
@@ -87,7 +88,10 @@ const AdminLoginPage = () => {
         try {
             const response = await fetch(`${API_BASE}/api/admin/auth/verify-totp`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-admin-token': intermediateToken
+                },
                 body: JSON.stringify({ token: code, email }),
                 credentials: 'include'
             });

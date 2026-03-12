@@ -13,6 +13,7 @@ import SpeedIcon from '@mui/icons-material/Speed';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import MonitorHeartIcon from '@mui/icons-material/MonitorHeart';
 import NavigationIcon from '@mui/icons-material/Navigation';
+import { pricingConfig } from './config/pricing';
 
 const useStyles = makeStyles()((theme) => ({
     root: {
@@ -263,11 +264,7 @@ const LandingPage = () => {
                     <Typography variant="h6" sx={{ textAlign: 'center', color: '#5A6A80', mb: 8, fontWeight: 400 }}>2 months free with annual billing.</Typography>
 
                     <Grid container spacing={4} justifyContent="center">
-                        {[
-                            { name: 'Starter', price: 'Free', features: ['1 Device', 'Basic Tracking', 'Email Support'] },
-                            { name: 'Pro', price: '₹999/mo', popular: true, features: ['Up to 25 Devices', 'All Features', 'Priority Support'] },
-                            { name: 'Enterprise', price: 'Custom', features: ['Unlimited Devices', 'Dedicated Onboarding', 'SLA Guarantee'] }
-                        ].map((p, i) => (
+                        {pricingConfig.map((p, i) => (
                             <Grid item xs={12} md={4} key={i}>
                                 <Box className={`${classes.pricingCard} ${p.popular ? classes.popularCard : ''}`}>
                                     {p.popular && (

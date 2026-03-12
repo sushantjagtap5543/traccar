@@ -72,6 +72,18 @@ router.post('/admin/auth/verify-totp', async (req, res) => {
     }
 });
 
+router.delete('/admin/auth/totp-secret', adminAuth, async (req, res) => {
+    try {
+        const email = req.admin?.email || 'admin';
+        await redisClient.del(`totp_secret:${email}`);
+        logger.warn(`TOTP Secret cleared for ${email} by administrative request.`);
+        res.json({ message: '2FA secret has been reset. You will need to setup 2FA again on next login.' });
+    } catch (err) {
+        logger.error('TOTP Reset failed:', err);
+        res.status(500).json({ error: 'Failed to reset 2FA secret' });
+    }
+});
+
 // --- CLIENT OTP AUTH ---
 router.post('/auth/send-otp', async (req, res) => {
     const { mobile } = req.body;

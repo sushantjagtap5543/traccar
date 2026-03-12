@@ -28,8 +28,37 @@ jobs:
           cd geosurepath-admin-api
           npm test
 
+  test-frontend-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: GeoSurePath/package-lock.json
+      - name: Install dependencies
+        run: |
+          cd GeoSurePath
+          npm ci
+      - name: Install Playwright Browsers
+        run: |
+          cd GeoSurePath
+          npx playwright install --with-deps
+      - name: Run Playwright tests
+        run: |
+          cd GeoSurePath
+          npx playwright test
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: playwright-report
+          path: GeoSurePath/playwright-report/
+          retention-days: 30
+
   build-and-push:
-    needs: test-admin-api
+    needs: [test-admin-api, test-frontend-e2e]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
