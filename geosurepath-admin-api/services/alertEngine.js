@@ -1,26 +1,28 @@
 const axios = require('axios');
-const { logger } = require('./db');
+const { logger, pool, redisClient } = require('./db');
 const { sendAlert } = require('./monitor');
 
 /**
- * GeoSurePath Alert Engine
- * Polls Traccar API, compares live telemetry against Admin-defined rules,
- * and dispatches alerts via the monitor/webhook system.
+ * Enhanced Alert Engine with Session Management
+ * Polls Traccar, evaluates rules, and dispatches alerts
  */
 
 let isRunning = false;
-let sessionCookie = null;
 let engineInterval = null;
+let sessionCookie = null;
+let sessionExpiry = null;
 const POLL_INTERVAL = 30000; // 30 seconds
+const SESSION_REFRESH_MARGIN = 60 * 60 * 1000; // Refresh 1 hour before expiry
 
 const getClient = () => {
     const traccarUrl = process.env.TRACCAR_URL || 'http://traccar:8082';
     const config = {
         baseURL: traccarUrl,
+        timeout: 10000,
         headers: {}
     };
 
-    if (sessionCookie) {
+    if (sessionCookie && sessionExpiry && Date.now() < sessionExpiry) {
         config.headers['Cookie'] = sessionCookie;
     } else {
         config.auth = {
@@ -32,157 +34,131 @@ const getClient = () => {
     return axios.create(config);
 };
 
+const refreshSession = async () => {
+    try {
+        const client = axios.create({
+            baseURL: process.env.TRACCAR_URL || 'http://traccar:8082',
+            timeout: 10000,
+            auth: {
+                username: process.env.ADMIN_EMAIL || 'admin@geosurepath.com',
+                password: process.env.TRACCAR_ADMIN_PASSWORD || 'admin'
+            }
+        });
+
+        const authRes = await client.get('/api/session');
+        if (authRes.headers['set-cookie']) {
+            sessionCookie = authRes.headers['set-cookie'][0].split(';')[0];
+            sessionExpiry = Date.now() + (23 * 60 * 60 * 1000); // 23 hours
+            logger.info('Alert Engine: Traccar session established');
+            return true;
+        }
+        return false;
+    } catch (err) {
+        logger.error('Alert Engine: Session refresh failed', { error: err.message });
+        sessionCookie = null;
+        sessionExpiry = null;
+        return false;
+    }
+};
+
+const processAlerts = async () => {
+    if (!isRunning) return;
+
+    try {
+        if (!sessionCookie || !sessionExpiry || (sessionExpiry - Date.now() < SESSION_REFRESH_MARGIN)) {
+            await refreshSession();
+        }
+
+        const client = getClient();
+
+        // 1. Fetch Config
+        let config;
+        const dbRes = await pool.query("SELECT value FROM geosurepath_settings WHERE key = 'alert_rules_config' LIMIT 1");
+        if (dbRes.rowCount > 0) {
+            config = JSON.parse(dbRes.rows[0].value);
+        } else {
+            const serverRes = await client.get('/api/server');
+            if (serverRes.data.attributes?.alertConfig) {
+                config = JSON.parse(serverRes.data.attributes.alertConfig);
+            }
+        }
+
+        if (!config) return;
+
+        // 2. Fetch Devices & Positions (Batch)
+        const [devicesRes, positionsRes] = await Promise.all([
+            client.get('/api/devices'),
+            client.get('/api/positions')
+        ]);
+
+        const positionMap = new Map(positionsRes.data.map(p => [p.deviceId, p]));
+
+        for (const device of devicesRes.data) {
+            const pos = positionMap.get(device.id);
+            if (!pos) continue;
+
+            const alarm = pos.attributes?.alarm;
+
+            // Rule evaluation
+            if (config.overSpeed?.enabled) {
+                const speedKph = pos.speed * 1.852;
+                if (speedKph > config.overSpeed.threshold) {
+                    await sendAlert('VEHICLE_OVERSPEED', `Vehicle ${device.name} is traveling at ${speedKph.toFixed(1)} km/h.`, 'WARNING', device.id);
+                }
+            }
+
+            if (config.batteryLow?.enabled && pos.attributes?.batteryLevel !== undefined) {
+                if (pos.attributes.batteryLevel < config.batteryLow.threshold) {
+                    await sendAlert('LOW_BATTERY', `Vehicle ${device.name} battery is at ${pos.attributes.batteryLevel}%.`, 'WARNING', device.id);
+                }
+            }
+
+            if (config.powerCut?.enabled && alarm === 'powerCut') {
+                await sendAlert('POWER_CUT', `External power disconnected for vehicle ${device.name}!`, 'CRITICAL', device.id);
+            }
+
+            if (config.deviceDisconnected?.enabled && device.status === 'offline') {
+                const lastUpdate = new Date(device.lastUpdate).getTime();
+                const threshold = (config.deviceDisconnected.thresholdMinutes || 10) * 60000;
+                if (Date.now() - lastUpdate > threshold) {
+                    await sendAlert('DEVICE_OFFLINE', `Telemetry lost for vehicle ${device.name}.`, 'WARNING', device.id);
+                }
+            }
+
+            if (alarm === 'sos') {
+                await sendAlert('SOS_ALERT', `EMERGENCY: ${device.name} panic button activated!`, 'CRITICAL', device.id);
+            }
+            
+            // Geofence events
+            if (alarm === 'geofenceExit') {
+                await sendAlert('GEOFENCE_EXIT', `Vehicle ${device.name} exited geofence.`, 'WARNING', device.id);
+            }
+            if (alarm === 'geofenceEnter') {
+                await sendAlert('GEOFENCE_ENTER', `Vehicle ${device.name} entered geofence.`, 'INFO', device.id);
+            }
+        }
+
+    } catch (err) {
+        logger.error('Alert Engine Cycle Error:', err.message);
+        if (err.response?.status === 401) {
+            sessionCookie = null;
+            sessionExpiry = null;
+        }
+    }
+};
+
 const startAlertEngine = () => {
     if (isRunning) return;
     isRunning = true;
-    logger.info('GeoSurePath Alert Engine started with Session Cache.');
-
-    engineInterval = setInterval(async () => {
-        try {
-            let client = getClient();
-
-            // 1. Ensure session
-            if (!sessionCookie) {
-                try {
-                    const authRes = await client.get('/api/session');
-                    if (authRes.headers['set-cookie']) {
-                        sessionCookie = authRes.headers['set-cookie'][0].split(';')[0];
-                        logger.info('Alert Engine: Traccar Session Established.');
-                        client = getClient(); // Refresh client with cookie
-                    }
-                } catch (err) {
-                    logger.error('Alert Engine Auth Failed:', err.message);
-                    return;
-                }
-            }
-
-            // 2. Fetch Config (Prioritize DB settings, then server attributes)
-            let config;
-            try {
-                const { pool } = require('./db');
-                const dbRes = await pool.query("SELECT value FROM geosurepath_settings WHERE key = 'alert_rules_config' LIMIT 1");
-                if (dbRes.rowCount > 0) {
-                    config = JSON.parse(dbRes.rows[0].value);
-                } else {
-                    const serverRes = await client.get('/api/server');
-                    const server = serverRes.data;
-                    if (server.attributes?.alertConfig) {
-                        config = JSON.parse(server.attributes.alertConfig);
-                    }
-                }
-            } catch (err) {
-                logger.error('Alert Engine: Failed to fetch/parse alertConfig:', { error: err.message });
-                return;
-            }
-
-            if (!config) return;
-
-            // 3. Fetch Devices
-            const devicesRes = await client.get('/api/devices');
-
-            for (const device of devicesRes.data) {
-                if (!device.lastUpdate) continue;
-
-                // 4. Get Latest Position
-                const posRes = await client.get(`/api/positions?deviceId=${device.id}`);
-                if (posRes.data.length === 0) continue;
-                const pos = posRes.data[0];
-                const alarm = pos.attributes?.alarm;
-
-                // Overspeed
-                if (config.overSpeed?.enabled) {
-                    const speedKph = pos.speed * 1.852;
-                    if (speedKph > config.overSpeed.threshold) {
-                        await sendAlert('VEHICLE_OVERSPEED', `Vehicle ${device.name} is traveling at ${speedKph.toFixed(1)} km/h.`, 'WARNING', device.id);
-                    }
-                }
-
-                // Battery
-                if (config.batteryLow?.enabled && pos.attributes?.batteryLevel !== undefined) {
-                    if (pos.attributes.batteryLevel < config.batteryLow.threshold) {
-                        await sendAlert('LOW_BATTERY', `Vehicle ${device.name} battery is at ${pos.attributes.batteryLevel}%.`, 'WARNING', device.id);
-                    }
-                }
-
-                // Engine
-                if (config.engineOn?.enabled && pos.attributes?.ignition) {
-                    await sendAlert('ENGINE_ON', `Vehicle ${device.name} engine started.`, 'INFO', device.id);
-                }
-                if (config.engineOff?.enabled && pos.attributes?.ignition === false) {
-                    await sendAlert('ENGINE_OFF', `Vehicle ${device.name} engine stopped.`, 'INFO', device.id);
-                }
-
-                // Security Alarms
-                if (config.powerCut?.enabled && alarm === 'powerCut') {
-                    await sendAlert('POWER_CUT', `External power disconnected for vehicle ${device.name}!`, 'CRITICAL', device.id);
-                }
-                if (config.ignitionTampering?.enabled && alarm === 'vibration') {
-                    await sendAlert('VIBRATION_ALARM', `Structural vibration detected on vehicle ${device.name}.`, 'WARNING', device.id);
-                }
-                if (config.towAlert?.enabled && alarm === 'tow') {
-                    await sendAlert('TOW_ALERT', `Vehicle ${device.name} is being moved without ignition!`, 'CRITICAL', device.id);
-                }
-
-                // Connectivity (With 10-minute stabilization delay)
-                if (config.deviceDisconnected?.enabled && device.status === 'offline') {
-                    const lastUpdate = new Date(device.lastUpdate).getTime();
-                    const tenMinutesAgo = Date.now() - 600000;
-                    if (lastUpdate < tenMinutesAgo) {
-                        await sendAlert('DEVICE_OFFLINE', `Telemetry lost for vehicle ${device.name}. (Offline > 10m)`, 'WARNING', device.id);
-                    }
-                }
-                if (config.gpsLost?.enabled && pos.valid === false) {
-                    await sendAlert('GPS_SIGNAL_LOST', `GPS fix lost for vehicle ${device.name}.`, 'WARNING', device.id);
-                }
-
-                // Idle & Stop
-                if (config.excessIdle?.enabled && pos.attributes?.motion === false) {
-                    const idleRes = await client.get(`/api/reports/summary?deviceId=${device.id}&from=${new Date(Date.now() - config.excessIdle.threshold * 60000).toISOString()}&to=${new Date().toISOString()}`);
-                    if (idleRes.data.length > 0 && idleRes.data[0].engineHours > 0 && idleRes.data[0].distance === 0) {
-                        await sendAlert('EXCESS_IDLE', `Vehicle ${device.name} has been idling for over ${config.excessIdle.threshold} minutes.`, 'WARNING', device.id);
-                    }
-                }
-                if (config.unexpectedStop?.enabled && alarm === 'stop') {
-                    await sendAlert('UNEXPECTED_STOP', `Unexpected stop detected for vehicle ${device.name}.`, 'WARNING', device.id);
-                }
-
-                // Geofence / Route Logistics (FIXED COLLISION)
-                if (alarm === 'geofenceExit') {
-                    const geoType = pos.attributes?.geofenceType || 'unknown';
-                    if (config.routeStart?.enabled && geoType === 'depot') {
-                        await sendAlert('ROUTE_STARTED', `Vehicle ${device.name} has departed from the depot.`, 'INFO', device.id);
-                    } else if (config.routeViolation?.enabled) {
-                        // If not a depot exit, it's a route violation (corridor/zone exit)
-                        await sendAlert('ROUTE_VIOLATION', `Vehicle ${device.name} deviated from assigned route/geofence.`, 'CRITICAL', device.id);
-                    }
-                }
-
-                if (config.routeCompleted?.enabled && alarm === 'geofenceEnter') {
-                    const geoType = pos.attributes?.geofenceType || 'unknown';
-                    if (geoType === 'destination' || geoType === 'depot') {
-                        await sendAlert('ROUTE_COMPLETED', `Vehicle ${device.name} reached destination.`, 'INFO', device.id);
-                    }
-                }
-
-                if (config.routeDelay?.enabled && device.status === 'online' && pos.speed < 5) {
-                    await sendAlert('ROUTE_DELAY', `Vehicle ${device.name} is experiencing delays in transit.`, 'WARNING', device.id);
-                }
-            }
-
-        } catch (err) {
-            logger.error('Alert Engine Error:', err.message);
-            if (err.response?.status === 401) sessionCookie = null;
-        }
-    }, POLL_INTERVAL);
+    logger.info('Alert Engine (Optimized) started.');
+    engineInterval = setInterval(processAlerts, POLL_INTERVAL);
+    processAlerts(); // Run immediately
 };
 
 const stopAlertEngine = () => {
-    if (engineInterval) {
-        clearInterval(engineInterval);
-        engineInterval = null;
-    }
     isRunning = false;
-    logger.info('GeoSurePath Alert Engine stopped.');
+    if (engineInterval) clearInterval(engineInterval);
+    logger.info('Alert Engine stopped.');
 };
 
 module.exports = { startAlertEngine, stopAlertEngine };

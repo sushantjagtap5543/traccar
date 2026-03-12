@@ -21,8 +21,8 @@
     "dayjs": "^1.11.19",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
-    "jspdf": "^4.2.0",
-    "jspdf-autotable": "^5.0.7",
+    "jspdf": "^2.5.2",
+    "jspdf-autotable": "^3.8.4",
     "mapbox-gl-draw-circle": "^1.1.2",
     "mapbox-gl-draw-rectangle-mode": "^1.0.4",
     "maplibre-gl": "^5.19.0",
@@ -46,6 +46,7 @@
   "scripts": {
     "start": "vite --host",
     "build": "vite build",
+    "validate": "npm run lint",
     "generate-pwa-assets": "pwa-assets-generator --preset minimal public/logo.svg",
     "lint": "eslint .",
     "lint:fix": "eslint --fix ."

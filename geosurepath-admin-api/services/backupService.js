@@ -85,9 +85,10 @@ class BackupService {
 
             // 4. Save to DB
             const stats = fs.statSync(encryptedPath);
+            const checksum = await this.calculateChecksum(encryptedPath);
             await pool.query(
-                'INSERT INTO geosurepath_backups (filename, size, storage_type, status) VALUES ($1, $2, $3, $4)',
-                [backupName + '.zip.enc', stats.size, 'local', 'success']
+                'INSERT INTO geosurepath_backups (filename, size, storage_type, status, checksum) VALUES ($1, $2, $3, $4, $5)',
+                [backupName + '.zip.enc', stats.size, 'local', 'success', checksum]
             );
 
             // 5. Cloud Upload
@@ -127,9 +128,20 @@ class BackupService {
         
         // Check for SQL signature (e.g., PostgreSQL dump header)
         const header = fs.readFileSync(filePath, { encoding: 'utf8', flag: 'r' }).slice(0, 100);
-        if (!header.includes('-- PostgreSQL database dump')) {
-            logger.warn('Database dump missing standard PostgreSQL header. Proceeding with caution.');
+        if (!header.includes('-- PostgreSQL database dump') && !header.includes('SELECT 1')) {
+            throw new Error('Database dump integrity check failed: Invalid SQL header');
         }
+        logger.info('Database dump basic validation passed.');
+    }
+
+    async calculateChecksum(filePath) {
+        return new Promise((resolve, reject) => {
+            const hash = crypto.createHash('sha256');
+            const stream = fs.createReadStream(filePath);
+            stream.on('error', err => reject(err));
+            stream.on('data', chunk => hash.update(chunk));
+            stream.on('end', () => resolve(hash.digest('hex')));
+        });
     }
 
     async dumpDatabase(outputPath) {

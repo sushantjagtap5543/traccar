@@ -53,7 +53,10 @@ if (process.env.NODE_ENV !== 'production') {
 // --- DATABASE ---
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false
+    ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
+    max: 20, // maximum pool size
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
 });
 
 const connectWithRetry = async (retries = 5) => {

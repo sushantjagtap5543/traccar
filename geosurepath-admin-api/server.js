@@ -42,7 +42,43 @@ for (const envVar of requiredEnvVars) {
         process.exit(1);
     }
 }
-logger.info('All required environment variables are configured.');
+
+// 1. Validate NODE_ENV
+const VALID_NODE_ENVS = ['production', 'development', 'test'];
+if (!VALID_NODE_ENVS.includes(process.env.NODE_ENV)) {
+    logger.error(`FATAL: NODE_ENV must be one of: ${VALID_NODE_ENVS.join(', ')}`);
+    process.exit(1);
+}
+
+// 2. Validate ENCRYPTION_KEY length (must be 64 characters/32 bytes for AES-256)
+if (process.env.ENCRYPTION_KEY.length !== 64) {
+    logger.error('FATAL: ENCRYPTION_KEY must be exactly 64 hexadecimal characters (32 bytes)');
+    process.exit(1);
+}
+
+// 3. Validate JWT_SECRET length
+if (process.env.JWT_SECRET.length < 64) {
+    logger.error('FATAL: JWT_SECRET must be at least 64 characters for security');
+    process.exit(1);
+}
+
+// 3. Validate ALLOWED_ORIGINS in production
+if (process.env.NODE_ENV === 'production' && !process.env.ALLOWED_ORIGINS) {
+    logger.error('FATAL: ALLOWED_ORIGINS must be set in production');
+    process.exit(1);
+}
+
+// 4. Validate External Service Credentials (Warning only, don't crash unless strictly required)
+if (process.env.NODE_ENV === 'production') {
+    const externalVars = ['RAZORPAY_KEY_ID', 'RAZORPAY_SECRET', 'TWILIO_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_NUMBER'];
+    externalVars.forEach(v => {
+        if (!process.env[v]) {
+            logger.warn(`Production: Missing optional external service variable: ${v}`);
+        }
+    });
+}
+
+logger.info('All required environment variables are configured and validated.');
 
 // --- RATE LIMITING ---
 const limiter = rateLimit({
@@ -145,12 +181,19 @@ app.use(helmet());
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:3000', 'http://localhost:5173'];
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(o => o.length > 0);
+if (allowedOrigins.length === 0 && process.env.NODE_ENV !== 'production') {
+    allowedOrigins.push('http://localhost:3000', 'http://localhost:5173');
+}
+
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      logger.warn(`Blocked CORS request from origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },

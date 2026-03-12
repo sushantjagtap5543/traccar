@@ -6,6 +6,7 @@ const { pool, logger } = require('../services/db');
 const { decrypt } = require('../utils/crypto');
 const Joi = require('joi');
 const { logAudit } = require('../services/auditService');
+const { verifyRazorpaySignature } = require('../middleware/razorpay');
 
 /**
  * Razorpay Payment Integration
@@ -156,9 +157,12 @@ router.post('/verify', async (req, res) => {
                 const invConfig = {};
                 invoiceSettings.rows.forEach(r => invConfig[r.key] = r.value);
                 
-                const prefix = invConfig.invoice_prefix || 'GS-INV-';
+                const prefix = invConfig.invoice_prefix || 'GSP-';
                 const nextVal = parseInt(invConfig.invoice_next_val || '1001');
-                const invoiceNumber = `${prefix}${nextVal}`;
+                
+                const now = new Date();
+                const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+                const invoiceNumber = `${prefix}${yearMonth}-${String(nextVal).padStart(6, '0')}`;
 
                 await dbClient.query("UPDATE geosurepath_settings SET value = $1 WHERE key = 'invoice_next_val'", [(nextVal + 1).toString()]);
 
@@ -247,25 +251,47 @@ router.post('/cancel', async (req, res) => {
 });
 
 // 5. Razorpay Webhook (For automated events)
-router.post('/webhook', async (req, res) => {
-    const resSettings = await pool.query("SELECT value FROM geosurepath_settings WHERE key = 'razorpay_webhook_secret' LIMIT 1");
-    const secret = resSettings.rows[0]?.value || process.env.RAZORPAY_WEBHOOK_SECRET;
-    const signature = req.headers['x-razorpay-signature'];
+router.post('/webhook', verifyRazorpaySignature, async (req, res) => {
+    try {
+        const { event, payload } = req.body;
+        logger.info('Razorpay webhook received', { event });
 
-    if (secret && signature) {
-        const expectedSignature = crypto.createHmac('sha256', secret).update(JSON.stringify(req.body)).digest('hex');
-        if (expectedSignature !== signature) return res.status(400).send('Invalid signature');
+        switch (event) {
+            case 'payment.captured':
+                await handlePaymentCaptured(payload.payment.entity);
+                break;
+            case 'payment.failed':
+                await handlePaymentFailed(payload.payment.entity);
+                break;
+            default:
+                logger.warn('Unhandled webhook event', { event });
+        }
+
+        res.status(200).json({ status: 'received' });
+    } catch (error) {
+        logger.error('Webhook processing error:', error);
+        res.status(200).json({ status: 'error', message: error.message });
     }
-
-    const { event, payload } = req.body;
-    logger.info(`Razorpay Event: ${event}`);
-
-    if (event === 'payment.captured') {
-        // Additional business logic if needed
-    }
-
-    res.json({ status: 'ok' });
 });
+
+async function handlePaymentCaptured(payment) {
+    const { order_id, id: payment_id, amount, notes } = payment;
+    const userId = notes?.userId;
+    
+    if (!userId) {
+        logger.warn('Captured payment without userId in notes:', { order_id, payment_id });
+        return;
+    }
+
+    // Logic similar to /verify would go here if we wanted to rely solely on webhooks
+    // For now, we log it. The /verify endpoint handles the activation for the UI.
+    logger.info('Payment captured via webhook confirmed', { order_id, payment_id, userId });
+}
+
+async function handlePaymentFailed(payment) {
+    const { order_id, id: payment_id, error_description } = payment;
+    logger.error('Payment failed via webhook', { order_id, payment_id, error_description });
+}
 
 // 6. Styled Invoice Generator
 router.get('/invoice/:paymentId', async (req, res) => {

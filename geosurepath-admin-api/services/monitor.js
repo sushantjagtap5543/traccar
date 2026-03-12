@@ -138,6 +138,13 @@ const startMonitor = () => {
             // Sync ALERT_WEBHOOK from DB
             await syncWebhook();
 
+            // Periodic Log of Active Cooldowns (Monitoring)
+            const { redisClient } = require('./db');
+            const cooldownKeys = await redisClient.keys('alert_cooldown:*');
+            if (cooldownKeys.length > 0) {
+                logger.info(`Monitor: ${cooldownKeys.length} active alert cooldowns in Redis.`);
+            }
+
             try {
                 await pool.query('SELECT 1');
             } catch (err) {
