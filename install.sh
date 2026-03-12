@@ -62,6 +62,16 @@ if [[ $EUID -ne 0 ]]; then
    error "This script must be run as root (use sudo)."
 fi
 
+# Optimization: Ensure Swap exists (Crucial for 2GB instances during build)
+if [ ! -f /swapfile ]; then
+    log "Creating 2GB swap file to prevent build OOM..."
+    fallocate -l 2G /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    echo '/swapfile none swap sw 0 0' | tee -a /etc/fstab
+fi
+
 # --- Step 1: Cleanup Old Environment ---
 log "[Step 1/11] Purging old installations and containers..."
 docker-compose down --remove-orphans 2>/dev/null || true
@@ -138,6 +148,7 @@ success "Traccar Core initialized on port 8082."
 log "[Step 5/11] Building React Frontend..."
 cd "$APP_DIR/GeoSurePath"
 npm install --legacy-peer-deps
+export NODE_OPTIONS="--max-old-space-size=2048"
 npm run build
 success "Frontend built successfully."
 
