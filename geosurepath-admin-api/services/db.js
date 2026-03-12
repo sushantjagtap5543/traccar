@@ -46,7 +46,8 @@ const connectWithRetry = async (retries = 5) => {
     } catch (err) {
         if (retries > 0) {
             logger.warn(`Database connection failed. Retrying in 5s... (${retries} retries left)`);
-            setTimeout(() => connectWithRetry(retries - 1), 5000);
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            return connectWithRetry(retries - 1);
         } else {
             logger.error('Could not connect to database after several attempts. Exiting...');
             process.exit(1);
@@ -55,7 +56,15 @@ const connectWithRetry = async (retries = 5) => {
 };
 
 if (process.env.NODE_ENV !== 'test') {
-    connectWithRetry();
+    (async () => {
+        try {
+            await connectWithRetry();
+            logger.info('Database initialization complete');
+        } catch (err) {
+            logger.error('Database initialization failed:', err);
+            process.exit(1);
+        }
+    })();
 }
 
 // --- REDIS (Cache) ---

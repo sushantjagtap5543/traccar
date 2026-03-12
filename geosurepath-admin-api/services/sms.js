@@ -7,42 +7,55 @@ const axios = require('axios');
  * Mock implementation logs to console, but ready for Twilio/MSG91.
  */
 const sendSMS = async (to, message) => {
-    logger.info(`[SMS-DISPATCH] To: ${to} | Msg: ${message}`);
-
-    // INTEGRATION POINT:
-    // To enable real SMS, uncomment and configure a provider below:
-
-    // 0. Fetch credentials from DB settings (to support Central Config Panel)
     const { pool } = require('./db');
     const { decrypt } = require('../utils/crypto');
 
-    try {
-        const res = await pool.query("SELECT key, value FROM geosurepath_settings WHERE key IN ('twilio_sid', 'twilio_auth_token', 'twilio_number')");
-        const config = {};
-        res.rows.forEach(r => config[r.key] = decrypt(r.value));
+    logger.info(`[SMS-DISPATCH] To: ${to} | Msg: ${message}`);
 
-        const sid = config.twilio_sid || process.env.TWILIO_SID;
-        const auth = config.twilio_auth_token || process.env.TWILIO_AUTH_TOKEN;
-        const from = config.twilio_number || process.env.TWILIO_NUMBER;
+    try {
+        const sid = process.env.TWILIO_ACCOUNT_SID;
+        const auth = process.env.TWILIO_AUTH_TOKEN;
+        const from = process.env.TWILIO_PHONE_NUMBER;
 
         if (sid && auth && from) {
             const twilio = require('twilio');
             const client = twilio(sid, auth);
-            await client.messages.create({
+            const result = await client.messages.create({
                 body: message,
                 from: from,
                 to: to
             });
-            logger.info(`[SMS-SUCCESS] Twilio dispatched to ${to}`);
-            return true;
+            logger.info(`[SMS-SUCCESS] Twilio dispatched to ${to}: ${result.sid}`);
+            return result.sid;
+        }
+
+        // Try DB fallback if env not set
+        const res = await pool.query("SELECT key, value FROM geosurepath_settings WHERE key IN ('twilio_sid', 'twilio_auth_token', 'twilio_number')");
+        if (res.rowCount > 0) {
+            const config = {};
+            res.rows.forEach(r => config[r.key] = decrypt(r.value));
+            const dbSid = config.twilio_sid;
+            const dbAuth = config.twilio_auth_token;
+            const dbFrom = config.twilio_number;
+
+            if (dbSid && dbAuth && dbFrom) {
+                const twilio = require('twilio');
+                const client = twilio(dbSid, dbAuth);
+                const result = await client.messages.create({
+                    body: message,
+                    from: dbFrom,
+                    to: to
+                });
+                logger.info(`[SMS-SUCCESS-DB] Twilio dispatched to ${to}: ${result.sid}`);
+                return result.sid;
+            }
         }
     } catch (err) {
-        logger.error(`[SMS-FAILURE] DB/Twilio Error: ${err.message}`);
-        // Fallback to mock if not configured
+        logger.error(`[SMS-FAILURE] Twilio Error: ${err.message}`);
     }
 
-    // Default: Mock success
-    return true;
+    logger.warn(`[SMS-MOCK] Twilio not configured. Message to ${to} not sent.`);
+    return null;
 };
 
 module.exports = { sendSMS };

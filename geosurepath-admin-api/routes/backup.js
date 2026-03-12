@@ -27,10 +27,23 @@ router.get('/admin/backups', adminAuth, async (req, res) => {
  *   post:
  *     summary: Trigger a manual backup
  */
+const backupCache = new Map();
+
 router.post('/admin/backups/run', adminAuth, async (req, res) => {
+    const idempotencyKey = req.headers['idempotency-key'] || 'default';
+    
+    if (backupCache.has(idempotencyKey)) {
+        const cached = backupCache.get(idempotencyKey);
+        if (Date.now() - cached.time < 300000) { // 5 minute cache
+            return res.json(cached.result);
+        }
+    }
+
     try {
-        await backupService.runFullBackup(true); 
-        res.json({ message: 'Backup task completed successfully' });
+        const result = await backupService.runFullBackup(true); 
+        const response = { message: 'Backup task completed successfully', result };
+        backupCache.set(idempotencyKey, { time: Date.now(), result: response });
+        res.json(response);
     } catch (err) {
         res.status(400).json({ error: err.message });
     }

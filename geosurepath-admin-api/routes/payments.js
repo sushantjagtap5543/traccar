@@ -4,6 +4,7 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const { pool, logger } = require('../services/db');
 const { decrypt } = require('../utils/crypto');
+const Joi = require('joi');
 
 /**
  * Razorpay Payment Integration
@@ -28,8 +29,15 @@ const getRazorpayClient = async () => {
 
 // 1. Create Order
 router.post('/orders', async (req, res) => {
-    const { planId, userId } = req.body;
-    // planId expected: '1month', '6month', '12month', 'enterprise'
+    const schema = Joi.object({
+        planId: Joi.string().valid('1month', '6month', '12month', 'enterprise').required(),
+        userId: Joi.number().integer().positive().required()
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
+    const { planId, userId } = value;
 
     try {
         const client = await getRazorpayClient();
@@ -49,16 +57,16 @@ router.post('/orders', async (req, res) => {
             currency: 'INR',
             receipt: `receipt_${userId}_${Date.now()}`,
             notes: {
-                basePrice: basePrice,
-                gst: gst,
-                planId: planId
+                basePrice,
+                gst,
+                planId
             }
         };
 
         const order = await client.orders.create(options);
         res.json({ ...order, gst, totalAmount: totalAmount / 100 });
     } catch (err) {
-        logger.error('Razorpay Order Error:', err.message);
+        logger.error('Razorpay Order Error:', { message: err.message, userId, planId });
         res.status(500).json({ error: 'Failed to create payment order' });
     }
 });
@@ -96,48 +104,62 @@ router.post('/verify', async (req, res) => {
             if (planId === '6month') months = 6;
             else if (planId === '12month' || planId === 'enterprise') months = 12;
 
-            // Check for existing active subscription
-            const existingSub = await pool.query(
-                "SELECT id FROM geosurepath_subscriptions WHERE user_id = $1 AND plan_id = $2 AND status = 'active' AND expiry_date > NOW()",
-                [userId, planId]
-            );
+            const dbClient = await pool.connect();
+            try {
+                await dbClient.query('BEGIN');
 
-            if (existingSub.rowCount > 0) {
-                logger.warn(`User ${userId} already has an active ${planId} subscription. Attempting to extend or log as duplicate.`);
-                // For now, we'll allow it but log it. Business logic might differ.
+                // Check for existing active subscription
+                const existingSub = await dbClient.query(
+                    "SELECT id FROM geosurepath_subscriptions WHERE user_id = $1 AND status = 'active' AND expiry_date > NOW() FOR UPDATE",
+                    [userId]
+                );
+
+                if (existingSub.rowCount > 0) {
+                    // Update existing one to cancelled/replaced or just expire it
+                    await dbClient.query(
+                        "UPDATE geosurepath_subscriptions SET status = 'replaced' WHERE user_id = $1 AND status = 'active'",
+                        [userId]
+                    );
+                }
+
+                const expiryDate = new Date();
+                expiryDate.setMonth(expiryDate.getMonth() + months);
+
+                // Fetch device limit and price from settings
+                const limitKey = `plan_limit_${planId}`;
+                const priceKey = `plan_price_${planId}`;
+
+                const [limitRes, priceRes] = await Promise.all([
+                    dbClient.query("SELECT value FROM geosurepath_settings WHERE key = $1", [limitKey]),
+                    dbClient.query("SELECT value FROM geosurepath_settings WHERE key = $1", [priceKey])
+                ]);
+
+                const deviceLimit = limitRes.rowCount > 0 ? parseInt(limitRes.rows[0].value) : (planId === 'enterprise' ? 100 : 25);
+                const basePrice = priceRes.rowCount > 0 ? parseInt(priceRes.rows[0].value) : (planId === 'enterprise' ? 4500 : 1500);
+                const gst = Math.round(basePrice * 0.18);
+                const totalAmount = basePrice + gst;
+
+                await dbClient.query(
+                    `INSERT INTO geosurepath_subscriptions 
+                    (user_id, plan_id, status, razorpay_order_id, razorpay_payment_id, expiry_date, device_limit, amount_paid, currency)
+                    VALUES ($1, $2, 'active', $3, $4, $5, $6, $7, 'INR')`,
+                    [userId, planId, razorpay_order_id, razorpay_payment_id, expiryDate, deviceLimit, totalAmount]
+                );
+
+                await dbClient.query('COMMIT');
+                logger.info(`Subscription activated for User ${userId}: ${planId} (₹${totalAmount})`);
+                res.json({ success: true, message: `Subscription activated for ${months} month(s)` });
+            } catch (err) {
+                await dbClient.query('ROLLBACK');
+                throw err;
+            } finally {
+                dbClient.release();
             }
-
-            const expiryDate = new Date();
-            expiryDate.setMonth(expiryDate.getMonth() + months);
-
-            // Fetch device limit and price from settings
-            const limitKey = `plan_limit_${planId}`;
-            const priceKey = `plan_price_${planId}`;
-
-            const [limitRes, priceRes] = await Promise.all([
-                pool.query("SELECT value FROM geosurepath_settings WHERE key = $1", [limitKey]),
-                pool.query("SELECT value FROM geosurepath_settings WHERE key = $1", [priceKey])
-            ]);
-
-            const deviceLimit = limitRes.rowCount > 0 ? parseInt(limitRes.rows[0].value) : (planId === 'enterprise' ? 100 : 25);
-            const basePrice = priceRes.rowCount > 0 ? parseInt(priceRes.rows[0].value) : (planId === 'enterprise' ? 4500 : 1500);
-            const gst = Math.round(basePrice * 0.18);
-            const totalAmount = basePrice + gst;
-
-            await pool.query(
-                `INSERT INTO geosurepath_subscriptions 
-                (user_id, plan_id, status, razorpay_order_id, razorpay_payment_id, expiry_date, device_limit, amount_paid, currency)
-                VALUES ($1, $2, 'active', $3, $4, $5, $6, $7, 'INR')`,
-                [userId, planId, razorpay_order_id, razorpay_payment_id, expiryDate, deviceLimit, totalAmount]
-            );
-
-            logger.info(`Subscription activated for User ${userId}: ${planId} (₹${totalAmount})`);
-            res.json({ success: true, message: `Subscription activated for ${months} month(s)` });
         } else {
             res.status(400).json({ success: false, error: 'Invalid payment signature' });
         }
     } catch (err) {
-        logger.error('Payment Verification Error:', err.message);
+        logger.error('Payment Verification Error:', { error: err.message, userId, orderId: razorpay_order_id });
         res.status(500).json({ error: 'Verification failed' });
     }
 });
@@ -146,7 +168,7 @@ router.post('/verify', async (req, res) => {
 router.get('/subscription/:userId', async (req, res) => {
     try {
         const subRes = await pool.query(
-            'SELECT *, (expiry_date - NOW()) as time_remaining FROM geosurepath_subscriptions WHERE user_id = $1 AND status = \'active\' ORDER BY created_at DESC LIMIT 1',
+            "SELECT *, (expiry_date - NOW()) as time_remaining FROM geosurepath_subscriptions WHERE user_id = $1 AND status = 'active' AND expiry_date > NOW() ORDER BY created_at DESC LIMIT 1",
             [req.params.userId]
         );
 

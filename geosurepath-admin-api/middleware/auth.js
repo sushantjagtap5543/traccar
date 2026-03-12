@@ -10,7 +10,12 @@ const verifyAdminToken = (req, res, next) => {
         return res.status(403).json({ error: 'No token provided' });
     }
 
-    jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret', (err, decoded) => {
+    if (!process.env.JWT_SECRET) {
+        logger.error('FATAL: JWT_SECRET environment variable not configured');
+        return res.status(500).json({ error: 'Server configuration error' });
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
         if (err || decoded.role !== 'admin') {
             logger.warn(`Invalid JWT attempt from ${req.ip}`);
             return res.status(403).json({ error: 'Unauthorized session' });

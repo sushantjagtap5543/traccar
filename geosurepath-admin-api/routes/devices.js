@@ -11,8 +11,24 @@ const TRACCAR_URL = process.env.TRACCAR_INTERNAL_URL || 'http://traccar:8082';
  * Intercepts device creation to enforce subscription limits.
  */
 
+const Joi = require('joi');
+
 // 1. Create Device with Limit Check
 router.post('/devices', checkDeviceLimit, async (req, res) => {
+    const schema = Joi.object({
+        name: Joi.string().required(),
+        uniqueId: Joi.string().required(),
+        phone: Joi.string().allow('', null).optional(),
+        model: Joi.string().allow('', null).optional(),
+        contact: Joi.string().allow('', null).optional(),
+        category: Joi.string().allow('', null).optional(),
+        disabled: Joi.boolean().optional(),
+        attributes: Joi.object().optional()
+    }).unknown(true);
+
+    const { error, value } = schema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
     try {
         logger.info(`Proxying device creation for user ${req.traccarUser?.id}`);
 

@@ -53,16 +53,24 @@ const runDailyTasks = async () => {
     try {
         // 1. Subscription Renewal Reminders (Expiring in 3 days)
         const expiringSubRes = await pool.query(
-            "SELECT s.*, u.phone, u.name FROM geosurepath_subscriptions s JOIN tc_users u ON s.user_id = u.id WHERE s.status = 'active' AND s.expiry_date BETWEEN NOW() AND NOW() + INTERVAL '3 days'"
+            "SELECT s.*, u.id as user_actual_id, u.name as user_name FROM geosurepath_subscriptions s JOIN tc_users u ON s.user_id = u.id WHERE s.status = 'active' AND s.expiry_date BETWEEN NOW() AND NOW() + INTERVAL '3 days'"
         );
 
         for (const sub of expiringSubRes.rows) {
-            logger.info(`Sending renewal reminder to ${sub.name} (User ${sub.user_id})`);
-            // In a real system, send SMS via Twilio or Email here
-            await sendAlert('RENEWAL_REMINDER', `Subscription for ${sub.name} expires in 3 days (Plan: ${sub.plan_id}). Renewal required.`, 'INFO', `user_${sub.user_id}`);
+            logger.info(`Sending renewal reminder to ${sub.user_name} (User ${sub.user_actual_id})`);
+            // In a real system, send SMS/Email here
+            await sendAlert('RENEWAL_REMINDER', `Subscription for ${sub.user_name} expires in 3 days (Plan: ${sub.plan_id}). Renewal required.`, 'INFO', `user_${sub.user_actual_id}`);
         }
 
-        // 2. Clean up old sessions or logs if needed...
+        // 2. Auto-deactivate Expired Subscriptions
+        const deactivationRes = await pool.query(
+            "UPDATE geosurepath_subscriptions SET status = 'expired' WHERE status = 'active' AND expiry_date < NOW()"
+        );
+        if (deactivationRes.rowCount > 0) {
+            logger.info(`Deactivated ${deactivationRes.rowCount} expired subscriptions.`);
+        }
+
+        // 3. Clean up old sessions or logs if needed...
 
     } catch (err) {
         logger.error('Daily tasks failed:', err.message);

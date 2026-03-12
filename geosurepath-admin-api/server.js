@@ -9,6 +9,7 @@ const promClient = require('prom-client');
 const si = require('systeminformation');
 const rateLimit = require('express-rate-limit');
 const { RedisStore } = require('rate-limit-redis');
+const uuid = require('uuid');
 
 // --- LOAD MODULAR COMPONENTS ---
 const { pool, redisClient, ioRedisClient, logger } = require('./services/db');
@@ -23,6 +24,25 @@ const backupService = require('./services/backupService');
 const app = express();
 const PORT = process.env.PORT || 8083;
 
+// --- ENV VALIDATION ---
+const requiredEnvVars = [
+    'DATABASE_URL',
+    'REDIS_URL',
+    'JWT_SECRET',
+    'ADMIN_EMAIL',
+    'ADMIN_PASSWORD_HASH',
+    'ENCRYPTION_KEY',
+    'NODE_ENV'
+];
+
+for (const envVar of requiredEnvVars) {
+    if (!process.env[envVar]) {
+        logger.error(`FATAL: Missing required environment variable: ${envVar}`);
+        process.exit(1);
+    }
+}
+logger.info('All required environment variables are configured.');
+
 // --- RATE LIMITING ---
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -31,9 +51,34 @@ const limiter = rateLimit({
     sendCommand: (...args) => ioRedisClient.call(...args),
   }),
 });
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10, // 10 attempts per 15 mins
+  store: new RedisStore({
+    sendCommand: (...args) => ioRedisClient.call(...args),
+  }),
+  skipSuccessfulRequests: true
+});
+
+const paymentLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20, // 20 attempts per hour
+  store: new RedisStore({
+    sendCommand: (...args) => ioRedisClient.call(...args),
+  }),
+});
+
 if (process.env.NODE_ENV !== 'test') {
   app.use(limiter);
 }
+
+// --- REQUEST TRACING ---
+app.use((req, res, next) => {
+  req.id = req.headers['x-request-id'] || uuid.v4();
+  res.setHeader('x-request-id', req.id);
+  next();
+});
 
 // --- METRICS CONFIGURATION ---
 const registry = new promClient.Registry();
@@ -65,7 +110,8 @@ if (process.env.NODE_ENV !== 'test') {
 // --- MIDDLEWARE ---
 app.use(helmet());
 app.use(cookieParser());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:3000', 'http://localhost:5173'];
 app.use(cors({
   origin: (origin, callback) => {
@@ -79,12 +125,12 @@ app.use(cors({
 }));
 
 // --- ROUTES ---
-app.use('/api', authRoutes);
+app.use('/api', authLimiter, authRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', backupRoutes);
 app.use('/api', migrationRoutes);
 app.use('/api', require('./routes/devices')); // Limit enforcement proxy
-app.use('/api/payments', require('./routes/payments'));
+app.use('/api/payments', paymentLimiter, require('./routes/payments'));
 
 // Protected metrics
 app.get('/metrics', adminAuth, async (req, res) => {
@@ -107,14 +153,51 @@ app.use('/api-docs', (req, res, next) => {
 }, swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 // Public health for Docker
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'UP', timestamp: new Date().toISOString() });
+app.get('/api/health', async (req, res) => {
+  const health = {
+    status: 'UP',
+    timestamp: new Date().toISOString(),
+    services: {
+      api: 'UP'
+    }
+  };
+
+  try {
+    await pool.query('SELECT 1');
+    health.services.database = 'UP';
+  } catch (err) {
+    health.services.database = 'DOWN';
+    health.status = 'DEGRADED';
+  }
+
+  try {
+    const redisRes = await redisClient.ping();
+    health.services.redis = (redisRes === 'PONG') ? 'UP' : 'DOWN';
+    if (redisRes !== 'PONG') health.status = 'DEGRADED';
+  } catch (err) {
+    health.services.redis = 'DOWN';
+    health.status = 'DEGRADED';
+  }
+
+  res.status(health.status === 'UP' ? 200 : 503).json(health);
 });
 
 // --- GLOBAL ERROR HANDLER ---
 app.use((err, req, res, next) => {
-  logger.error(err.stack);
-  res.status(500).json({ error: 'Internal Server Error' });
+  const status = err.status || 500;
+  const message = err.message || 'Internal Server Error';
+  const requestId = req.id || 'unknown';
+
+  logger.error(`[${requestId}] Error:`, { status, message, stack: err.stack });
+
+  res.status(status).json({
+    error: {
+      code: err.code || 'INTERNAL_ERROR',
+      message,
+      requestId,
+      timestamp: new Date().toISOString()
+    }
+  });
 });
 
 // --- STARTUP ---
@@ -126,9 +209,9 @@ const startServer = async () => {
     logger.info('Database migrations completed.');
     await knex.destroy();
   } catch (err) {
-    logger.error('Migration failure:', err);
-    // In many production cases, you might want process.exit(1) here 
-    // if migrations fail, as the DB is in an inconsistent state.
+    logger.error('FATAL: Database migrations failed:', err);
+    logger.error('Cannot proceed with inconsistent database schema. Exiting immediately.');
+    process.exit(1);
   }
 
   // 2. Start core services

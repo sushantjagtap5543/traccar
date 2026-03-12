@@ -4,12 +4,21 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const speakeasy = require('speakeasy');
 const QRCode = require('qrcode');
+const Joi = require('joi');
 const { pool, redisClient, logger } = require('../services/db');
 const { adminAuth } = require('../middleware/auth');
 
 // --- AUTH ENDPOINTS ---
 router.post('/admin/auth/login', async (req, res) => {
-    const { email, password } = req.body;
+    const schema = Joi.object({
+        email: Joi.string().email().required(),
+        password: Joi.string().min(8).required()
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
+    const { email, password } = value;
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@geosurepath.com';
     const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
@@ -46,7 +55,15 @@ router.get('/admin/auth/totp-setup', adminAuth, async (req, res) => {
 });
 
 router.post('/admin/auth/verify-totp', async (req, res) => {
-    const { token: totpToken, email } = req.body;
+    const schema = Joi.object({
+        token: Joi.string().length(6).required(),
+        email: Joi.string().email().optional()
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
+    const { token: totpToken, email } = value;
     try {
         const secret = await redisClient.get(`totp_secret:${email || 'admin'}`);
         if (!secret) return res.status(400).json({ error: '2FA session expired or not initialized' });
@@ -107,8 +124,15 @@ router.post('/auth/send-otp', async (req, res) => {
 });
 
 router.post('/auth/verify-otp', async (req, res) => {
-    const { mobile, code } = req.body;
-    if (!mobile || !code) return res.status(400).json({ error: 'Mobile and code required' });
+    const schema = Joi.object({
+        mobile: Joi.string().pattern(/^\+?[0-9]{10,15}$/).required(),
+        code: Joi.string().length(6).required()
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
+    const { mobile, code } = value;
 
     try {
         const storedCode = await redisClient.get(`otp:${mobile}`);

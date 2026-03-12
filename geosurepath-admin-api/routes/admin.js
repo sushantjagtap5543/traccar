@@ -246,16 +246,33 @@ router.get('/admin/billing/overview', adminAuth, async (req, res) => {
 
 // Record Manual Payment (Admin Only)
 router.post('/admin/billing/record-manual', adminAuth, async (req, res) => {
-    const { email, planId, amount, transactionId, months } = req.body;
+    const schema = Joi.object({
+        email: Joi.string().email().required(),
+        planId: Joi.string().required(),
+        amount: Joi.number().positive().required(),
+        transactionId: Joi.string().optional(),
+        months: Joi.number().integer().positive().optional()
+    });
 
+    const { error, value } = schema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
+    const { email, planId, amount, transactionId, months } = value;
+
+    const client = await pool.connect();
     try {
+        await client.query('BEGIN');
+
         // 1. Find user by email
-        const userRes = await pool.query('SELECT id FROM tc_users WHERE email = $1', [email]);
-        if (userRes.rowCount === 0) return res.status(404).json({ error: 'User not found' });
+        const userRes = await client.query('SELECT id FROM tc_users WHERE email = $1', [email]);
+        if (userRes.rowCount === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'User not found' });
+        }
         const userId = userRes.rows[0].id;
 
         // 2. Determine limits
-        const limitRes = await pool.query('SELECT value FROM geosurepath_settings WHERE key = $1', [`plan_limit_${planId}`]);
+        const limitRes = await client.query('SELECT value FROM geosurepath_settings WHERE key = $1', [`plan_limit_${planId}`]);
         const deviceLimit = limitRes.rowCount > 0 ? parseInt(limitRes.rows[0].value) : 10;
 
         // 3. Calculate expiry
@@ -263,27 +280,34 @@ router.post('/admin/billing/record-manual', adminAuth, async (req, res) => {
         expiryDate.setMonth(expiryDate.getMonth() + (parseInt(months) || 12));
 
         // 4. Insert subscription
-        await pool.query(
+        await client.query(
             `INSERT INTO geosurepath_subscriptions 
             (user_id, plan_id, status, device_limit, amount_paid, razorpay_payment_id, expiry_date) 
             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
             [userId, planId, 'active', deviceLimit, amount, transactionId || 'MANUAL_PAY', expiryDate]
         );
 
-        logger.info(`Admin ${req.adminId} recorded manual payment for user ${userId} (${email})`);
+        await client.query('COMMIT');
+        logger.info(`Admin recorded manual payment for user ${userId} (${email})`);
         res.json({ message: 'Subscription record successfully updated.' });
     } catch (err) {
+        await client.query('ROLLBACK');
         logger.error('Manual Billing Record Error:', err);
         res.status(500).json({ error: 'System failed to record manual payment' });
+    } finally {
+        client.release();
     }
 });
 
 router.post('/admin/alerts/config', adminAuth, async (req, res) => {
-    const { webhookUrl } = req.body;
-    if (!webhookUrl || !webhookUrl.startsWith('http')) {
-        return res.status(400).json({ error: 'Invalid webhook URL' });
-    }
+    const schema = Joi.object({
+        webhookUrl: Joi.string().uri().required()
+    });
 
+    const { error, value } = schema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
+    const { webhookUrl } = value;
     try {
         await pool.query(
             'INSERT INTO geosurepath_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
