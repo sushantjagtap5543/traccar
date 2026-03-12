@@ -88,11 +88,14 @@ success "Core dependencies installed."
 
 # --- Step 3: Repository Deployment ---
 log "[Step 3/11] Deploying codebase to $APP_DIR..."
-mkdir -p "$APP_DIR"
-# In a real scenario, we'd clone. For this script, we assume context is being copied or script is in repo.
-# For demo, we sync from current dir if possible, or create structure.
-cp -r . "$APP_DIR"
-cd "$APP_DIR"
+if [ -d "$APP_DIR/.git" ]; then
+    log "Existing repository detected in $APP_DIR. Refreshing..."
+    cd "$APP_DIR" && git pull
+else
+    log "Cloning GeoSurePath from GitHub..."
+    git clone https://github.com/sushantjagtap5543/traccar.git "$APP_DIR"
+    cd "$APP_DIR"
+fi
 success "Codebase deployed."
 
 # --- Step 4: Traccar Backend Installation ---
