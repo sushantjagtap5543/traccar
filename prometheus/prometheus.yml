@@ -9,5 +9,5 @@ scrape_configs:
     http_sd_configs: []
     # Using basic static auth via headers
     authorization:
-      type: ApiKey
-      credentials: ${ADMIN_API_KEY}
+      type: Bearer
+      credentials_file: /etc/prometheus/api_key.txt

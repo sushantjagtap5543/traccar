@@ -84,6 +84,14 @@ curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
 apt-get install -y nodejs
 npm install -g pm2 yarn
 
+# Install Docker
+log "Provisioning Docker Engine..."
+curl -fsSL https://get.docker.com | bash
+usermod -aG docker ubuntu || true
+systemctl enable docker
+systemctl start docker
+apt-get install -y docker-compose-plugin
+
 success "Core dependencies installed."
 
 # --- Step 3: Repository Deployment ---

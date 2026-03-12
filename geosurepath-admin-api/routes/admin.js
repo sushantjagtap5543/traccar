@@ -80,20 +80,28 @@ router.get('/admin/health', adminAuth, async (req, res) => {
 
 router.get('/admin/logs', adminAuth, (req, res) => {
     const logDir = process.env.LOG_DIR || path.join(__dirname, '../logs');
-    const logPath = path.join(logDir, 'combined.log'); // Or use the rotated log correctly
-
-    // For this simplified refactor, we'll try combined first, or fallback to the latest application file
-    if (!fs.existsSync(logPath)) {
-        // Find latest rotated log? For now, we'll just check if application log exists
-        const files = fs.readdirSync(logDir).filter(f => f.startsWith('application-')).sort().reverse();
-        if (files.length === 0) return res.json({ logs: ['No logs found.'] });
-        const content = fs.readFileSync(path.join(logDir, files[0]), 'utf8');
-        const lines = content.split('\n').filter(Boolean).slice(-100);
-        return res.json({ logs: lines.reverse() });
+    
+    if (!fs.existsSync(logDir)) {
+        return res.json({ logs: ['Log directory not found.'] });
     }
 
-    const logs = fs.readFileSync(logPath, 'utf8').split('\n').filter(Boolean).slice(-100);
-    res.json({ logs: logs.reverse() });
+    try {
+        const files = fs.readdirSync(logDir)
+            .filter(f => f.startsWith('application-'))
+            .sort()
+            .reverse();
+
+        if (files.length === 0) {
+            return res.json({ logs: ['No logs found.'] });
+        }
+
+        const content = fs.readFileSync(path.join(logDir, files[0]), 'utf8');
+        const lines = content.split('\n').filter(Boolean).slice(-100);
+        res.json({ logs: lines.reverse() });
+    } catch (err) {
+        logger.error('Log Read Error:', err);
+        res.status(500).json({ error: 'Failed to read logs' });
+    }
 });
 
 router.get('/admin/db/tables', adminAuth, async (req, res) => {
