@@ -24,6 +24,13 @@ class MigrationService {
 
         try {
             await addLog(`Starting migration sequence to ${host}...`);
+            
+            // Enable Maintenance Mode
+            await pool.query("UPDATE geosurepath_settings SET value = 'true' WHERE key = 'maintenance_mode'");
+            const { redisClient } = require('./db');
+            await redisClient.set('maintenance_mode', 'true');
+            await addLog('Maintenance mode ENABLED to ensure data consistency during snapshot.');
+
             await pool.query('UPDATE geosurepath_migration_jobs SET status = $1, progress = $2 WHERE id = $3', ['in_progress', 5, jobId]);
 
             // 1. Check SSH Connection
@@ -103,6 +110,15 @@ class MigrationService {
             await pool.query('UPDATE geosurepath_migration_jobs SET status = $1, error_message = $2 WHERE id = $3', ['failed', err.message, jobId]);
             // ROLLBACK if needed...
         } finally {
+            // Disable Maintenance Mode
+            try {
+                await pool.query("UPDATE geosurepath_settings SET value = 'false' WHERE key = 'maintenance_mode'");
+                const { redisClient } = require('./db');
+                await redisClient.set('maintenance_mode', 'false');
+                await addLog('Maintenance mode DISABLED.');
+            } catch (maintErr) {
+                logger.error('Failed to disable maintenance mode after migration:', maintErr);
+            }
             this.activeMigration = null;
         }
     }

@@ -15,10 +15,27 @@ const transport = new winston.transports.DailyRotateFile({
     maxFiles: '14d'
 });
 
+const maskSensitive = winston.format((info) => {
+    const sensitiveKeys = ['password', 'token', 'secret', 'key', 'auth', 'mobile', 'email'];
+    const mask = (obj) => {
+        for (const key in obj) {
+            if (typeof obj[key] === 'object' && obj[key] !== null) {
+                mask(obj[key]);
+            } else if (sensitiveKeys.some(sk => key.toLowerCase().includes(sk))) {
+                obj[key] = '********';
+            }
+        }
+    };
+    if (info.payload && typeof info.payload === 'object') mask(info.payload);
+    if (typeof info.message === 'object') mask(info.message);
+    return info;
+});
+
 const logger = winston.createLogger({
     level: 'info',
     format: winston.format.combine(
         winston.format.timestamp(),
+        maskSensitive(),
         winston.format.json()
     ),
     transports: [

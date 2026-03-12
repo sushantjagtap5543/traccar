@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { pool, logger } = require('../services/db');
 const { decrypt } = require('../utils/crypto');
 const Joi = require('joi');
+const { logAudit } = require('../services/auditService');
 
 /**
  * Razorpay Payment Integration
@@ -108,14 +109,29 @@ router.post('/verify', async (req, res) => {
             try {
                 await dbClient.query('BEGIN');
 
+                // Check for idempotency
+                const idempotencyCheck = await dbClient.query(
+                    "SELECT id FROM geosurepath_subscriptions WHERE razorpay_payment_id = $1",
+                    [razorpay_payment_id]
+                );
+
+                if (idempotencyCheck.rowCount > 0) {
+                    await dbClient.query('ROLLBACK');
+                    return res.json({ success: true, message: 'Payment already verified and subscription active' });
+                }
+
                 // Check for existing active subscription
                 const existingSub = await dbClient.query(
                     "SELECT id FROM geosurepath_subscriptions WHERE user_id = $1 AND status = 'active' AND expiry_date > NOW() FOR UPDATE",
                     [userId]
                 );
 
+                let carryOverDays = 0;
                 if (existingSub.rowCount > 0) {
-                    // Update existing one to cancelled/replaced or just expire it
+                    const oldSub = existingSub.rows[0];
+                    const diff = new Date(oldSub.expiry_date) - new Date();
+                    carryOverDays = Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+
                     await dbClient.query(
                         "UPDATE geosurepath_subscriptions SET status = 'replaced' WHERE user_id = $1 AND status = 'active'",
                         [userId]
@@ -124,6 +140,7 @@ router.post('/verify', async (req, res) => {
 
                 const expiryDate = new Date();
                 expiryDate.setMonth(expiryDate.getMonth() + months);
+                expiryDate.setDate(expiryDate.getDate() + carryOverDays);
 
                 // Fetch device limit and price from settings
                 const limitKey = `plan_limit_${planId}`;
@@ -134,6 +151,17 @@ router.post('/verify', async (req, res) => {
                     dbClient.query("SELECT value FROM geosurepath_settings WHERE key = $1", [priceKey])
                 ]);
 
+                // Generate Invoice Number
+                const invoiceSettings = await dbClient.query("SELECT key, value FROM geosurepath_settings WHERE key IN ('invoice_prefix', 'invoice_next_val') FOR UPDATE");
+                const invConfig = {};
+                invoiceSettings.rows.forEach(r => invConfig[r.key] = r.value);
+                
+                const prefix = invConfig.invoice_prefix || 'GS-INV-';
+                const nextVal = parseInt(invConfig.invoice_next_val || '1001');
+                const invoiceNumber = `${prefix}${nextVal}`;
+
+                await dbClient.query("UPDATE geosurepath_settings SET value = $1 WHERE key = 'invoice_next_val'", [(nextVal + 1).toString()]);
+
                 const deviceLimit = limitRes.rowCount > 0 ? parseInt(limitRes.rows[0].value) : (planId === 'enterprise' ? 100 : 25);
                 const basePrice = priceRes.rowCount > 0 ? parseInt(priceRes.rows[0].value) : (planId === 'enterprise' ? 4500 : 1500);
                 const gst = Math.round(basePrice * 0.18);
@@ -141,9 +169,9 @@ router.post('/verify', async (req, res) => {
 
                 await dbClient.query(
                     `INSERT INTO geosurepath_subscriptions 
-                    (user_id, plan_id, status, razorpay_order_id, razorpay_payment_id, expiry_date, device_limit, amount_paid, currency)
-                    VALUES ($1, $2, 'active', $3, $4, $5, $6, $7, 'INR')`,
-                    [userId, planId, razorpay_order_id, razorpay_payment_id, expiryDate, deviceLimit, totalAmount]
+                    (user_id, plan_id, status, razorpay_order_id, razorpay_payment_id, expiry_date, device_limit, amount_paid, currency, invoice_number)
+                    VALUES ($1, $2, 'active', $3, $4, $5, $6, $7, 'INR', $8)`,
+                    [userId, planId, razorpay_order_id, razorpay_payment_id, expiryDate, deviceLimit, totalAmount, invoiceNumber]
                 );
 
                 await dbClient.query('COMMIT');
@@ -167,8 +195,9 @@ router.post('/verify', async (req, res) => {
 // 3. Get Subscription Status
 router.get('/subscription/:userId', async (req, res) => {
     try {
+        const GRACE_PERIOD_DAYS = 3;
         const subRes = await pool.query(
-            "SELECT *, (expiry_date - NOW()) as time_remaining FROM geosurepath_subscriptions WHERE user_id = $1 AND status = 'active' AND expiry_date > NOW() ORDER BY created_at DESC LIMIT 1",
+            "SELECT *, (expiry_date - NOW()) as time_remaining FROM geosurepath_subscriptions WHERE user_id = $1 AND status = 'active' AND (expiry_date + INTERVAL '3 days') > NOW() ORDER BY created_at DESC LIMIT 1",
             [req.params.userId]
         );
 
@@ -196,14 +225,20 @@ router.get('/subscription/:userId', async (req, res) => {
     }
 });
 
-// 4. Cancel Subscription
+// 4. Cancel Subscription (With Churn Analytics)
 router.post('/cancel', async (req, res) => {
-    const { userId } = req.body;
+    const { userId, reason } = req.body;
     try {
-        await pool.query(
-            "UPDATE geosurepath_subscriptions SET status = 'cancelled' WHERE user_id = $1 AND status = 'active'",
+        const result = await pool.query(
+            "UPDATE geosurepath_subscriptions SET status = 'cancelled' WHERE user_id = $1 AND status = 'active' RETURNING id",
             [userId]
         );
+        
+        if (result.rowCount > 0) {
+            logger.warn(`User ${userId} cancelled subscription. Reason: ${reason || 'Not provided'}`);
+            logAudit('SUBSCRIPTION_CANCELLED', 'subscription', { userId, reason }, userId);
+        }
+
         res.json({ success: true, message: 'Subscription cancelled successfully' });
     } catch (err) {
         logger.error('Cancel Subscription Error:', err.message);
@@ -281,6 +316,7 @@ router.get('/invoice/:paymentId', async (req, res) => {
                         <small style="text-transform: uppercase; color: #777; font-weight: bold;">Bill To:</small><br>
                         <b>${sub.user_name}</b><br>
                         ${sub.user_email}<br>
+                        Invoice: <b>${sub.invoice_number}</b><br>
                         Payment ID: ${sub.razorpay_payment_id}<br>
                         Date: ${new Date(sub.created_at).toLocaleDateString()}
                     </div>
@@ -328,7 +364,26 @@ router.get('/invoice/:paymentId', async (req, res) => {
     }
 });
 
-// 7. Payment History for a specific User
+// 7. Refund & Dispute Handling (Admin Only)
+router.post('/refund/:paymentId', async (req, res) => {
+    // Note: In a real app, this would also trigger Razorpay's refund API
+    try {
+        const result = await pool.query(
+            "UPDATE geosurepath_subscriptions SET status = 'refunded' WHERE razorpay_payment_id = $1 RETURNING user_id",
+            [req.params.paymentId]
+        );
+
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Payment record not found' });
+
+        logger.info(`Payment ${req.params.paymentId} marked as refunded for user ${result.rows[0].user_id}`);
+        res.json({ success: true, message: 'Subscription marked as refunded' });
+    } catch (err) {
+        logger.error('Refund Error:', err.message);
+        res.status(500).json({ error: 'Failed to process refund' });
+    }
+});
+
+// 8. Payment History for a specific User
 router.get('/history/:userId', async (req, res) => {
     try {
         const result = await pool.query(

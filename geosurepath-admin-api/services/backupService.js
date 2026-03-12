@@ -73,6 +73,7 @@ class BackupService {
             // 1. Database Dump
             const dbDumpPath = path.join(BACKUP_DIR, `db_${timestamp}.sql`);
             await this.dumpDatabase(dbDumpPath);
+            await this.validateDatabaseDump(dbDumpPath);
 
             // 2. Create Archive (Only include database. Source code excluded for security)
             await this.createArchive(localPath, [
@@ -93,8 +94,8 @@ class BackupService {
             if (settings.google_drive_enabled === 'true') {
                 try {
                     await googleDriveService.init(settings.google_drive_client_id, settings.google_drive_client_secret, settings.google_drive_refresh_token);
-                    await googleDriveService.uploadFile(encryptedPath, backupName + '.zip.enc');
-                    await pool.query('UPDATE geosurepath_backups SET storage_type = $1 WHERE filename = $2', ['both', backupName + '.zip.enc']);
+                    const cloudFileId = await googleDriveService.uploadFile(encryptedPath, backupName + '.zip.enc');
+                    await pool.query('UPDATE geosurepath_backups SET storage_type = $1, cloud_file_id = $2 WHERE filename = $3', ['both', cloudFileId, backupName + '.zip.enc']);
                 } catch (err) {
                     logger.error('Scheduled backup cloud upload failed:', err.message);
                 }
@@ -116,6 +117,18 @@ class BackupService {
             await this.sendNotification('Backup Failed', `Error: ${err.message}`);
         } finally {
             this.currentTask = null;
+        }
+    }
+
+    async validateDatabaseDump(filePath) {
+        if (!fs.existsSync(filePath)) throw new Error('Database dump file not found');
+        const stats = fs.statSync(filePath);
+        if (stats.size < 1024) throw new Error('Database dump file too small (possible failure)');
+        
+        // Check for SQL signature (e.g., PostgreSQL dump header)
+        const header = fs.readFileSync(filePath, { encoding: 'utf8', flag: 'r' }).slice(0, 100);
+        if (!header.includes('-- PostgreSQL database dump')) {
+            logger.warn('Database dump missing standard PostgreSQL header. Proceeding with caution.');
         }
     }
 
@@ -189,10 +202,20 @@ class BackupService {
                 if (fs.existsSync(filePath)) {
                     await fs.remove(filePath);
                 }
+                
                 // Also delete from GDrive if possible...
+                if (row.cloud_file_id && settings.google_drive_enabled === 'true') {
+                    try {
+                        await googleDriveService.init(settings.google_drive_client_id, settings.google_drive_client_secret, settings.google_drive_refresh_token);
+                        await googleDriveService.deleteFile(row.cloud_file_id);
+                        logger.info(`Cleanup: Deleted cloud backup ${row.cloud_file_id}`);
+                    } catch (cloudErr) {
+                        logger.error(`Cleanup: Failed to delete cloud backup ${row.cloud_file_id}:`, cloudErr.message);
+                    }
+                }
                 
                 await pool.query('DELETE FROM geosurepath_backups WHERE id = $1', [row.id]);
-                logger.info(`Cleanup: Deleted old backup ${row.filename}`);
+                logger.info(`Cleanup: Deleted old backup record ${row.filename}`);
             }
         } catch (err) {
             logger.error('Cleanup failed:', err);

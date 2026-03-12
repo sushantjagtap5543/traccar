@@ -8,6 +8,7 @@ const swaggerJsDoc = require('swagger-jsdoc');
 const promClient = require('prom-client');
 const si = require('systeminformation');
 const rateLimit = require('express-rate-limit');
+const morgan = require('morgan');
 const { RedisStore } = require('rate-limit-redis');
 const uuid = require('uuid');
 
@@ -73,11 +74,43 @@ if (process.env.NODE_ENV !== 'test') {
   app.use(limiter);
 }
 
-// --- REQUEST TRACING ---
 app.use((req, res, next) => {
   req.id = req.headers['x-request-id'] || uuid.v4();
   res.setHeader('x-request-id', req.id);
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    res.setHeader('x-response-time', `${duration}ms`);
+  });
   next();
+});
+
+// Access Logging
+if (process.env.NODE_ENV !== 'test') {
+  app.use(morgan(':method :url :status :res[content-length] - :response-time ms', {
+    stream: { write: (message) => logger.info(message.trim()) }
+  }));
+}
+
+// Maintenance Mode Middleware
+app.use(async (req, res, next) => {
+    if (req.path.startsWith('/api/admin') || req.path === '/api/health' || req.path === '/metrics') {
+        return next();
+    }
+    
+    try {
+        const maintRes = await redisClient.get('maintenance_mode');
+        if (maintRes === 'true') {
+            return res.status(503).json({ error: 'System is under maintenance. Please try again later.' });
+        }
+    } catch (err) {
+        // Fallback to DB if Redis fails
+        const dbRes = await pool.query("SELECT value FROM geosurepath_settings WHERE key = 'maintenance_mode' LIMIT 1");
+        if (dbRes.rowCount > 0 && dbRes.rows[0].value === 'true') {
+            return res.status(503).json({ error: 'System is under maintenance. Please try again later.' });
+        }
+    }
+    next();
 });
 
 // --- METRICS CONFIGURATION ---
@@ -153,6 +186,7 @@ app.use('/api-docs', (req, res, next) => {
 }, swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 // Public health for Docker
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 app.get('/api/health', async (req, res) => {
   const health = {
     status: 'UP',

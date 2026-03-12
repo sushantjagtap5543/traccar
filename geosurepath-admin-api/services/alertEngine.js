@@ -56,25 +56,26 @@ const startAlertEngine = () => {
                 }
             }
 
-            // 2. Fetch Config from Traccar Server Attributes
-            let server;
-            try {
-                const serverRes = await client.get('/api/server');
-                server = serverRes.data;
-            } catch (err) {
-                if (err.response?.status === 401) sessionCookie = null; // Reset session on 401
-                throw err;
-            }
-
-            if (!server.attributes?.alertConfig) return;
-            
+            // 2. Fetch Config (Prioritize DB settings, then server attributes)
             let config;
             try {
-                config = JSON.parse(server.attributes.alertConfig);
+                const { pool } = require('./db');
+                const dbRes = await pool.query("SELECT value FROM geosurepath_settings WHERE key = 'alert_rules_config' LIMIT 1");
+                if (dbRes.rowCount > 0) {
+                    config = JSON.parse(dbRes.rows[0].value);
+                } else {
+                    const serverRes = await client.get('/api/server');
+                    const server = serverRes.data;
+                    if (server.attributes?.alertConfig) {
+                        config = JSON.parse(server.attributes.alertConfig);
+                    }
+                }
             } catch (err) {
-                logger.error('Alert Engine: Invalid alertConfig JSON in server attributes:', { error: err.message });
+                logger.error('Alert Engine: Failed to fetch/parse alertConfig:', { error: err.message });
                 return;
             }
+
+            if (!config) return;
 
             // 3. Fetch Devices
             const devicesRes = await client.get('/api/devices');
@@ -122,9 +123,13 @@ const startAlertEngine = () => {
                     await sendAlert('TOW_ALERT', `Vehicle ${device.name} is being moved without ignition!`, 'CRITICAL', device.id);
                 }
 
-                // Connectivity
+                // Connectivity (With 10-minute stabilization delay)
                 if (config.deviceDisconnected?.enabled && device.status === 'offline') {
-                    await sendAlert('DEVICE_OFFLINE', `Telemetry lost for vehicle ${device.name}.`, 'WARNING', device.id);
+                    const lastUpdate = new Date(device.lastUpdate).getTime();
+                    const tenMinutesAgo = Date.now() - 600000;
+                    if (lastUpdate < tenMinutesAgo) {
+                        await sendAlert('DEVICE_OFFLINE', `Telemetry lost for vehicle ${device.name}. (Offline > 10m)`, 'WARNING', device.id);
+                    }
                 }
                 if (config.gpsLost?.enabled && pos.valid === false) {
                     await sendAlert('GPS_SIGNAL_LOST', `GPS fix lost for vehicle ${device.name}.`, 'WARNING', device.id);

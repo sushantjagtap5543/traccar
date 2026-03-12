@@ -13,11 +13,23 @@ const sendAlert = async (title, message, severity = 'WARNING', deviceId = 'infra
     try {
         const onCooldown = await redisClient.get(alertKey);
         if (onCooldown) {
-            logger.info(`Alert ${title} for ${deviceId} silenced (on cooldown).`);
+            logger.info(`Alert ${title} for ${deviceId} silenced (on cooldown via Redis).`);
+            return;
+        }
+
+        // DB Fallback/Persistence check
+        const dbCheck = await pool.query(
+            "SELECT id FROM geosurepath_alerts WHERE title = $1 AND device_id = $2 AND created_at > NOW() - INTERVAL '15 minutes' LIMIT 1",
+            [title, deviceId]
+        );
+        if (dbCheck.rowCount > 0) {
+            logger.info(`Alert ${title} for ${deviceId} silenced (on cooldown via DB).`);
+            // Sync back to Redis if it was missing
+            await redisClient.set(alertKey, '1', { EX: 900 });
             return;
         }
     } catch (err) {
-        logger.error('Redis Cooldown check failed:', err.message);
+        logger.error('Deduplication check failed:', err.message);
     }
 
     logger.warn(`ALERT [${severity}]: ${title} - ${message}`);
@@ -27,6 +39,13 @@ const sendAlert = async (title, message, severity = 'WARNING', deviceId = 'infra
         await axios.post(ALERT_WEBHOOK, {
             content: `🚨 **GS-INFRA ALERT [${severity}]**\n**${title}**: ${message}\nTime: ${new Date().toISOString()}`
         });
+        
+        // Save to DB for history/audit
+        await pool.query(
+            "INSERT INTO geosurepath_alerts (title, device_id, severity, message) VALUES ($1, $2, $3, $4)",
+            [title, deviceId, severity, message]
+        );
+
         // Set cooldown for 15 minutes
         await redisClient.set(alertKey, '1', { EX: 900 });
     } catch (err) {
@@ -62,9 +81,9 @@ const runDailyTasks = async () => {
             await sendAlert('RENEWAL_REMINDER', `Subscription for ${sub.user_name} expires in 3 days (Plan: ${sub.plan_id}). Renewal required.`, 'INFO', `user_${sub.user_actual_id}`);
         }
 
-        // 2. Auto-deactivate Expired Subscriptions
+        // 2. Auto-deactivate Expired Subscriptions (After 3-day grace period)
         const deactivationRes = await pool.query(
-            "UPDATE geosurepath_subscriptions SET status = 'expired' WHERE status = 'active' AND expiry_date < NOW()"
+            "UPDATE geosurepath_subscriptions SET status = 'expired' WHERE status = 'active' AND (expiry_date + INTERVAL '3 days') < NOW()"
         );
         if (deactivationRes.rowCount > 0) {
             logger.info(`Deactivated ${deactivationRes.rowCount} expired subscriptions.`);

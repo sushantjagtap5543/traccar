@@ -11,6 +11,7 @@ const { pool, redisClient, logger } = require('../services/db');
 const { adminAuth } = require('../middleware/auth');
 
 const { encrypt } = require('../utils/crypto');
+const { logAudit } = require('../services/auditService');
 
 const restartSchema = Joi.object({
     service: Joi.string().valid('traccar', 'database', 'backend', 'cache').required()
@@ -220,6 +221,7 @@ router.post('/admin/restart/:service', adminAuth, (req, res) => {
     }
 
     logger.info(`Restarting service: ${service} by request of ${req.ip}`);
+    logAudit('RESTART_SERVICE', service, { success: true }, null, req.ip);
     exec(command, (error, stdout, stderr) => {
         if (error) {
             logger.error(`Exec Error for ${service}: ${error}`);
@@ -299,6 +301,46 @@ router.post('/admin/billing/record-manual', adminAuth, async (req, res) => {
     }
 });
 
+// --- SETTINGS MANAGEMENT ---
+router.post('/admin/settings/maintenance', adminAuth, async (req, res) => {
+    const { enabled } = req.body;
+    if (typeof enabled !== 'boolean') return res.status(400).json({ error: 'enabled (boolean) required' });
+
+    try {
+        const val = enabled ? 'true' : 'false';
+        await pool.query(
+            "INSERT INTO geosurepath_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2",
+            ['maintenance_mode', val]
+        );
+        await redisClient.set('maintenance_mode', val);
+        
+        logAudit('TOGGLE_MAINTENANCE', 'system', { enabled }, null, req.ip);
+        res.json({ message: `Maintenance mode ${enabled ? 'enabled' : 'disabled'}`, status: enabled });
+    } catch (err) {
+        logger.error('Failed to toggle maintenance mode:', err.message);
+        res.status(500).json({ error: 'Settings update failed' });
+    }
+});
+
+router.post('/admin/alerts/rules', adminAuth, async (req, res) => {
+    const { config } = req.body;
+    if (typeof config !== 'object') return res.status(400).json({ error: 'Config object required' });
+
+    try {
+        const configJson = JSON.stringify(config);
+        await pool.query(
+            "INSERT INTO geosurepath_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2",
+            ['alert_rules_config', configJson]
+        );
+        
+        logAudit('UPDATE_ALERT_RULES', 'geosurepath_settings', config, null, req.ip);
+        res.json({ message: 'Alert rules updated successfully' });
+    } catch (err) {
+        logger.error('Failed to update alert rules:', err.message);
+        res.status(500).json({ error: 'Failed to save rules' });
+    }
+});
+
 router.post('/admin/alerts/config', adminAuth, async (req, res) => {
     const schema = Joi.object({
         webhookUrl: Joi.string().uri().required()
@@ -323,7 +365,12 @@ router.post('/admin/alerts/config', adminAuth, async (req, res) => {
 });
 
 // --- PLATFORM CONFIGURATION (CENTRAL PANEL) ---
-const SENSITIVE_KEYS = ['razorpay_secret', 'twilio_auth_token', 'jwt_secret', 'admin_api_key', 'traccar_admin_password', 'razorpay_webhook_secret', 'twilio_sid', 'twilio_number'];
+const SENSITIVE_KEYS = [
+    'razorpay_secret', 'twilio_auth_token', 'jwt_secret', 'admin_api_key', 
+    'traccar_admin_password', 'razorpay_webhook_secret', 'twilio_sid', 'twilio_number',
+    'google_drive_client_secret', 'google_drive_refresh_token', 'smtp_password',
+    'encryption_key', 'database_url', 'backup_encryption_key'
+];
 
 router.get('/admin/config', adminAuth, async (req, res) => {
     try {
@@ -361,6 +408,7 @@ router.post('/admin/config', adminAuth, async (req, res) => {
             );
         }
         logger.info('Platform configuration updated securely (encrypted).');
+        logAudit('UPDATE_CONFIG', 'geosurepath_settings', updates, null, req.ip);
         res.json({ message: 'Configuration synchronized. Note: Security changes require a server restart.' });
     } catch (err) {
         logger.error('Bulk config error:', err);

@@ -15,11 +15,29 @@ const verifyAdminToken = (req, res, next) => {
         return res.status(500).json({ error: 'Server configuration error' });
     }
 
-    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
         if (err || decoded.role !== 'admin') {
             logger.warn(`Invalid JWT attempt from ${req.ip}`);
             return res.status(403).json({ error: 'Unauthorized session' });
         }
+
+        // Verify session in DB
+        try {
+            const crypto = require('crypto');
+            const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+            const sessionRes = await pool.query(
+                "SELECT id FROM geosurepath_sessions WHERE token_hash = $1 AND expires_at > NOW()",
+                [tokenHash]
+            );
+            if (sessionRes.rowCount === 0) {
+                logger.warn(`Session revoked or expired for ${decoded.email} from ${req.ip}`);
+                return res.status(401).json({ error: 'Session expired or revoked' });
+            }
+        } catch (dbErr) {
+            logger.error('Session verification DB error:', dbErr);
+            return res.status(500).json({ error: 'Internal auth error' });
+        }
+
         req.admin = decoded;
         next();
     });
