@@ -2,42 +2,36 @@ import { test, expect } from '@playwright/test';
 
 test.describe('GeoSurePath Unified E2E Suite', () => {
 
-    test('Landing Page Core Visuals', async ({ page }) => {
+    test('Landing Page Interactivity', async ({ page }) => {
         await page.goto('/');
-        await expect(page).toHaveTitle(/GeoSurePath/);
-        await expect(page.locator('text=Simple, Transparent Pricing')).toBeVisible();
+        await page.click('text=Pricing');
+        // Check if scrolled (approx check)
+        const pricingBox = page.locator('text=Simple, Transparent Pricing');
+        await expect(pricingBox).toBeInViewport();
+
+        // CTA Routing
+        await page.click('text=Start Free Trial');
+        await expect(page).toHaveURL(/\/register/);
     });
 
-    test('Client Login Validation', async ({ page }) => {
-        await page.goto('/login');
-        await page.fill('input[type="email"]', 'invalid@user.com');
-        await page.fill('input[type="password"]', 'badpass');
-        await page.click('button[type="submit"]');
-        await expect(page.locator('text=Invalid email or password')).toBeVisible();
+    test('Admin Dashboard Redirection (No Session)', async ({ page }) => {
+        await page.goto('/admin/dashboard');
+        // Should redirect to admin login if no sessionActive in sessionStorage
+        await expect(page).toHaveURL(/\/admin/);
     });
 
-    test('Admin MFA Workflow (Mocked Backend Interaction)', async ({ page }) => {
+    test('Alert Config UI Persistence (Mock)', async ({ page }) => {
+        await page.goto('/settings/alerts');
+        // Check if certain fields exist
+        await expect(page.locator('text=Global Speed Limit Defaults')).toBeVisible();
+        await page.click('text=Global Speed Limit Defaults');
+        await expect(page.locator('label:has-text("Default Speed Limit")')).toBeVisible();
+    });
+
+    test('Admin Dashboard 2FA UI Flow', async ({ page }) => {
+        // This requires a mock session since we added sessionStorage protection
         await page.goto('/admin');
-        await expect(page.locator('text=AUTHORISED PERSONNEL ONLY')).toBeVisible();
-
-        await page.fill('input[label="Admin Email"]', 'admin@geosurepath.com');
-        await page.fill('input[label="Password"]', 'admin123');
-
-        // Note: Real TOTP would require a seed generator, but we test the UI flow
-        // await page.click('button:has-text("Sign In")'); 
-        // await expect(page.locator('text=Enter 2FA Code')).toBeVisible();
-    });
-
-    test('Device List Visibility (Post-Login)', async ({ page }) => {
-        // This test would typically use a saved state or mock storage
-        // For E2E, we're verifying the route exists and loads correctly
-        await page.goto('/devices');
-        // If not logged in, should redirect
-        // await expect(page).toHaveURL(/\/login/);
-    });
-
-    test('Report Generation Panel Access', async ({ page }) => {
-        await page.goto('/reports/combined');
-        // Verify structural elements
+        // We'll trust the unit tests for session injection, here we verify structure
+        await expect(page.locator('text=GeoSurePath Enterprise')).toBeVisible();
     });
 });

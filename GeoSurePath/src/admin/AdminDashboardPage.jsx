@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import {
   Typography, Grid, Card, CardContent, CircularProgress,
-  Button, Box, Divider, Snackbar, Alert, LinearProgress, Stack
+  Button, Box, Divider, Snackbar, Alert, LinearProgress, Stack,
+  Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
 import { useNavigate } from 'react-router-dom';
@@ -70,23 +71,41 @@ const AdminDashboardPage = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [webhookUrl, setWebhookUrl] = useState('');
   const [networkHistory, setNetworkHistory] = useState([]);
+  const [totpDialog, setTotpDialog] = useState({ open: false, qrCode: '', secret: '' });
   const API_BASE = import.meta.env.VITE_ADMIN_API_URL || `http://${window.location.hostname}:8083`;
 
-  // Access Control
+  // Access Control & Session Expiry
   useEffect(() => {
-    if (user && !user.administrator) {
-      navigate('/');
+    const sessionActive = sessionStorage.getItem('adminSessionActive');
+    if (!sessionActive) {
+      navigate('/admin');
+      return;
     }
-  }, [user, navigate]);
+
+    // Inactivity Logout (30 mins)
+    let timeout;
+    const resetTimer = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        sessionStorage.removeItem('adminSessionActive');
+        navigate('/admin');
+      }, 1800000); // 30 minutes
+    };
+
+    window.addEventListener('mousemove', resetTimer);
+    window.addEventListener('keypress', resetTimer);
+    resetTimer();
+
+    return () => {
+      clearTimeout(timeout);
+      window.removeEventListener('mousemove', resetTimer);
+      window.removeEventListener('keypress', resetTimer);
+    };
+  }, [navigate]);
 
   const fetchStats = async () => {
     try {
-      const apiKey = import.meta.env.VITE_ADMIN_API_KEY;
-      const headers = {
-        'x-api-key': apiKey
-      };
-
-      const fetchOptions = { headers, credentials: 'include' };
+      const fetchOptions = { credentials: 'include' };
       const [healthRes, logsRes, traccarRes, tablesRes] = await Promise.all([
         fetch(`${API_BASE}/api/admin/health`, fetchOptions),
         fetch(`${API_BASE}/api/admin/logs`, fetchOptions),
@@ -128,6 +147,25 @@ const AdminDashboardPage = () => {
     }
   };
 
+  const handleSetup2FA = async () => {
+    setActionLoading('totp');
+    try {
+      const response = await fetch(`${API_BASE}/api/admin/auth/totp-setup`, {
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setTotpDialog({ open: true, qrCode: data.qrCode, secret: data.secret });
+      } else {
+        throw new Error('Failed to start 2FA setup');
+      }
+    } catch (error) {
+      setSnackbar({ open: true, message: error.message, severity: 'error' });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   useEffect(() => {
     fetchStats();
     const interval = setInterval(fetchStats, 5000);
@@ -138,12 +176,8 @@ const AdminDashboardPage = () => {
     if (!window.confirm(`Restart ${service}? This may impact active users.`)) return;
     setActionLoading(service);
     try {
-      const apiKey = import.meta.env.VITE_ADMIN_API_KEY;
       const response = await fetch(`${API_BASE}/api/admin/restart/${service}`, {
         method: 'POST',
-        headers: {
-          'x-api-key': apiKey
-        },
         credentials: 'include'
       });
       if (response.ok) {
@@ -163,12 +197,8 @@ const AdminDashboardPage = () => {
   const handleBackup = async () => {
     setActionLoading('backup');
     try {
-      const apiKey = import.meta.env.VITE_ADMIN_API_KEY;
       const response = await fetch(`${API_BASE}/api/admin/backup`, {
         method: 'POST',
-        headers: {
-          'x-api-key': apiKey
-        },
         credentials: 'include'
       });
       if (response.ok) {
@@ -185,11 +215,9 @@ const AdminDashboardPage = () => {
     e.preventDefault();
     setActionLoading('webhook');
     try {
-      const apiKey = import.meta.env.VITE_ADMIN_API_KEY;
       const response = await fetch(`${API_BASE}/api/admin/alerts/config`, {
         method: 'POST',
         headers: {
-          'x-api-key': apiKey,
           'Content-Type': 'application/json'
         },
         credentials: 'include',
@@ -300,6 +328,15 @@ const AdminDashboardPage = () => {
                       </Stack>
                     </Box>
                   ))}
+                  <Button
+                    variant="text"
+                    size="small"
+                    startIcon={<SecurityIcon />}
+                    onClick={handleSetup2FA}
+                    sx={{ mt: 1, fontSize: 10, fontWeight: 'bold' }}
+                  >
+                    Setup Administrative 2FA
+                  </Button>
                 </Stack>
               </CardContent>
             </Card>
@@ -457,6 +494,24 @@ const AdminDashboardPage = () => {
             </Card>
           </Grid>
         </Grid>
+
+        <Dialog open={totpDialog.open} onClose={() => setTotpDialog({ ...totpDialog, open: false })}>
+          <DialogTitle sx={{ fontWeight: 'bold' }}>Administrative 2FA Setup</DialogTitle>
+          <DialogContent>
+            <Typography variant="body2" color="textSecondary" gutterBottom>
+              Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.) to enable multi-factor login protection.
+            </Typography>
+            <Box sx={{ textAlign: 'center', my: 3, p: 2, bgcolor: 'white', borderRadius: 2 }}>
+              {totpDialog.qrCode && <img src={totpDialog.qrCode} alt="2FA QR Code" style={{ width: 200, height: 200 }} />}
+            </Box>
+            <Typography variant="caption" display="block" sx={{ textAlign: 'center', fontWeight: 'bold' }}>
+              SECRET CODE: {totpDialog.secret}
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setTotpDialog({ ...totpDialog, open: false })} variant="contained">I have scanned it</Button>
+          </DialogActions>
+        </Dialog>
 
         <Snackbar
           open={snackbar.open}

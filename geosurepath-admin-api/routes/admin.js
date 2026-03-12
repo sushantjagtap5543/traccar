@@ -214,14 +214,24 @@ router.post('/admin/restart/:service', adminAuth, (req, res) => {
     });
 });
 
-router.post('/admin/alerts/config', adminAuth, (req, res) => {
+router.post('/admin/alerts/config', adminAuth, async (req, res) => {
     const { webhookUrl } = req.body;
     if (!webhookUrl || !webhookUrl.startsWith('http')) {
         return res.status(400).json({ error: 'Invalid webhook URL' });
     }
-    ALERT_WEBHOOK = webhookUrl;
-    logger.info(`Emergency webhook configured: ${webhookUrl}`);
-    res.json({ message: 'Alerting system updated.', url: ALERT_WEBHOOK });
+
+    try {
+        await pool.query(
+            'INSERT INTO geosurepath_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
+            ['alert_webhook', webhookUrl]
+        );
+        ALERT_WEBHOOK = webhookUrl;
+        logger.info(`Emergency webhook configured and persisted: ${webhookUrl}`);
+        res.json({ message: 'Alerting system updated and saved.', url: ALERT_WEBHOOK });
+    } catch (err) {
+        logger.error('Failed to persist webhook:', err);
+        res.status(500).json({ error: 'Failed to save configuration' });
+    }
 });
 
 module.exports = router;

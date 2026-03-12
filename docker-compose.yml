@@ -72,6 +72,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8083/api/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - ./geosurepath-admin-api/logs:/app/logs
       - ./backups:/app/backups
@@ -108,7 +113,12 @@ services:
       timeout: 5s
       retries: 3
     depends_on:
-
+      frontend:
+        condition: service_started
+      admin-api:
+        condition: service_healthy
+      traccar:
+        condition: service_started
 
   grafana:
     image: grafana/grafana-oss:latest

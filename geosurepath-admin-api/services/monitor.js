@@ -41,6 +41,16 @@ const startMonitor = () => {
                 await sendAlert('CRITICAL_DISK', `Disk usage reached ${rootDisk.use.toFixed(2)}% on ${rootDisk.mount}`, 'CRITICAL');
             }
 
+            // Sync ALERT_WEBHOOK from DB
+            try {
+                const res = await pool.query("SELECT value FROM geosurepath_settings WHERE key = 'alert_webhook' LIMIT 1");
+                if (res.rowCount > 0 && res.rows[0].value) {
+                    ALERT_WEBHOOK = res.rows[0].value;
+                }
+            } catch (err) {
+                logger.error('Failed to sync ALERT_WEBHOOK from DB:', err.message);
+            }
+
             try {
                 await pool.query('SELECT 1');
             } catch (err) {

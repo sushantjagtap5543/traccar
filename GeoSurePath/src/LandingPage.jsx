@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Box, Container, Typography, Button, AppBar, Toolbar, Stack,
     Grid, Card, CardContent, Divider, useMediaQuery, useTheme
@@ -77,8 +78,16 @@ const useStyles = makeStyles()((theme) => ({
 
 const LandingPage = () => {
     const { classes } = useStyles();
+    const navigate = useNavigate();
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+    const featuresRef = useRef(null);
+    const pricingRef = useRef(null);
+
+    const scrollTo = (ref) => {
+        ref.current?.scrollIntoView({ behavior: 'smooth' });
+    };
 
     return (
         <Box className={classes.root}>
@@ -94,17 +103,18 @@ const LandingPage = () => {
 
                         {!isMobile && (
                             <Stack direction="row" spacing={4}>
-                                <Typography className={classes.navLink}>Features</Typography>
-                                <Typography className={classes.navLink}>Pricing</Typography>
+                                <Typography className={classes.navLink} onClick={() => scrollTo(featuresRef)}>Features</Typography>
+                                <Typography className={classes.navLink} onClick={() => scrollTo(pricingRef)}>Pricing</Typography>
                                 <Typography className={classes.navLink}>Use Cases</Typography>
                                 <Typography className={classes.navLink}>Resources</Typography>
                             </Stack>
                         )}
 
                         <Stack direction="row" spacing={2}>
-                            <Button sx={{ color: '#0F2D5C', fontWeight: 'bold' }}>Sign In</Button>
+                            <Button sx={{ color: '#0F2D5C', fontWeight: 'bold' }} onClick={() => navigate('/login')}>Sign In</Button>
                             <Button
                                 variant="contained"
+                                onClick={() => navigate('/register')}
                                 sx={{ bgcolor: '#0B7A75', '&:hover': { bgcolor: '#08635F' }, textTransform: 'none', fontWeight: 'bold', borderRadius: 2 }}
                             >
                                 Start Free Trial
@@ -131,6 +141,7 @@ const LandingPage = () => {
                                 <Button
                                     variant="contained"
                                     size="large"
+                                    onClick={() => navigate('/register')}
                                     sx={{ bgcolor: '#0B7A75', '&:hover': { bgcolor: '#08635F' }, py: 1.5, px: 4, fontWeight: 'bold', borderRadius: 2 }}
                                 >
                                     Start Free 14-Day Trial
@@ -203,7 +214,7 @@ const LandingPage = () => {
             </Box>
 
             {/* Features Grid */}
-            <Box sx={{ py: 10, bgcolor: '#FFFFFF' }}>
+            <Box sx={{ py: 10, bgcolor: '#FFFFFF' }} ref={featuresRef}>
                 <Container maxWidth="lg">
                     <Typography variant="h3" sx={{ textAlign: 'center', fontWeight: 800, mb: 1, color: '#0F2D5C' }}>Powerful Tracking Features</Typography>
                     <Typography variant="h6" sx={{ textAlign: 'center', color: '#5A6A80', mb: 8, fontWeight: 400 }}>Built for precision and performance.</Typography>
@@ -258,7 +269,7 @@ const LandingPage = () => {
             </Box>
 
             {/* Pricing Section */}
-            <Box sx={{ py: 12, bgcolor: '#FFFFFF' }}>
+            <Box sx={{ py: 12, bgcolor: '#FFFFFF' }} ref={pricingRef}>
                 <Container maxWidth="lg">
                     <Typography variant="h3" sx={{ textAlign: 'center', fontWeight: 800, mb: 1, color: '#0F2D5C' }}>Simple, Transparent Pricing</Typography>
                     <Typography variant="h6" sx={{ textAlign: 'center', color: '#5A6A80', mb: 8, fontWeight: 400 }}>2 months free with annual billing.</Typography>
@@ -285,6 +296,7 @@ const LandingPage = () => {
                                     <Button
                                         fullWidth
                                         variant={p.popular ? 'contained' : 'outlined'}
+                                        onClick={() => navigate('/register')}
                                         sx={{ py: 1.5, fontWeight: 'bold', bgcolor: p.popular ? '#0F2D5C' : 'transparent', color: p.popular ? 'white' : '#0F2D5C' }}
                                     >
                                         Choose {p.name}
@@ -311,15 +323,22 @@ const LandingPage = () => {
                                 Industry-leading GPS intelligence for modern fleet operations. Real-time insights, automated reports, and infrastructure health monitoring.
                             </Typography>
                         </Grid>
-                        {['Product', 'Company', 'Resources', 'Legal'].map(section => (
-                            <Grid item xs={6} md={2} key={section}>
-                                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 3 }}>{section}</Typography>
-                                <Stack spacing={2}>
-                                    <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }}>Item One</Typography>
-                                    <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }}>Item Two</Typography>
-                                </Stack>
-                            </Grid>
-                        ))}
+                        <Grid item xs={6} md={2}>
+                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 3 }}>Product</Typography>
+                            <Stack spacing={2}>
+                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }} onClick={() => scrollTo(featuresRef)}>Features</Typography>
+                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }} onClick={() => scrollTo(pricingRef)}>Pricing</Typography>
+                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }} onClick={() => navigate('/login')}>Login</Typography>
+                            </Stack>
+                        </Grid>
+                        <Grid item xs={6} md={2}>
+                            <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 3 }}>Resources</Typography>
+                            <Stack spacing={2}>
+                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }}>Documentation</Typography>
+                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }}>API Reference</Typography>
+                                <Typography variant="caption" color="textSecondary" sx={{ cursor: 'pointer' }} onClick={() => navigate('/admin/login')}>Admin Portal</Typography>
+                            </Stack>
+                        </Grid>
                     </Grid>
                     <Divider sx={{ my: 6, borderColor: '#D0DAE8' }} />
                     <Stack direction="row" justifyContent="space-between" alignItems="center">

@@ -92,10 +92,12 @@ router.post('/auth/send-otp', async (req, res) => {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     try {
         await redisClient.set(`otp:${mobile}`, code, { EX: 300 });
+        const { sendSMS } = require('../services/sms');
+        await sendSMS(mobile, `GeoSurePath Verification Code: ${code}. Valid for 5 minutes.`);
         res.json({ message: 'OTP sent successfully', mobile });
     } catch (err) {
-        logger.error('Redis OTP Storage Failed:', err);
-        res.status(500).json({ error: 'Failed to generate OTP' });
+        logger.error('Redis OTP Storage or SMS Dispatch Failed:', err);
+        res.status(500).json({ error: 'Failed to generate or send OTP' });
     }
 });
 

@@ -114,6 +114,8 @@ app.use((err, req, res, next) => {
 const server = app.listen(PORT, () => {
   logger.info(`GeoSurePath Admin API v7.2 modular running on port ${PORT}`);
   startMonitor();
+  const { startAlertEngine } = require('./services/alertEngine');
+  startAlertEngine();
 });
 
 // --- GRACEFUL SHUTDOWN ---

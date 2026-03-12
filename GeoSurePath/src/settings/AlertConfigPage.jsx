@@ -120,7 +120,7 @@ const AlertConfigPage = () => {
         if (server.attributes?.alertConfig) {
           setAlerts({ ...DEFAULT_ALERTS, ...JSON.parse(server.attributes.alertConfig) });
         }
-      } catch (_) {}
+      } catch (_) { }
     };
     load();
   }, []);
@@ -222,7 +222,7 @@ const AlertConfigPage = () => {
           </AccordionSummary>
           <AccordionDetails>
             <Typography variant="body2" color="textSecondary" gutterBottom>
-              Set global speed defaults. These can be overridden per-vehicle, per-route, or per-geofence zone individually.
+              Set global speed defaults. These are reflected in the overspeed calculations if not overridden.
             </Typography>
             <Grid container spacing={3} mt={1}>
               <Grid item xs={12} sm={4}>
@@ -230,7 +230,8 @@ const AlertConfigPage = () => {
                   fullWidth
                   label="Default Speed Limit"
                   type="number"
-                  defaultValue={80}
+                  value={alerts.defaultSpeedLimit || 80}
+                  onChange={(e) => setAlerts(prev => ({ ...prev, defaultSpeedLimit: Number(e.target.value) }))}
                   InputProps={{ endAdornment: <Typography variant="caption" color="textSecondary">km/h</Typography> }}
                   size="small"
                 />
@@ -240,7 +241,8 @@ const AlertConfigPage = () => {
                   fullWidth
                   label="Urban Zone Speed Limit"
                   type="number"
-                  defaultValue={50}
+                  value={alerts.urbanSpeedLimit || 50}
+                  onChange={(e) => setAlerts(prev => ({ ...prev, urbanSpeedLimit: Number(e.target.value) }))}
                   InputProps={{ endAdornment: <Typography variant="caption" color="textSecondary">km/h</Typography> }}
                   size="small"
                 />
@@ -250,7 +252,8 @@ const AlertConfigPage = () => {
                   fullWidth
                   label="Highway Speed Limit"
                   type="number"
-                  defaultValue={120}
+                  value={alerts.highwaySpeedLimit || 120}
+                  onChange={(e) => setAlerts(prev => ({ ...prev, highwaySpeedLimit: Number(e.target.value) }))}
                   InputProps={{ endAdornment: <Typography variant="caption" color="textSecondary">km/h</Typography> }}
                   size="small"
                 />
