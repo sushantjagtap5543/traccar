@@ -66,6 +66,8 @@ import AdminLoginPage from './login/AdminLoginPage';
 import CentralConfigPage from './admin/CentralConfigPage';
 import BillingPage from './admin/BillingPage';
 import SubscriptionPage from './settings/SubscriptionPage';
+import BackupManagerPage from './admin/BackupManagerPage';
+import MigrationPage from './admin/CloudMigrationPage';
 import LegalPage from './LegalPage';
 
 const Navigation = () => {
@@ -200,6 +202,8 @@ const Navigation = () => {
           <Route path="dashboard" element={<AdminDashboardPage />} />
           <Route path="config" element={<CentralConfigPage />} />
           <Route path="billing" element={<BillingPage />} />
+          <Route path="backups" element={<BackupManagerPage />} />
+          <Route path="migration" element={<MigrationPage />} />
         </Route>
         <Route path="settings/alerts" element={<AlertConfigPage />} />
       </Route>

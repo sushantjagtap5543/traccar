@@ -86,12 +86,20 @@ const startMonitor = () => {
             const mem = await si.mem();
             const ramPercent = (mem.active / mem.total) * 100;
 
-            if (cpu.currentLoad > 90) {
-                await sendAlert('CRITICAL_CPU', `CPU Load reached ${cpu.currentLoad.toFixed(2)}%`, 'CRITICAL');
+            // Fetch dynamic thresholds
+            const threshRes = await pool.query("SELECT key, value FROM geosurepath_settings WHERE key IN ('alert_threshold_cpu', 'alert_threshold_ram')");
+            const thresholds = {};
+            threshRes.rows.forEach(r => thresholds[r.key] = parseInt(r.value));
+            
+            const cpuLimit = thresholds.alert_threshold_cpu || 90;
+            const ramLimit = thresholds.alert_threshold_ram || 90;
+
+            if (cpu.currentLoad > cpuLimit) {
+                await sendAlert('CRITICAL_CPU', `CPU Load reached ${cpu.currentLoad.toFixed(2)}% (Limit: ${cpuLimit}%)`, 'CRITICAL');
             }
 
-            if (ramPercent > 90) {
-                await sendAlert('CRITICAL_RAM', `Memory usage reached ${ramPercent.toFixed(2)}%`, 'CRITICAL');
+            if (ramPercent > ramLimit) {
+                await sendAlert('CRITICAL_RAM', `Memory usage reached ${ramPercent.toFixed(2)}% (Limit: ${ramLimit}%)`, 'CRITICAL');
             }
 
             const disks = await si.fsSize();

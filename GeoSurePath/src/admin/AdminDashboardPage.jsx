@@ -19,6 +19,8 @@ import TimerIcon from '@mui/icons-material/Timer';
 import SettingsApplicationsIcon from '@mui/icons-material/SettingsApplications';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import SecurityIcon from '@mui/icons-material/Security';
+import CloudSyncIcon from '@mui/icons-material/CloudSync';
+import SystemUpdateAltIcon from '@mui/icons-material/SystemUpdateAlt';
 
 import {
   RadialBarChart, RadialBar, ResponsiveContainer,
@@ -93,25 +95,42 @@ const AdminDashboardPage = () => {
   }, [API_BASE, navigate]);
 
     // Inactivity Logout (30 mins)
-    let timeout;
-    const resetTimer = () => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        sessionStorage.removeItem('adminSessionActive');
-        navigate('/admin');
-      }, 1800000); // 30 minutes
-    };
+    useEffect(() => {
+        let timeout;
+        const resetTimer = () => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+            sessionStorage.removeItem('adminSessionActive');
+            navigate('/admin');
+        }, 1800000); // 30 minutes
+        };
 
-    window.addEventListener('mousemove', resetTimer);
-    window.addEventListener('keypress', resetTimer);
-    resetTimer();
+        window.addEventListener('mousemove', resetTimer);
+        window.addEventListener('keypress', resetTimer);
+        resetTimer();
 
-    return () => {
-      clearTimeout(timeout);
-      window.removeEventListener('mousemove', resetTimer);
-      window.removeEventListener('keypress', resetTimer);
+        return () => {
+        clearTimeout(timeout);
+        window.removeEventListener('mousemove', resetTimer);
+        window.removeEventListener('keypress', resetTimer);
+        };
+    }, [navigate]);
+
+    const calculateReadiness = () => {
+        if (!stats) return 0;
+        let score = 0;
+        if (traccarStatus?.status === 'REACHABLE') score += 25;
+        if (stats?.database?.status === 'ONLINE') score += 25;
+        if (stats?.cache?.status === 'ONLINE') score += 25;
+        
+        // Final 25% from system load
+        const cpu = parseFloat(stats.cpu) || 0;
+        const ram = parseFloat(stats.ram?.percent) || 0;
+        const loadFactor = (100 - ((cpu + ram) / 2)) / 100;
+        score += Math.max(0, 25 * loadFactor);
+        
+        return Math.round(score);
     };
-  }, [navigate]);
 
   const fetchStats = async () => {
     try {
@@ -272,6 +291,37 @@ const AdminDashboardPage = () => {
         </div>
 
         <Grid container spacing={3}>
+          {/* Readiness Score */}
+          <Grid item xs={12}>
+            <Card sx={{ borderRadius: 4, bgcolor: '#0F2D5C', color: 'white', overflow: 'hidden' }}>
+              <Grid container alignItems="center">
+                <Grid item xs={12} md={8} sx={{ p: 4 }}>
+                    <Typography variant="h5" fontWeight="bold">Infrastructure Readiness</Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.8, mt: 1 }}>Combined score based on service availability, server load, and network stability.</Typography>
+                    <Stack direction="row" spacing={4} sx={{ mt: 3 }}>
+                       <Box>
+                          <Typography variant="h4" fontWeight="bold">{calculateReadiness()}%</Typography>
+                          <Typography variant="caption" sx={{ opacity: 0.7 }}>STABILITY SCORE</Typography>
+                       </Box>
+                       <Divider orientation="vertical" flexItem sx={{ bgcolor: 'rgba(255,255,255,0.2)' }} />
+                       <Box>
+                          <Typography variant="h4" fontWeight="bold">{traccarStatus?.status === 'REACHABLE' ? 'READY' : 'ERROR'}</Typography>
+                          <Typography variant="caption" sx={{ opacity: 0.7 }}>TELEMETRY ENGINE</Typography>
+                       </Box>
+                    </Stack>
+                </Grid>
+                <Grid item xs={12} md={4} sx={{ bgcolor: 'rgba(255,255,255,0.05)', p: 4, textAlign: 'center' }}>
+                    <Box sx={{ height: 120 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <RadialBarChart cx="50%" cy="50%" innerRadius="70%" outerRadius="100%" barSize={15} data={[{ name: 'Score', value: calculateReadiness(), fill: '#0B7A75' }]}>
+                                <RadialBar background dataKey="value" cornerRadius={10} />
+                            </RadialBarChart>
+                        </ResponsiveContainer>
+                    </Box>
+                </Grid>
+              </Grid>
+            </Card>
+          </Grid>
           {/* CPU & RAM Radial Gauges */}
           <Grid item xs={12} md={6}>
             <Card className={classes.statCard}>
@@ -326,7 +376,7 @@ const AdminDashboardPage = () => {
                   {[
                     { name: 'Telemetry Engine', status: traccarStatus?.status === 'REACHABLE' ? 'ONLINE' : 'ERROR', detail: traccarStatus?.version || 'v5.12' },
                     { name: 'SQL Storage', status: stats?.database?.status === 'ONLINE' ? 'ONLINE' : 'OFFLINE', detail: stats?.database?.storage || '0MB' },
-                    { name: 'Cache Layer', status: stats?.cache?.status || 'ONLINE', detail: 'Redis v7.2' }
+                    { name: 'Cache Layer', status: (stats?.cache?.status === 'ONLINE') ? 'ONLINE' : 'OFFLINE', detail: 'Redis v7.2' }
                   ].map((svc) => (
                     <Box key={svc.name} sx={{ p: 1.5, borderRadius: 2, bgcolor: 'background.default', border: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Typography variant="body2" fontWeight="bold">{svc.name}</Typography>
@@ -472,8 +522,8 @@ const AdminDashboardPage = () => {
             <Card className={classes.diagnosticCard} variant="outlined">
               <CardContent>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-                  <Typography variant="h6" fontWeight="bold">Enterprise Recovery Actions</Typography>
-                  <Stack direction="row" spacing={2}>
+                  <Typography variant="h6" fontWeight="bold">Enterprise Resilience & Recovery</Typography>
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                     <Button
                       variant="outlined"
                       startIcon={<ReceiptIcon />}
@@ -481,7 +531,7 @@ const AdminDashboardPage = () => {
                       onClick={() => navigate('/admin/billing')}
                       sx={{ borderRadius: 1.5, textTransform: 'none', fontWeight: 'bold' }}
                     >
-                      Billing Oversight
+                      Billing
                     </Button>
                     <Button
                       variant="outlined"
@@ -490,7 +540,27 @@ const AdminDashboardPage = () => {
                       onClick={() => navigate('/admin/config')}
                       sx={{ borderRadius: 1.5, textTransform: 'none', fontWeight: 'bold' }}
                     >
-                      Central Config
+                      Config
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<SystemUpdateAltIcon />}
+                      size="small"
+                      color="secondary"
+                      onClick={() => navigate('/admin/backups')}
+                      sx={{ borderRadius: 1.5, textTransform: 'none', fontWeight: 'bold' }}
+                    >
+                      Backup Manager
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<CloudSyncIcon />}
+                      size="small"
+                      color="info"
+                      onClick={() => navigate('/admin/migration')}
+                      sx={{ borderRadius: 1.5, textTransform: 'none', fontWeight: 'bold' }}
+                    >
+                      Cloud Migration
                     </Button>
                     <Button
                       variant="contained"
@@ -500,7 +570,7 @@ const AdminDashboardPage = () => {
                       disabled={actionLoading === 'backup'}
                       sx={{ bgcolor: '#1a1a1a', '&:hover': { bgcolor: '#333' } }}
                     >
-                      {actionLoading === 'backup' ? <CircularProgress size={16} color="inherit" /> : 'Backup SQL Engine'}
+                      {actionLoading === 'backup' ? <CircularProgress size={16} color="inherit" /> : 'Quick SQL Dump'}
                     </Button>
                   </Stack>
                 </Stack>

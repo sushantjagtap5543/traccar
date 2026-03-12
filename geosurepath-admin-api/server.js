@@ -15,7 +15,10 @@ const { pool, redisClient, ioRedisClient, logger } = require('./services/db');
 const { startMonitor } = require('./services/monitor');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
+const backupRoutes = require('./routes/backup');
+const migrationRoutes = require('./routes/migration');
 const { adminAuth } = require('./middleware/auth');
+const backupService = require('./services/backupService');
 
 const app = express();
 const PORT = process.env.PORT || 8083;
@@ -78,6 +81,8 @@ app.use(cors({
 // --- ROUTES ---
 app.use('/api', authRoutes);
 app.use('/api', adminRoutes);
+app.use('/api', backupRoutes);
+app.use('/api', migrationRoutes);
 app.use('/api', require('./routes/devices')); // Limit enforcement proxy
 app.use('/api/payments', require('./routes/payments'));
 
@@ -130,6 +135,7 @@ const startServer = async () => {
   startMonitor();
   const { startAlertEngine } = require('./services/alertEngine');
   startAlertEngine();
+  backupService.startCron();
 
   // 3. Listen
   const server = app.listen(PORT, () => {

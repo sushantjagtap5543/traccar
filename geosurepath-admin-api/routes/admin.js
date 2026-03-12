@@ -69,7 +69,11 @@ router.get('/admin/health', adminAuth, async (req, res) => {
             } : { rx: 0, tx: 0 },
             database: { status: dbStatus, latency: dbLatency, storage: dbSize },
             cache: { status: redisStatus },
-            uptime: { process: Math.floor(process.uptime()), system: si.time().uptime },
+            uptime: { 
+                process: Math.floor(process.uptime()),
+                formatted: new Date(process.uptime() * 1000).toISOString().substr(11, 8),
+                system: si.time().uptime 
+            },
             timestamp: new Date().toISOString()
         });
     } catch (error) {

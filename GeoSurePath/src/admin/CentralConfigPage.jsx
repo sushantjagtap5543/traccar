@@ -9,6 +9,7 @@ import SecurityIcon from '@mui/icons-material/Security';
 import PaymentIcon from '@mui/icons-material/Payment';
 import SmsIcon from '@mui/icons-material/Sms';
 import SettingsIcon from '@mui/icons-material/Settings';
+import CloudQueueIcon from '@mui/icons-material/CloudQueue';
 
 const CentralConfigPage = () => {
     const [loading, setLoading] = useState(true);
@@ -93,6 +94,7 @@ const CentralConfigPage = () => {
                     <Tab icon={<SecurityIcon />} label="Security & API" />
                     <Tab icon={<SmsIcon />} label="SMS & Notify" />
                     <Tab icon={<PaymentIcon />} label="Payments" />
+                    <Tab icon={<CloudQueueIcon />} label="Backup & Cloud" />
                     <Tab icon={<SettingsIcon />} label="Global" />
                 </Tabs>
             </Box>
@@ -234,6 +236,58 @@ const CentralConfigPage = () => {
             )}
 
             {tab === 3 && (
+                <Card sx={{ borderRadius: 3, border: '1px solid #e0e0e0' }} elevation={0}>
+                    <CardContent sx={{ p: 4 }}>
+                        <Typography variant="h6" gutterBottom>Backup & Cloud Orchestration</Typography>
+                        <Grid container spacing={3}>
+                            <Grid item xs={12} md={6}>
+                                <TextField
+                                    fullWidth
+                                    label="Backup Encryption Key (AES-256)"
+                                    type="password"
+                                    value={config.backup_encryption_key || ''}
+                                    onChange={(e) => handleChange('backup_encryption_key', e.target.value)}
+                                    helperText="Ensure this is saved safely; backups cannot be restored without it."
+                                />
+                            </Grid>
+                            <Grid item xs={12}>
+                                <Divider sx={{ my: 1 }}>
+                                    <Chip label="GOOGLE DRIVE OAUTH" size="small" />
+                                </Divider>
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <TextField
+                                    fullWidth
+                                    label="Google Client ID"
+                                    value={config.google_drive_client_id || ''}
+                                    onChange={(e) => handleChange('google_drive_client_id', e.target.value)}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <TextField
+                                    fullWidth
+                                    label="Google Client Secret"
+                                    type="password"
+                                    value={config.google_drive_client_secret || ''}
+                                    onChange={(e) => handleChange('google_drive_client_secret', e.target.value)}
+                                />
+                            </Grid>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    label="Google Refresh Token"
+                                    type="password"
+                                    value={config.google_drive_refresh_token || ''}
+                                    onChange={(e) => handleChange('google_drive_refresh_token', e.target.value)}
+                                    helperText="Use Google OAuth Playground to generate a permanent refresh token."
+                                />
+                            </Grid>
+                        </Grid>
+                    </CardContent>
+                </Card>
+            )}
+
+            {tab === 4 && (
                 <Card sx={{ borderRadius: 3, border: '1px solid #e0e0e0' }} elevation={0}>
                     <CardContent sx={{ p: 4 }}>
                         <Typography variant="h6" gutterBottom>System Parameters</Typography>
