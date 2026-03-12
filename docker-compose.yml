@@ -124,7 +124,7 @@ services:
     image: grafana/grafana-oss:latest
     restart: always
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin123}
       - GF_AUTH_ANONYMOUS_ENABLED=false

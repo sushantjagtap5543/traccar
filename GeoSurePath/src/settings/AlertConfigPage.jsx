@@ -222,7 +222,7 @@ const AlertConfigPage = () => {
           </AccordionSummary>
           <AccordionDetails>
             <Typography variant="body2" color="textSecondary" gutterBottom>
-              Set global speed defaults. These are reflected in the overspeed calculations if not overridden.
+              Set global speed defaults. These are reflected in all overspeed calculations across the entire fleet.
             </Typography>
             <Grid container spacing={3} mt={1}>
               <Grid item xs={12} sm={4}>

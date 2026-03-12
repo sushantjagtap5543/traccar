@@ -89,19 +89,28 @@ router.post('/verify', async (req, res) => {
             const expiryDate = new Date();
             expiryDate.setMonth(expiryDate.getMonth() + months);
 
-            // Fetch device limit from settings or use defaults
+            // Fetch device limit and price from settings
             const limitKey = `plan_limit_${planId}`;
-            const limitRes = await pool.query("SELECT value FROM geosurepath_settings WHERE key = $1", [limitKey]);
+            const priceKey = `plan_price_${planId}`;
+
+            const [limitRes, priceRes] = await Promise.all([
+                pool.query("SELECT value FROM geosurepath_settings WHERE key = $1", [limitKey]),
+                pool.query("SELECT value FROM geosurepath_settings WHERE key = $1", [priceKey])
+            ]);
+
             const deviceLimit = limitRes.rowCount > 0 ? parseInt(limitRes.rows[0].value) : 10;
+            const basePrice = priceRes.rowCount > 0 ? parseInt(priceRes.rows[0].value) : 0;
+            const gst = Math.round(basePrice * 0.18);
+            const totalAmount = basePrice + gst;
 
             await pool.query(
                 `INSERT INTO geosurepath_subscriptions 
-                (user_id, plan_id, status, razorpay_order_id, razorpay_payment_id, expiry_date, device_limit)
-                VALUES ($1, $2, 'active', $3, $4, $5, $6)`,
-                [userId, planId, razorpay_order_id, razorpay_payment_id, expiryDate, deviceLimit]
+                (user_id, plan_id, status, razorpay_order_id, razorpay_payment_id, expiry_date, device_limit, amount_paid, currency)
+                VALUES ($1, $2, 'active', $3, $4, $5, $6, $7, 'INR')`,
+                [userId, planId, razorpay_order_id, razorpay_payment_id, expiryDate, deviceLimit, totalAmount]
             );
 
-            logger.info(`Subscription activated for User ${userId}: ${planId} (${months} months)`);
+            logger.info(`Subscription activated for User ${userId}: ${planId} (₹${totalAmount})`);
             res.json({ success: true, message: `Subscription activated for ${months} month(s)` });
         } else {
             res.status(400).json({ success: false, error: 'Invalid payment signature' });
@@ -190,9 +199,9 @@ router.get('/invoice/:paymentId', async (req, res) => {
         if (result.rowCount === 0) return res.send('<h1>Invoice Not Found</h1>');
 
         const sub = result.rows[0];
-        const baseAmount = sub.plan_id === '1month' ? 200 : (sub.plan_id === '6month' ? 950 : 1500);
-        const gst = Math.round(baseAmount * 0.18);
-        const total = baseAmount + gst;
+        const total = parseFloat(sub.amount_paid) || (sub.plan_id === '1month' ? 236 : (sub.plan_id === '6month' ? 1121 : 1770));
+        const baseAmount = Math.round(total / 1.18);
+        const gst = total - baseAmount;
 
         res.send(`
             <html>
@@ -226,10 +235,11 @@ router.get('/invoice/:paymentId', async (req, res) => {
                     </div>
                     
                     <div class="bill-to">
-                        <Typography variant="overline">BILL TO:</Typography><br>
+                        <small style="text-transform: uppercase; color: #777; font-weight: bold;">Bill To:</small><br>
                         <b>${sub.user_name}</b><br>
                         ${sub.user_email}<br>
-                        Payment ID: ${sub.razorpay_payment_id}
+                        Payment ID: ${sub.razorpay_payment_id}<br>
+                        Date: ${new Date(sub.created_at).toLocaleDateString()}
                     </div>
 
                     <table>
@@ -244,20 +254,20 @@ router.get('/invoice/:paymentId', async (req, res) => {
                             <tr>
                                 <td>GPS Fleet Subscription - ${sub.plan_id.toUpperCase()} Tier</td>
                                 <td>1</td>
-                                <td style="text-align: right;">₹${baseAmount.toFixed(2)}</td>
+                                <td style="text-align: right;">₹${baseAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                             </tr>
                             <tr>
                                 <td>Integrated GST (18%)</td>
                                 <td>1</td>
-                                <td style="text-align: right;">₹${gst.toFixed(2)}</td>
+                                <td style="text-align: right;">₹${gst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                             </tr>
                         </tbody>
                     </table>
 
                     <div class="totals">
-                        <div>Subtotal: ₹${baseAmount.toFixed(2)}</div>
-                        <div>Tax: ₹${gst.toFixed(2)}</div>
-                        <div style="font-size: 20px; font-weight: bold; color: #0B7A75;">Total Paid: ₹${total.toFixed(2)}</div>
+                        <div>Subtotal: ₹${baseAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                        <div>Tax: ₹${gst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                        <div style="font-size: 20px; font-weight: bold; color: #0B7A75;">Total Paid: ₹${total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                         <div class="status-stamp">PAID</div>
                     </div>
 

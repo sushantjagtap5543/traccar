@@ -194,6 +194,40 @@ const CentralConfigPage = () => {
                                     onChange={(e) => handleChange('razorpay_secret', e.target.value)}
                                 />
                             </Grid>
+
+                            <Grid item xs={12}>
+                                <Divider sx={{ my: 2 }}>
+                                    <Chip label="PLAN PRICING & LIMITS" size="small" />
+                                </Divider>
+                            </Grid>
+
+                            {[
+                                { id: '1month', label: '1 Month' },
+                                { id: '6month', label: '6 Month' },
+                                { id: '12month', label: '12 Month' }
+                            ].map(p => (
+                                <React.Fragment key={p.id}>
+                                    <Grid item xs={12} md={6}>
+                                        <TextField
+                                            fullWidth
+                                            label={`${p.label} Base Price (Excl. 18% GST)`}
+                                            type="number"
+                                            value={config[`plan_price_${p.id}`] || ''}
+                                            onChange={(e) => handleChange(`plan_price_${p.id}`, e.target.value)}
+                                            InputProps={{ startAdornment: <Typography variant="caption" sx={{ mr: 1 }}>₹</Typography> }}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} md={6}>
+                                        <TextField
+                                            fullWidth
+                                            label={`${p.label} Device Limit`}
+                                            type="number"
+                                            value={config[`plan_limit_${p.id}`] || ''}
+                                            onChange={(e) => handleChange(`plan_limit_${p.id}`, e.target.value)}
+                                        />
+                                    </Grid>
+                                </React.Fragment>
+                            ))}
                         </Grid>
                     </CardContent>
                 </Card>
