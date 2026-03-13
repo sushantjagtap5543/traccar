@@ -152,11 +152,25 @@ fi
 success "Codebase deployed and environment initialized."
 
 # --- Step 4: Traccar Backend Installation ---
-log "[Step 4/11] Downloading and Installing Traccar ${TRACCAR_VERSION}..."
-wget -q https://github.com/traccar/traccar/releases/download/v${TRACCAR_VERSION}/traccar-linux-64-${TRACCAR_VERSION}.zip
-unzip -o traccar-linux-64-${TRACCAR_VERSION}.zip -d traccar-installer
-./traccar-installer/traccar.run
-rm -rf traccar-installer traccar-linux-64-${TRACCAR_VERSION}.zip
+ARCH=$(uname -m)
+if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+    log "[Step 4/11] Detected ARM64 architecture. Downloading Traccar for ARM..."
+    TRACCAR_PACKAGE="traccar-other-${TRACCAR_VERSION}.zip"
+else
+    log "[Step 4/11] Detected x86_64 architecture. Downloading Traccar for Linux 64-bit..."
+    TRACCAR_PACKAGE="traccar-linux-64-${TRACCAR_VERSION}.zip"
+fi
+
+wget -q "https://github.com/traccar/traccar/releases/download/v${TRACCAR_VERSION}/${TRACCAR_PACKAGE}"
+unzip -o "$TRACCAR_PACKAGE" -d traccar-installer
+if [ -f "./traccar-installer/traccar.run" ]; then
+    ./traccar-installer/traccar.run
+else
+    log "Alternative installation: Moving files manually for non-installer package..."
+    mkdir -p /opt/traccar
+    cp -r ./traccar-installer/* /opt/traccar/
+fi
+rm -rf traccar-installer "$TRACCAR_PACKAGE"
 
 # Configure Traccar to use local Postgres
 sudo -u postgres psql -c "CREATE DATABASE traccar;" 2>/dev/null || true

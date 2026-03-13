@@ -10,11 +10,27 @@ const expectedKey = process.env.ADMIN_API_KEY;
  * Production-Grade JWT Authenticator
  * Supports access/refresh separation and revocation checks.
  */
+const axios = require('axios');
+const TRACCAR_URL = process.env.TRACCAR_INTERNAL_URL || 'http://traccar:8082';
+
 const authenticateJWT = asyncHandler(async (req, res, next) => {
     const authHeader = req.headers.authorization;
     const token = req.cookies.adminToken || (authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null);
 
     if (!token) {
+        // FALLBACK: Check for Traccar Session (Fix for C-004)
+        const cookie = req.headers.cookie;
+        if (cookie && cookie.includes('JSESSIONID')) {
+             try {
+                const sessionRes = await axios.get(`${TRACCAR_URL}/api/session`, { headers: { Cookie: cookie }, timeout: 5000 });
+                if (sessionRes.data && sessionRes.data.id) {
+                    req.user = { id: sessionRes.data.id, email: sessionRes.data.email, role: 'client' };
+                    return next();
+                }
+             } catch (err) {
+                 logger.debug(`Traccar session fallback failed: ${err.message}`);
+             }
+        }
         return next(new AppError('AUTH_REQUIRED', 'No token provided', 401));
     }
 

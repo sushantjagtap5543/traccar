@@ -3,7 +3,7 @@ const router = express.Router();
 const axios = require('axios');
 const { checkDeviceLimit } = require('../middleware/subscription');
 const { tenantIsolation } = require('../middleware/tenant');
-const { logger } = require('../services/db');
+const { pool, logger } = require('../services/db');
 
 const TRACCAR_URL = process.env.TRACCAR_INTERNAL_URL || 'http://traccar:8082';
 
@@ -67,8 +67,17 @@ router.post('/devices', tenantIsolation, checkDeviceLimit, validate(schemas.crea
 router.post('/devices/bulk-delete', tenantIsolation, validate(schemas.bulkAction), asyncHandler(async (req, res) => {
     const { ids } = req.body;
     const results = [];
+    const userId = req.traccarUser?.id;
+
     for (const id of ids) {
         try {
+            // Security verification (C-011)
+            const ownership = await pool.query("SELECT 1 FROM tc_user_device WHERE userid = $1 AND deviceid = $2", [userId, id]);
+            if (ownership.rowCount === 0) {
+                results.push({ id, status: 'failed', error: 'Unauthorized: Device does not belong to user' });
+                continue;
+            }
+
             await axios.delete(`${TRACCAR_URL}/api/devices/${id}`, {
                 headers: { 'Cookie': req.headers.cookie }
             });
@@ -84,8 +93,17 @@ router.post('/devices/bulk-delete', tenantIsolation, validate(schemas.bulkAction
 router.post('/devices/bulk-update', tenantIsolation, validate(schemas.bulkAction), asyncHandler(async (req, res) => {
     const { ids, updates } = req.body;
     const results = [];
+    const userId = req.traccarUser?.id;
+
     for (const id of ids) {
         try {
+            // Security verification (C-011)
+            const ownership = await pool.query("SELECT 1 FROM tc_user_device WHERE userid = $1 AND deviceid = $2", [userId, id]);
+            if (ownership.rowCount === 0) {
+                results.push({ id, status: 'failed', error: 'Unauthorized: Device does not belong to user' });
+                continue;
+            }
+
             await axios.put(`${TRACCAR_URL}/api/devices/${id}`, { ...updates, id }, {
                 headers: { 'Cookie': req.headers.cookie }
             });
@@ -153,7 +171,13 @@ router.post('/devices/bulk-import', tenantIsolation, checkDeviceLimit, asyncHand
  */
 router.post('/devices/:id/optimize', tenantIsolation, asyncHandler(async (req, res, next) => {
     const { mode } = req.body; // 'economy', 'standard', 'ultra-fine'
-    
+    const deviceId = req.params.id;
+    const userId = req.traccarUser?.id;
+
+    // Security verification (C-011)
+    const ownership = await pool.query("SELECT 1 FROM tc_user_device WHERE userid = $1 AND deviceid = $2", [userId, deviceId]);
+    if (ownership.rowCount === 0) return next(new AppError('UNAUTHORIZED', 'Device does not belong to user', 403));
+
     let attributes = {};
     switch (mode) {
         case 'economy':
@@ -170,8 +194,8 @@ router.post('/devices/:id/optimize', tenantIsolation, asyncHandler(async (req, r
     }
 
     try {
-        const response = await axios.put(`${TRACCAR_URL}/api/devices/${req.params.id}`, {
-            id: req.params.id,
+        const response = await axios.put(`${TRACCAR_URL}/api/devices/${deviceId}`, {
+            id: deviceId,
             attributes: { ...attributes }
         }, {
             headers: { 'Cookie': req.headers.cookie }

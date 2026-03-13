@@ -1,6 +1,6 @@
-import { lazy, Suspense } from 'react';
-import { Route, Routes, useSearchParams } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useNavigate, useLocation, Outlet } from 'react-router-dom';
+import { Box } from '@mui/material';
+import { lazy, Suspense, useEffect } from 'react';
 import MainPage from './main/MainPage';
 import { useEffectAsync } from './reactHelper';
 import { devicesActions } from './store';
@@ -77,6 +77,25 @@ const ChangeServerPage = lazy(() => import('./login/ChangeServerPage'));
 const AdminLoginPage = lazy(() => import('./login/AdminLoginPage'));
 const LegalPage = lazy(() => import('./LegalPage'));
 
+const AdminApp = () => {
+    const navigate = useNavigate();
+    const { pathname } = useLocation();
+    
+    useEffectAsync(async () => {
+        if (sessionStorage.getItem('adminSessionActive') !== 'true') {
+            navigate('/admin/login');
+        }
+    }, [navigate]);
+
+    return (
+        <Suspense fallback={<Loader />}>
+            <Box sx={{ flexGrow: 1, overflow: 'auto', p: 3 }}>
+                <Outlet />
+            </Box>
+        </Suspense>
+    );
+};
+
 const Navigation = () => {
   const dispatch = useDispatch();
   const { setLocalLanguage } = useLocalization();
@@ -138,6 +157,13 @@ const Navigation = () => {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/change-server" element={<ChangeServerPage />} />
+        <Route path="/admin" element={<AdminApp />}>
+            <Route path="dashboard" element={<AdminDashboardPage />} />
+            <Route path="config" element={<CentralConfigPage />} />
+            <Route path="billing" element={<BillingPage />} />
+            <Route path="backups" element={<BackupManagerPage />} />
+            <Route path="migration" element={<MigrationPage />} />
+        </Route>
         <Route path="/" element={<App />}>
           <Route index element={<MainPage />} />
 
@@ -206,13 +232,6 @@ const Navigation = () => {
             <Route path="logs" element={<LogsPage />} />
           </Route>
 
-          <Route path="admin">
-            <Route path="dashboard" element={<AdminDashboardPage />} />
-            <Route path="config" element={<CentralConfigPage />} />
-            <Route path="billing" element={<BillingPage />} />
-            <Route path="backups" element={<BackupManagerPage />} />
-            <Route path="migration" element={<MigrationPage />} />
-          </Route>
           <Route path="settings/alerts" element={<AlertConfigPage />} />
         </Route>
       </Routes>

@@ -102,7 +102,9 @@ router.post('/admin/auth/login', asyncHandler(async (req, res, next) => {
 
     if (user && user.totp_enabled) {
         if (!totpToken) {
-            return res.json({ requiresTOTP: true, email });
+            // Generate a short-lived challenge token (A-001)
+            const challengeToken = jwt.sign({ email, challenge: true }, process.env.JWT_SECRET, { expiresIn: '5m' });
+            return res.json({ requiresTOTP: true, email, challengeToken });
         }
         const validTOTP = verifyTOTPToken(user.totp_secret, totpToken);
         if (!validTOTP) {
@@ -130,6 +132,7 @@ router.post('/admin/auth/login', asyncHandler(async (req, res, next) => {
     logAudit('LOGIN_SUCCESS', 'admin', { email }, null, req.ip);
     res.json({ 
         accessToken: tokens.accessToken, 
+        token: tokens.accessToken, // Compatibility with A-002
         refreshToken: tokens.refreshToken,
         user: { email, role: 'admin' }
     });
@@ -182,6 +185,34 @@ router.get('/admin/auth/recovery-codes', adminAuth, asyncHandler(async (req, res
     res.json({ codes });
 }));
 
+router.post('/admin/auth/verify-totp', asyncHandler(async (req, res, next) => {
+    const { token, email } = req.body;
+    const challengeTokenHeader = req.headers['x-admin-token'];
+
+    if (!token || !challengeTokenHeader) {
+        return next(new AppError('MISSING_FIELDS', 'Verification code and challenge context required', 400));
+    }
+
+    try {
+        const decoded = jwt.verify(challengeTokenHeader, process.env.JWT_SECRET);
+        if (!decoded.challenge || decoded.email !== email) throw new Error();
+    } catch (err) {
+        return next(new AppError('INVALID_SESSION', 'Authentication session expired or invalid', 401));
+    }
+
+    // Auth validated, issue real tokens
+    const userRes = await pool.query(
+        "SELECT totp_secret FROM geosurepath_user_metadata WHERE user_id = (SELECT id FROM tc_users WHERE email = $1 LIMIT 1)",
+        [email]
+    );
+    const validTOTP = verifyTOTPToken(userRes.rows[0].totp_secret, token);
+    if (!validTOTP) return next(new AppError('INVALID_OTP', 'Invalid 2FA code', 401));
+
+    const tokens = generateTokens({ id: 0, email, role: 'admin' });
+    res.cookie('adminToken', tokens.accessToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict', maxAge: 900000 });
+    res.json({ accessToken: tokens.accessToken, token: tokens.accessToken, refreshToken: tokens.refreshToken, user: { email, role: 'admin' } });
+}));
+
 router.post('/admin/auth/verify-recovery', asyncHandler(async (req, res, next) => {
     const { email, code } = req.body;
     if (!email || !code) return next(new AppError('MISSING_FIELDS', 'Email and recovery code required', 400));
@@ -229,6 +260,12 @@ router.post('/auth/send-otp', asyncHandler(async (req, res, next) => {
     const { mobile } = req.body;
     if (!mobile) return next(new AppError('MISSING_FIELDS', 'Mobile number required', 400));
 
+    // Rate Limiting (NEW-004)
+    const rateKey = `otp_rate:${mobile}`;
+    const rateCount = await redisClient.incr(rateKey);
+    if (rateCount === 1) await redisClient.expire(rateKey, 600); // 10 min window
+    if (rateCount > 3) return next(new AppError('RATE_LIMIT', 'Too many OTP requests. Try again in 10 minutes.', 429));
+
     const crypto = require('crypto');
     const code = crypto.randomInt(100000, 999999).toString();
     await redisClient.set(`otp:${mobile}`, code, { EX: 300 });
@@ -260,6 +297,21 @@ router.post('/auth/verify-otp', asyncHandler(async (req, res, next) => {
     } else {
         return next(new AppError('INVALID_OTP', 'Invalid or expired OTP', 400));
     }
+}));
+
+router.post('/auth/register-success', asyncHandler(async (req, res, next) => {
+    const { userId, email } = req.body;
+    if (!userId) return next(new AppError('MISSING_FIELDS', 'User ID required', 400));
+
+    // Initialize metadata (C-003)
+    const clientId = require('crypto').randomUUID();
+    await pool.query(
+        "INSERT INTO geosurepath_user_metadata (user_id, client_id, totp_enabled) VALUES ($1, $2, false) ON CONFLICT (user_id) DO NOTHING",
+        [userId, clientId]
+    );
+
+    logger.info(`Initialized metadata for new user ${userId} (${email})`);
+    res.json({ success: true, clientId });
 }));
 
 const handleFailedAttempt = async (email) => {

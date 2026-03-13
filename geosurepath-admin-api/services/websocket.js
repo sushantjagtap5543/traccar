@@ -22,23 +22,43 @@ const initWebSocket = (server) => {
         pingInterval: 10000
     });
 
-    // 1. Authentication Middleware
-    io.use((socket, next) => {
+    // 1. Authentication Middleware (C-013)
+    io.use(async (socket, next) => {
         const token = socket.handshake.auth.token || socket.handshake.headers['authorization'];
+        const cookie = socket.handshake.headers.cookie;
         
-        if (!token) return next(new Error('Authentication failed: Missing token'));
-
-        try {
-            const decoded = jwt.verify(token.replace('Bearer ', ''), process.env.JWT_SECRET);
-            socket.user = decoded;
-            next();
-        } catch (err) {
-            next(new Error('Authentication failed: Invalid token'));
+        if (token) {
+            try {
+                const decoded = jwt.verify(token.replace('Bearer ', ''), process.env.JWT_SECRET);
+                socket.user = decoded;
+                return next();
+            } catch (err) {
+                // Fallback to cookie if token fails
+            }
         }
+
+        if (cookie) {
+            try {
+                const traccarUrl = process.env.TRACCAR_INTERNAL_URL || 'http://traccar:8082';
+                const axios = require('axios');
+                const sessionRes = await axios.get(`${traccarUrl}/api/session`, {
+                    headers: { Cookie: cookie }
+                });
+                if (sessionRes.data && sessionRes.data.id) {
+                    socket.user = sessionRes.data;
+                    socket.user.traccarSession = true;
+                    return next();
+                }
+            } catch (err) {
+                logger.error('WebSocket: Cookie auth failed', err.message);
+            }
+        }
+
+        next(new Error('Authentication failed: No valid token or session'));
     });
 
     io.on('connection', (socket) => {
-        const userId = socket.user.id || socket.user.email;
+        const userId = socket.user.id || socket.user.email || socket.user.userId;
         logger.info(`WebSocket: User ${userId} connected (${socket.id})`);
 
         // Track connection for cleanup metrics
@@ -54,10 +74,18 @@ const initWebSocket = (server) => {
             logger.info(`WebSocket: Admin ${userId} joined broadcast channel`);
         }
 
-        socket.on('subscribe_device', (deviceId) => {
-            // In a real multi-tenant scenario, verify device ownership here
-            socket.join(`device_${deviceId}`);
-            logger.debug(`Socket ${socket.id} subscribed to device ${deviceId}`);
+        socket.on('subscribe_device', async (deviceId) => {
+            // Security verification (C-011 / C-013)
+            const { pool } = require('./db');
+            const ownership = await pool.query("SELECT 1 FROM tc_user_device WHERE userid = $1 AND deviceid = $2", [userId, deviceId]);
+            
+            if (ownership.rowCount > 0 || socket.user.role === 'admin') {
+                socket.join(`device_${deviceId}`);
+                logger.debug(`Socket ${socket.id} authorized for device ${deviceId}`);
+            } else {
+                logger.warn(`Socket ${socket.id} denied access to device ${deviceId}`);
+                socket.emit('error', 'Unauthorized device subscription');
+            }
         });
 
         socket.on('disconnect', () => {

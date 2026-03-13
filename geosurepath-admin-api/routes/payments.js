@@ -413,15 +413,42 @@ router.get('/invoice/:paymentId', authenticateJWT, asyncHandler(async (req, res,
 
 // 7. Refund & Dispute Handling (Strict Admin Only - BUG-003)
 router.post('/refund/:paymentId', adminAuth, asyncHandler(async (req, res, next) => {
-    const result = await pool.query(
-        "UPDATE geosurepath_subscriptions SET status = 'refunded' WHERE razorpay_payment_id = $1 RETURNING user_id",
-        [req.params.paymentId]
-    );
+    const paymentId = req.params.paymentId;
+    const { amount, reason } = req.body; // Optional partial refund
 
-    if (result.rowCount === 0) return next(new AppError('NOT_FOUND', 'Payment record not found', 404));
+    try {
+        const rzp = await getRazorpayClient();
+        
+        // 1. Check if payment exists and is not already refunded
+        const checkRes = await pool.query(
+            "SELECT status, amount_paid FROM geosurepath_subscriptions WHERE razorpay_payment_id = $1",
+            [paymentId]
+        );
+        if (checkRes.rowCount === 0) return next(new AppError('NOT_FOUND', 'Payment record not found', 404));
+        if (checkRes.rows[0].status === 'refunded') return next(new AppError('BAD_REQUEST', 'Payment already refunded', 400));
 
-    logger.info(`Payment ${req.params.paymentId} marked as refunded for user ${result.rows[0].user_id}`);
-    res.json({ success: true, message: 'Subscription marked as refunded' });
+        // 2. Call Razorpay Refund API
+        const refundOptions = {
+            payment_id: paymentId,
+            speed: 'normal',
+            notes: { reason: reason || 'Admin requested refund' }
+        };
+        if (amount) refundOptions.amount = amount * 100; // Partial refund support
+
+        const refund = await rzp.payments.refund(paymentId, refundOptions);
+
+        // 3. Update local DB status
+        await pool.query(
+            "UPDATE geosurepath_subscriptions SET status = 'refunded', updated_at = NOW() WHERE razorpay_payment_id = $1",
+            [paymentId]
+        );
+
+        logger.info(`Payment ${paymentId} refunded successfully via Razorpay API. Refund ID: ${refund.id}`);
+        res.json({ success: true, message: 'Refund processed successfully', refundId: refund.id });
+    } catch (err) {
+        logger.error(`Razorpay Refund Error for ${paymentId}:`, err.message);
+        return next(new AppError('REFUND_FAILED', `Payment gateway rejected refund: ${err.message}`, 502));
+    }
 }));
 
 // 8. Payment History for a specific User

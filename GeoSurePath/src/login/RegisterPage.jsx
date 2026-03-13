@@ -140,6 +140,14 @@ const RegisterPage = () => {
         body: JSON.stringify({ name, email, password, phone: mobile }),
       });
       user = await userRes.json();
+      
+      // Initialize GeoSurePath metadata (C-003)
+      await fetch(`${API_BASE}/api/auth/register-success`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, email: user.email })
+      }).catch(err => console.error('Metadata initialization failed:', err));
+
     } catch (err) {
       setErrorMessage('Failed to register user. Email might exist.');
       return;

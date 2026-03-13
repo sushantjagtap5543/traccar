@@ -1,3 +1,19 @@
+const Sentry = require('@sentry/node');
+const Tracing = require('@sentry/tracing');
+
+// Initialize Sentry (NEW-010)
+if (process.env.SENTRY_DSN) {
+    Sentry.init({
+        dsn: process.env.SENTRY_DSN,
+        environment: process.env.NODE_ENV || 'development',
+        integrations: [
+            new Sentry.Integrations.Http({ tracing: true }),
+            new Tracing.Integrations.Express({ app: express() }),
+        ],
+        tracesSampleRate: 1.0,
+    });
+}
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -18,6 +34,7 @@ const { startMonitor } = require('./services/monitor');
 const { startMaintenanceTasks } = require('./services/maintenance');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
+const alertsRouter = require('./routes/alerts');
 const backupRoutes = require('./routes/backup');
 const migrationRoutes = require('./routes/migration');
 const reportRoutes = require('./routes/reports');
@@ -236,6 +253,7 @@ app.use('/api', migrationRoutes);
 app.use('/api', reportRoutes);
 app.use('/api', require('./routes/devices')); // Limit enforcement proxy
 app.use('/api/payments', paymentLimiter, require('./routes/payments'));
+app.use('/api/alerts', alertsRouter);
 
 // Protected metrics
 app.get('/metrics', adminAuth, async (req, res) => {

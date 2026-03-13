@@ -120,24 +120,39 @@ const processAlerts = async () => {
 
         const positionMap = new Map(positionsData.map(p => [p.deviceId, p]));
 
+        // 3. Fetch Device -> Owner Mapping & Per-User Config (Fix for C-009)
+        const ownerRes = await pool.query("SELECT deviceid, userid FROM tc_user_device");
+        const deviceOwnerMap = new Map(ownerRes.rows.map(r => [r.deviceid, r.userid]));
+        
+        // Batch fetch all user configs to avoid N+1 queries
+        const userIds = [...new Set(ownerRes.rows.map(r => r.userid))];
+        const configRes = await pool.query(
+            "SELECT user_id, value FROM geosurepath_settings WHERE key = 'alert_config' AND user_id = ANY($1)",
+            [userIds]
+        );
+        const userConfigMap = new Map(configRes.rows.map(r => [r.user_id, JSON.parse(r.value)]));
+
         // Evaluation Loop (Parallel - Fix for WF-012)
         const evaluationTasks = devicesData.map(async (device) => {
             try {
                 const pos = positionMap.get(device.id);
                 if (!pos) return;
 
+                const ownerId = deviceOwnerMap.get(device.id);
+                const userConfig = userConfigMap.get(ownerId) || config; // Fallback to global config
+
                 const alarm = pos.attributes?.alarm;
 
-                // Rule evaluation
-                if (config.overSpeed?.enabled) {
+                // Rule evaluation using per-user config
+                if (userConfig.overSpeed?.enabled) {
                     const speedKph = pos.speed * 1.852;
-                    if (speedKph > config.overSpeed.threshold) {
+                    if (speedKph > userConfig.overSpeed.threshold) {
                         await sendAlert('VEHICLE_OVERSPEED', `Vehicle ${device.name} is traveling at ${speedKph.toFixed(1)} km/h.`, 'WARNING', device.id);
                     }
                 }
 
-                if (config.batteryLow?.enabled && pos.attributes?.batteryLevel !== undefined) {
-                    if (pos.attributes.batteryLevel < config.batteryLow.threshold) {
+                if (userConfig.batteryLow?.enabled && pos.attributes?.batteryLevel !== undefined) {
+                    if (pos.attributes.batteryLevel < userConfig.batteryLow.threshold) {
                         await sendAlert('LOW_BATTERY', `Vehicle ${device.name} battery is at ${pos.attributes.batteryLevel}%.`, 'WARNING', device.id);
                     }
                 }

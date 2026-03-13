@@ -134,6 +134,7 @@ const SubscriptionPage = () => {
 
     const plans = [
         { id: '1month', name: 'Standard (Monthly)', price: '₹200', limit: 25, features: ['25 Devices', '365 Day History', 'SMS & WhatsApp Alerts', 'Geofence Reports'] },
+        { id: '6month', name: 'Standard (Half-Year)', price: '₹950', limit: 25, features: ['25 Devices', '365 Day History', 'SMS & WhatsApp Alerts', 'Geofence Reports'] },
         { id: '12month', name: 'Standard (Annual)', price: '₹1500', limit: 25, features: ['25 Devices', '365 Day History', 'SMS & WhatsApp Alerts', 'Geofence Reports', '2 Months FREE!'] },
         { id: 'enterprise', name: 'Enterprise (Annual)', price: '₹4500', limit: 100, features: ['100 Devices', 'White-label Support', 'API Access', 'Dedicated Manager', 'Custom Reports'] },
     ];

@@ -184,7 +184,7 @@ router.post('/admin/backup', adminAuth, (req, res) => {
 
 router.get('/admin/traccar/status', adminAuth, async (req, res) => {
     try {
-        const traccarUrl = process.env.TRACCAR_URL || 'http://localhost:8082';
+        const traccarUrl = process.env.TRACCAR_INTERNAL_URL || 'http://traccar:8082';
         const response = await axios.get(`${traccarUrl}/api/server`, { timeout: 3000 });
         res.json({ status: 'REACHABLE', version: response.data.version || 'Unknown' });
     } catch (err) {
@@ -202,7 +202,7 @@ router.post('/admin/restart/:service', adminAuth, (req, res) => {
         case 'traccar': command = process.platform === 'win32' ? 'net stop traccar && net start traccar' : 'echo "Service manager required for containerized Traccar"'; break;
         case 'database': command = process.platform === 'win32' ? 'net stop postgresql-x64-15 && net start postgresql-x64-15' : 'echo "Service manager required for containerized Database"'; break;
         case 'backend': command = 'pm2 restart geosurepath-admin-api'; break;
-        case 'cache': command = 'redis-cli flushall'; break;
+        case 'cache': command = 'redis-cli flushdb'; break; // Fix for A-008 (NEW-001)
     }
 
     logger.info(`Restarting service: ${service} by request of ${req.ip}`);

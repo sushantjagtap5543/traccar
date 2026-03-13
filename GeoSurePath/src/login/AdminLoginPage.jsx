@@ -68,8 +68,14 @@ const AdminLoginPage = () => {
             const data = await response.json();
 
             if (response.ok) {
-                setIntermediateToken(data.token);
-                setStep(2); // Proceed to TOTP 2FA Verification
+                if (data.requiresTOTP) {
+                    setIntermediateToken(data.challengeToken || data.token); // Store challenge for Step 2
+                    setStep(2);
+                } else {
+                    // Direct login (No 2FA)
+                    sessionStorage.setItem('adminSessionActive', 'true');
+                    navigate('/admin/dashboard');
+                }
             } else {
                 throw new Error(data.error || 'Authentication failed');
             }

@@ -35,10 +35,10 @@ const generateTOTPSecret = async (user) => {
     issuer: 'GeoSurePath'
   });
   
-  // Store secret in database for persistence (Production Standard)
+  // Store secret in metadata table (Fix for NEW-008)
   await pool.query(
-    'UPDATE tc_users SET totp_secret = $1 WHERE email = $2',
-    [secret.base32, user.email]
+    'INSERT INTO geosurepath_user_metadata (user_id, totp_secret, totp_enabled) VALUES ((SELECT id FROM tc_users WHERE email = $1), $2, true) ON CONFLICT (user_id) DO UPDATE SET totp_secret = $2, totp_enabled = true',
+    [user.email, secret.base32]
   );
   
   // Generate QR code

@@ -115,33 +115,26 @@ const AlertConfigPage = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetchOrThrow('/api/server');
-        const server = await res.json();
-        if (server.attributes?.alertConfig) {
-          setAlerts({ ...DEFAULT_ALERTS, ...JSON.parse(server.attributes.alertConfig) });
+        const apiUrl = import.meta.env.VITE_ADMIN_API_URL || '';
+        const res = await fetch(`${apiUrl}/api/alerts/client-config`, { credentials: 'include' });
+        if (res.ok) {
+          const config = await res.json();
+          setAlerts({ ...DEFAULT_ALERTS, ...config });
         }
       } catch (_) { }
     };
     load();
   }, []);
-
   const handleSave = async () => {
     try {
-      // Save alert config in server attributes
-      const serverRes = await fetchOrThrow('/api/server');
-      const server = await serverRes.json();
-      const updatedServer = {
-        ...server,
-        attributes: {
-          ...server.attributes,
-          alertConfig: JSON.stringify(alerts),
-        },
-      };
-      await fetchOrThrow('/api/server', {
-        method: 'PUT',
+      const apiUrl = import.meta.env.VITE_ADMIN_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/alerts/client-config`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedServer),
+        body: JSON.stringify(alerts),
+        credentials: 'include'
       });
+      if (!res.ok) throw new Error('Failed to save');
       setSnackbar({ open: true, message: 'Alert configuration saved successfully!', severity: 'success' });
     } catch (error) {
       dispatch(errorsActions.push(error.message));
