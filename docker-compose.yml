@@ -74,6 +74,7 @@ services:
       - ./traccar.xml.template:/app/traccar.xml.template:ro
       - ./entrypoint.sh:/app/entrypoint.sh:ro
       - ./data:/opt/traccar/data
+      - ./logs:/opt/traccar/logs
     entrypoint: [ "/bin/sh", "/app/entrypoint.sh" ]
     command: [ "/opt/traccar/jre/bin/java", "-Xms1024m", "-Xmx2048m", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200", "-jar", "tracker-server.jar", "/app/traccar.xml" ]
     ports:

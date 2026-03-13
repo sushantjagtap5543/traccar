@@ -15,6 +15,9 @@
     <entry key='web.path'>./web</entry>
     <entry key='web.cacheControl'>max-age=3600,public</entry>
     <entry key='web.registration'>false</entry>
+    <entry key='gt06.port'>5023</entry>
+    <entry key='teltonika.port'>5027</entry>
+    <entry key='h02.port'>5013</entry>
 
     <entry key='logger.file'>./logs/tracker-server.log</entry>
     <entry key='logger.level'>info</entry>
