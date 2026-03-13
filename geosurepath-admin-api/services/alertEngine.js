@@ -77,16 +77,24 @@ const processAlerts = async () => {
 
         const client = getClient();
 
-        // 1. Fetch Config
+        // 1. Fetch Config (Cached - Fix for BUG-019)
         let config;
         try {
-            const dbRes = await pool.query("SELECT value FROM geosurepath_settings WHERE key = 'alert_rules_config' LIMIT 1");
-            if (dbRes.rowCount > 0) {
-                config = JSON.parse(dbRes.rows[0].value);
+            const cacheKey = 'alert_rules_config_v2';
+            const cachedArr = await redisClient.get(cacheKey);
+            if (cachedArr) {
+                config = JSON.parse(cachedArr);
             } else {
-                const serverRes = await client.get('/api/server');
-                if (serverRes.data.attributes?.alertConfig) {
-                    config = JSON.parse(serverRes.data.attributes.alertConfig);
+                const dbRes = await pool.query("SELECT value FROM geosurepath_settings WHERE key = 'alert_rules_config' LIMIT 1");
+                if (dbRes.rowCount > 0) {
+                    config = JSON.parse(dbRes.rows[0].value);
+                    await redisClient.set(cacheKey, JSON.stringify(config), { EX: 300 }); // 5 min cache
+                } else {
+                    const serverRes = await client.get('/api/server');
+                    if (serverRes.data.attributes?.alertConfig) {
+                        config = JSON.parse(serverRes.data.attributes.alertConfig);
+                        await redisClient.set(cacheKey, JSON.stringify(config), { EX: 300 });
+                    }
                 }
             }
         } catch (configErr) {
@@ -112,10 +120,11 @@ const processAlerts = async () => {
 
         const positionMap = new Map(positionsData.map(p => [p.deviceId, p]));
 
-        for (const device of devicesData) {
+        // Evaluation Loop (Parallel - Fix for WF-012)
+        const evaluationTasks = devicesData.map(async (device) => {
             try {
                 const pos = positionMap.get(device.id);
-                if (!pos) continue;
+                if (!pos) return;
 
                 const alarm = pos.attributes?.alarm;
 
@@ -167,7 +176,7 @@ const processAlerts = async () => {
                         const idleTime = (Date.now() - parseInt(idleStart)) / 60000;
                         if (idleTime > (config.idleThresholdMinutes || 15)) {
                             await sendAlert('VEHICLE_IDLE', `Vehicle ${device.name} has been idling for ${Math.floor(idleTime)} minutes.`, 'WARNING', device.id);
-                            // Reset to avoid spamming every cycle if needed, or use a flag
+                            // Set high cooldown flag
                             await redisClient.set(`idle_start:${device.id}`, Date.now().toString(), { EX: 3600 });
                         }
                     }
@@ -175,17 +184,28 @@ const processAlerts = async () => {
                     await redisClient.del(`idle_start:${device.id}`);
                 }
                 
-                // Geofence events
-                if (alarm === 'geofenceExit') {
-                    await sendAlert('GEOFENCE_EXIT', `Vehicle ${device.name} exited geofence.`, 'WARNING', device.id);
+                // Geofence events with state tracking (Fix for WF-010)
+                const geofenceKey = `geofence_state:${device.id}`;
+                const currentGeoAlarm = alarm?.startsWith('geofence') ? alarm : 'none';
+                const prevGeoAlarm = await redisClient.get(geofenceKey) || 'none';
+
+                if (currentGeoAlarm !== prevGeoAlarm && currentGeoAlarm !== 'none') {
+                    if (currentGeoAlarm === 'geofenceExit') {
+                        await sendAlert('GEOFENCE_EXIT', `Vehicle ${device.name} exited geofence.`, 'WARNING', device.id);
+                    } else if (currentGeoAlarm === 'geofenceEnter') {
+                        await sendAlert('GEOFENCE_ENTER', `Vehicle ${device.name} entered geofence.`, 'INFO', device.id);
+                    }
                 }
-                if (alarm === 'geofenceEnter') {
-                    await sendAlert('GEOFENCE_ENTER', `Vehicle ${device.name} entered geofence.`, 'INFO', device.id);
+                
+                if (currentGeoAlarm !== prevGeoAlarm) {
+                    await redisClient.set(geofenceKey, currentGeoAlarm, { EX: 86400 });
                 }
             } catch (deviceErr) {
                 logger.error(`Alert Engine: Failed to process device ${device.id}`, deviceErr.message);
             }
-        }
+        });
+
+        await Promise.all(evaluationTasks);
 
     } catch (err) {
         logger.error('Alert Engine Cycle Error:', err.message);

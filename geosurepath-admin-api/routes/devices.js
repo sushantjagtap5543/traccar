@@ -8,8 +8,35 @@ const { logger } = require('../services/db');
 const TRACCAR_URL = process.env.TRACCAR_INTERNAL_URL || 'http://traccar:8082';
 
 /**
- * Shielded Device Management
- * Intercepts device creation to enforce subscription limits.
+ * @openapi
+ * components:
+ *   schemas:
+ *     Device:
+ *       type: object
+ *       properties:
+ *         id: { type: integer }
+ *         name: { type: string }
+ *         uniqueId: { type: string, description: "IMEI/Serial" }
+ *         status: { type: string }
+ */
+
+/**
+ * @openapi
+ * /api/devices:
+ *   post:
+ *     summary: Create Device
+ *     description: Registers a new device with subscription limit enforcement.
+ *     security:
+ *       - ApiKeyAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/Device' }
+ *     responses:
+ *       201:
+ *         description: Created
+ *       403:
+ *         description: Limit Exceeded
  */
 
 const validate = require('../middleware/validate');
@@ -103,7 +130,27 @@ router.post('/devices/bulk-import', tenantIsolation, checkDeviceLimit, asyncHand
     res.json(results);
 }));
 
-// 5. GPS Frequency Optimization (WF-002)
+/**
+ * @openapi
+ * /api/devices/{id}/optimize:
+ *   post:
+ *     summary: GPS Frequency Optimization (WF-002)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               mode: { type: string, enum: [economy, standard, ultra-fine] }
+ *     responses:
+ *       200:
+ *         description: Success
+ */
 router.post('/devices/:id/optimize', tenantIsolation, asyncHandler(async (req, res, next) => {
     const { mode } = req.body; // 'economy', 'standard', 'ultra-fine'
     

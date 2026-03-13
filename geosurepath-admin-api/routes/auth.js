@@ -14,6 +14,39 @@ const { generateTokens, blacklistToken, verifyTOTPToken } = require('../services
 const { asyncHandler } = require('../middleware/errorHandler');
 const { AppError } = require('../utils/errors');
 
+/**
+ * @openapi
+ * /api/admin/auth/login:
+ *   post:
+ *     summary: Administrative Login
+ *     description: Authenticates admin via email/password and Optional 2FA.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password]
+ *             properties:
+ *               email: { type: string, example: admin@geosurepath.com }
+ *               password: { type: string, example: P@ssw0rd123 }
+ *               totpToken: { type: string, example: "123456" }
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 accessToken: { type: string }
+ *                 refreshToken: { type: string }
+ *       401:
+ *         description: Auth failed
+ *       403:
+ *         description: Account Locked (WF-011)
+ */
+
 // --- AUTH ENDPOINTS ---
 /**
  * Production Login Flow
@@ -29,22 +62,35 @@ router.post('/admin/auth/login', asyncHandler(async (req, res, next) => {
     const { error, value } = schema.validate(req.body);
     if (error) return next(new AppError('VALIDATION_ERROR', error.details[0].message, 400));
 
-    const { email, password, totpToken } = value;
-    
+    const lockoutKey = `lockout:${email}`;
+    const attemptsKey = `login_attempts:${email}`;
+
+    // 1. Check if locked
+    const isLocked = await redisClient.get(lockoutKey);
+    if (isLocked) {
+        return next(new AppError('ACCOUNT_LOCKED', 'Too many failed attempts. Account locked for 15 minutes.', 403));
+    }
+
     const adminEmail = process.env.ADMIN_EMAIL;
     const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
-    // 1. Timing-safe verification
+    // 2. Timing-safe verification
     if (email !== adminEmail) {
         await bcrypt.compare(password, '$2a$10$invalidhashplaceholderformistmatch');
+        // Increment attempts even for wrong email to prevent user enumeration via timing
+        await handleFailedAttempt(email); 
         return next(new AppError('AUTH_FAILED', 'Invalid credentials', 401));
     }
 
     const isValid = await bcrypt.compare(password, adminPasswordHash);
     if (!isValid) {
+        await handleFailedAttempt(email);
         logAudit('LOGIN_FAILURE', 'admin', { email }, null, req.ip);
         return next(new AppError('AUTH_FAILED', 'Invalid credentials', 401));
     }
+
+    // Reset attempts on success
+    await redisClient.del(attemptsKey);
 
     // 2. 2FA Check (Persistence-based)
     const userRes = await pool.query("SELECT totp_secret, totp_enabled FROM tc_users WHERE email = $1", [email]);
@@ -84,6 +130,18 @@ router.post('/admin/auth/login', asyncHandler(async (req, res, next) => {
         user: { email, role: 'admin' }
     });
 }));
+
+/**
+ * @openapi
+ * /api/admin/auth/logout:
+ *   post:
+ *     summary: Session Revocation
+ *     security:
+ *       - ApiKeyAuth: []
+ *     responses:
+ *       200:
+ *         description: Success
+ */
 
 router.post('/admin/auth/logout', authenticateJWT, asyncHandler(async (req, res) => {
     const token = req.cookies.adminToken || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
@@ -199,5 +257,21 @@ router.post('/auth/verify-otp', asyncHandler(async (req, res, next) => {
         return next(new AppError('INVALID_OTP', 'Invalid or expired OTP', 400));
     }
 }));
+
+const handleFailedAttempt = async (email) => {
+    const attemptsKey = `login_attempts:${email}`;
+    const lockoutKey = `lockout:${email}`;
+
+    const attempts = await redisClient.incr(attemptsKey);
+    if (attempts === 1) {
+        await redisClient.expire(attemptsKey, 900); // 15 mins
+    }
+
+    if (attempts >= 5) {
+        await redisClient.set(lockoutKey, '1', { EX: 900 }); // Lockout for 15 mins
+        await redisClient.del(attemptsKey);
+        logger.warn(`Account locked for ${email} due to 5 failed attempts.`);
+    }
+};
 
 module.exports = router;

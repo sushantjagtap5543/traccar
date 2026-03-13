@@ -307,7 +307,13 @@ const startServer = async () => {
   backupService.startCron();
 
   // 3. Listen
-  const server = app.listen(PORT, () => {
+  // 3. Listen with WebSocket support
+  const { createServer } = require('http');
+  const httpServer = createServer(app);
+  const { initWebSocket } = require('./services/websocket');
+  initWebSocket(httpServer);
+
+  httpServer.listen(PORT, () => {
     logger.info(`GeoSurePath Admin API v14.1 running on port ${PORT}`);
   });
 
@@ -326,7 +332,7 @@ const startServer = async () => {
         process.exit(1);
     }, 15000);
 
-    server.close(async () => {
+    httpServer.close(async () => {
       try {
         logger.info('HTTP server closed. Closing database and cache connections...');
         
