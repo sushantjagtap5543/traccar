@@ -1,24 +1,30 @@
+require('dotenv').config();
+
+/**
+ * @type { Object.<string, import("knex").Knex.Config> }
+ */
 module.exports = {
-    development: {
-        client: 'pg',
-        connection: process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/traccar',
-        migrations: {
-            directory: './migrations'
-        },
-        seeds: {
-            directory: './seeds'
-        }
+  development: {
+    client: 'postgresql',
+    connection: process.env.DATABASE_URL,
+    pool: {
+      min: 2,
+      max: 10
     },
-    production: {
-        client: 'pg',
-        connection: (() => {
-            if (!process.env.DATABASE_URL) {
-                throw new Error('DATABASE_URL environment variable is required in production');
-            }
-            return process.env.DATABASE_URL;
-        })(),
-        migrations: {
-            directory: './migrations'
-        }
+    migrations: {
+      tableName: 'knex_migrations'
     }
+  },
+
+  production: {
+    client: 'postgresql',
+    connection: process.env.DATABASE_URL,
+    pool: {
+      min: 2,
+      max: 20
+    },
+    migrations: {
+      tableName: 'knex_migrations'
+    }
+  }
 };

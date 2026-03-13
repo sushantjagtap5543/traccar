@@ -15,10 +15,12 @@ const uuid = require('uuid');
 // --- LOAD MODULAR COMPONENTS ---
 const { pool, redisClient, ioRedisClient, logger } = require('./services/db');
 const { startMonitor } = require('./services/monitor');
+const { startMaintenanceTasks } = require('./services/maintenance');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const backupRoutes = require('./routes/backup');
 const migrationRoutes = require('./routes/migration');
+const reportRoutes = require('./routes/reports');
 const { adminAuth } = require('./middleware/auth');
 const backupService = require('./services/backupService');
 
@@ -206,6 +208,7 @@ app.use('/api', authLimiter, authRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', backupRoutes);
 app.use('/api', migrationRoutes);
+app.use('/api', reportRoutes);
 app.use('/api', require('./routes/devices')); // Limit enforcement proxy
 app.use('/api/payments', paymentLimiter, require('./routes/payments'));
 
@@ -303,6 +306,7 @@ const startServer = async () => {
   const { startAlertEngine } = require('./services/alertEngine');
   startAlertEngine();
   startMonitor();
+  startMaintenanceTasks();
   backupService.startCron();
 
   // 3. Listen

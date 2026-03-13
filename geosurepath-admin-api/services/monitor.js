@@ -7,49 +7,69 @@ const BACKGROUND_MONITOR_INTERVAL = 60000;
 
 const sendAlert = async (title, message, severity = 'WARNING', deviceId = 'infra') => {
     const { redisClient } = require('./db');
+    const { sendSMS } = require('./sms');
+    const { sendEmail } = require('./email');
+
     const alertKey = `alert_cooldown:${title}:${deviceId}`;
 
-    // Cooldown: 15 minutes for the same alert type/device
+    // 1. Atomic Check & Set (Fix for BUG-003 Race Condition)
+    // Attempt to set key only if it doesn't exist, with 15-minute expiration
     try {
-        const onCooldown = await redisClient.get(alertKey);
-        if (onCooldown) {
-            logger.info(`Alert ${title} for ${deviceId} silenced (on cooldown via Redis).`);
-            return;
-        }
+        const canDispatch = await redisClient.set(alertKey, '1', {
+            NX: true,
+            EX: 900 // 15 minutes
+        });
 
-        // DB Fallback/Persistence check
-        const dbCheck = await pool.query(
-            "SELECT id FROM geosurepath_alerts WHERE title = $1 AND device_id = $2 AND created_at > NOW() - INTERVAL '15 minutes' LIMIT 1",
-            [title, deviceId]
-        );
-        if (dbCheck.rowCount > 0) {
-            logger.info(`Alert ${title} for ${deviceId} silenced (on cooldown via DB).`);
-            // Sync back to Redis if it was missing
-            await redisClient.set(alertKey, '1', { EX: 900 });
+        if (!canDispatch) {
+            logger.debug(`Alert suppressed by 15m atomic cooldown: ${title}`);
             return;
         }
     } catch (err) {
         logger.error('Deduplication check failed:', err.message);
+        // Fail open or fail closed? We fail closed to prevent alert storms if Redis is fluttering.
+        return; 
     }
 
     logger.warn(`ALERT [${severity}]: ${title} - ${message}`);
-    if (!ALERT_WEBHOOK) return;
+
+    // Multichannel Dispatch for HIGH severity
+    const isCritical = ['CRITICAL', 'EMERGENCY', 'SOS'].includes(severity);
+    
+    // 1. Webhook (Primary)
+    if (ALERT_WEBHOOK) {
+        try {
+            await axios.post(ALERT_WEBHOOK, {
+                content: `🚨 **GS-INFRA ALERT [${severity}]**\n**${title}**: ${message}\nTime: ${new Date().toISOString()}`
+            });
+        } catch (err) {
+            logger.error('Failed to dispatch alert webhook:', err.message);
+        }
+    }
+
+    // 2. Email & SMS (Emergency/Critical Only)
+    if (isCritical) {
+        try {
+            const adminEmailRes = await pool.query("SELECT email FROM tc_users WHERE administrator = true LIMIT 1");
+            if (adminEmailRes.rowCount > 0) {
+                await sendEmail(adminEmailRes.rows[0].email, `GeoSurePath EMERGENCY: ${title}`, `<h3>${title}</h3><p>${message}</p><p>Severity: ${severity}</p>`);
+            }
+            
+            const adminPhoneRes = await pool.query("SELECT phone FROM tc_users WHERE administrator = true AND phone IS NOT NULL LIMIT 1");
+            if (adminPhoneRes.rowCount > 0) {
+                await sendSMS(adminPhoneRes.rows[0].phone, `ALERT [${severity}]: ${title} - ${message}`);
+            }
+        } catch (dispatchErr) {
+            logger.error('Emergency dispatch failure:', dispatchErr.message);
+        }
+    }
 
     try {
-        await axios.post(ALERT_WEBHOOK, {
-            content: `🚨 **GS-INFRA ALERT [${severity}]**\n**${title}**: ${message}\nTime: ${new Date().toISOString()}`
-        });
-        
-        // Save to DB for history/audit
         await pool.query(
             "INSERT INTO geosurepath_alerts (title, device_id, severity, message) VALUES ($1, $2, $3, $4)",
             [title, deviceId, severity, message]
         );
-
-        // Set cooldown for 15 minutes
-        await redisClient.set(alertKey, '1', { EX: 900 });
     } catch (err) {
-        logger.error('Failed to dispatch alert webhook:', err.message);
+        logger.error('Alert persistence error:', err.message);
     }
 };
 

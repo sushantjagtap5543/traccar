@@ -9,110 +9,90 @@ const { pool, redisClient, logger } = require('../services/db');
 const { adminAuth } = require('../middleware/auth');
 const { logAudit } = require('../services/auditService');
 
+const { authenticateJWT } = require('../middleware/auth');
+const { generateTokens, blacklistToken, verifyTOTPToken } = require('../services/authService');
+
 // --- AUTH ENDPOINTS ---
+/**
+ * Production Login Flow
+ * Supports timing-safe passwords and 2FA challenges.
+ */
 router.post('/admin/auth/login', async (req, res) => {
     const schema = Joi.object({
         email: Joi.string().email().required(),
-        password: Joi.string().min(8).required()
+        password: Joi.string().min(8).required(),
+        totpToken: Joi.string().length(6).optional()
     });
 
     const { error, value } = schema.validate(req.body);
     if (error) return res.status(400).json({ error: error.details[0].message });
 
-    const { email, password } = value;
-    const adminEmail = process.env.ADMIN_EMAIL;
-    if (!adminEmail) {
-        logger.error('ADMIN_EMAIL environment variable not set');
-        return res.status(500).json({ error: 'Server authentication configuration missing' });
-    }
-    const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
-
-    if (!adminPasswordHash || !process.env.JWT_SECRET) {
-        logger.error('Authentication environment variables missing. Login rejected.');
-        return res.status(500).json({ error: 'Server authentication configuration missing' });
-    }
-
-    if (email !== adminEmail) {
-        logger.warn(`Email mismatch for admin login: ${email}`);
-        return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    const isValid = await bcrypt.compare(password, adminPasswordHash);
-    if (!isValid) {
-        logger.warn(`Invalid password for admin login: ${email}`);
-        return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    const token = jwt.sign({ role: 'admin', email }, process.env.JWT_SECRET, { expiresIn: '30m' });
-    logAudit('LOGIN_ATTEMPT', 'admin', { email }, null, req.ip);
-    res.json({ token });
-});
-
-router.get('/admin/auth/totp-setup', adminAuth, async (req, res) => {
+    const { email, password, totpToken } = value;
+    
     try {
-        const secret = speakeasy.generateSecret({ name: 'GeoSurePath Admin', issuer: 'GeoSurePath' });
-        await redisClient.set(`totp_secret:${req.admin?.email || 'admin'}`, secret.base32, { EX: 600 });
-        const qrCode = await QRCode.toDataURL(secret.otpauth_url);
-        logAudit('TOTP_SETUP_INIT', 'admin', { email: req.admin?.email }, null, req.ip);
-        res.json({ qrCode, secret: secret.base32 });
-    } catch (err) {
-        logger.error('TOTP Setup failed:', err);
-        res.status(500).json({ error: 'Failed to generate 2FA secret' });
-    }
-});
+        const adminEmail = process.env.ADMIN_EMAIL;
+        const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
-router.post('/admin/auth/verify-totp', async (req, res) => {
-    const schema = Joi.object({
-        token: Joi.string().length(6).required(),
-        email: Joi.string().email().optional()
-    });
+        // 1. Timing-safe verification
+        if (email !== adminEmail) {
+            await bcrypt.compare(password, '$2a$10$invalidhashplaceholderformistmatch');
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
 
-    const { error, value } = schema.validate(req.body);
-    if (error) return res.status(400).json({ error: error.details[0].message });
+        const isValid = await bcrypt.compare(password, adminPasswordHash);
+        if (!isValid) {
+            logAudit('LOGIN_FAILURE', 'admin', { email }, null, req.ip);
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
 
-    const { token: totpToken, email } = value;
-    try {
-        const secret = await redisClient.get(`totp_secret:${email || 'admin'}`);
-        if (!secret) return res.status(400).json({ error: '2FA session expired or not initialized' });
+        // 2. 2FA Check (Persistence-based)
+        const userRes = await pool.query("SELECT totp_secret, totp_enabled FROM tc_users WHERE email = $1", [email]);
+        const user = userRes.rows[0];
 
-        const verified = speakeasy.totp.verify({
-            secret,
-            encoding: 'base32',
-            token: totpToken,
-            window: 2
+        if (user && user.totp_enabled) {
+            if (!totpToken) {
+                return res.json({ requiresTOTP: true, email });
+            }
+            const validTOTP = verifyTOTPToken(user.totp_secret, totpToken);
+            if (!validTOTP) {
+                return res.status(401).json({ error: 'Invalid 2FA code' });
+            }
+        }
+
+        // 3. Token Generation & Session Persistence
+        const tokens = generateTokens({ id: 0, email, role: 'admin' });
+        const crypto = require('crypto');
+        const tokenHash = crypto.createHash('sha256').update(tokens.accessToken).digest('hex');
+
+        await pool.query(
+            "INSERT INTO geosurepath_sessions (user_email, token_hash, ip_address, user_agent, expires_at) VALUES ($1, $2, $3, $4, NOW() + INTERVAL '15 minutes')",
+            [email, tokenHash, req.ip, req.headers['user-agent']]
+        );
+
+        res.cookie('adminToken', tokens.accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 900000 // 15 mins
         });
 
-        if (verified) {
-            const finalToken = jwt.sign({ role: 'admin', email: email || 'admin' }, process.env.JWT_SECRET, { expiresIn: '1h' });
-            
-            // Session Management
-            const crypto = require('crypto');
-            const tokenHash = crypto.createHash('sha256').update(finalToken).digest('hex');
-            await pool.query(
-                "INSERT INTO geosurepath_sessions (user_email, token_hash, ip_address, user_agent, expires_at) VALUES ($1, $2, $3, $4, NOW() + INTERVAL '1 hour')",
-                [email || 'admin', tokenHash, req.ip, req.headers['user-agent']]
-            );
-
-            res.cookie('adminToken', finalToken, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
-                maxAge: 3600000
-            });
-            res.json({ success: true, token: finalToken });
-        } else {
-            res.status(400).json({ error: 'Invalid or expired 2FA code' });
-        }
+        logAudit('LOGIN_SUCCESS', 'admin', { email }, null, req.ip);
+        res.json({ 
+            accessToken: tokens.accessToken, 
+            refreshToken: tokens.refreshToken,
+            user: { email, role: 'admin' }
+        });
     } catch (err) {
-        logger.error('TOTP Verification failed:', err);
-        res.status(500).json({ error: 'Verification error' });
+        logger.error('Login error:', err.message);
+        res.status(500).json({ error: 'Authentication service unavailable' });
     }
 });
 
-router.post('/admin/auth/logout', adminAuth, async (req, res) => {
+router.post('/admin/auth/logout', authenticateJWT, async (req, res) => {
     try {
-        const token = req.cookies.adminToken || req.headers['x-admin-token'];
+        const token = req.cookies.adminToken || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
         if (token) {
+            await blacklistToken(token);
             const crypto = require('crypto');
             const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
             await pool.query("DELETE FROM geosurepath_sessions WHERE token_hash = $1", [tokenHash]);
