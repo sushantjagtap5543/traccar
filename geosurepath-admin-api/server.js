@@ -329,7 +329,8 @@ app.use(errorHandler);
 const startServer = async () => {
   // 1. Run migrations first
   try {
-    const knex = require('knex')(require('./knexfile'));
+    const knexConfig = require('./knexfile');
+    const knex = require('knex')(knexConfig[process.env.NODE_ENV || 'development']);
     await knex.migrate.latest();
     logger.info('Database migrations completed.');
     await knex.destroy();

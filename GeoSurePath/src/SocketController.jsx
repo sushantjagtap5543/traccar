@@ -147,6 +147,7 @@ const SocketController = () => {
       return () => {
         clearReconnectTimeout();
         socketRef.current?.close(logoutCode);
+        dispatch(devicesActions.reset());
       };
     }
     return null;

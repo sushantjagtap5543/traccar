@@ -73,8 +73,9 @@ services:
     volumes:
       - ./traccar.xml.template:/app/traccar.xml.template:ro
       - ./entrypoint.sh:/app/entrypoint.sh:ro
+      - ./data:/opt/traccar/data
     entrypoint: [ "/bin/sh", "/app/entrypoint.sh" ]
-    command: [ "java", "-Xms1024m", "-Xmx2048m", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200", "-jar", "tracker-server.jar", "/app/traccar.xml" ]
+    command: [ "/opt/traccar/jre/bin/java", "-Xms1024m", "-Xmx2048m", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200", "-jar", "tracker-server.jar", "/app/traccar.xml" ]
     ports:
       - "8082:8082"
       - "5000-5150:5000-5150/tcp"

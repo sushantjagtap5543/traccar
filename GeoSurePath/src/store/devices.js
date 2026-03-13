@@ -21,6 +21,10 @@ const { reducer, actions } = createSlice({
     remove(state, action) {
       delete state.items[action.payload];
     },
+    reset(state) {
+      state.items = {};
+      state.selectedId = null;
+    },
   },
 });
 
