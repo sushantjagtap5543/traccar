@@ -141,14 +141,8 @@ router.post('/admin/auth/login', authLimiter, asyncHandler(async (req, res, next
         sameSite: 'strict',
         maxAge: 900000 // 15 mins
     });
-
-    logAudit('LOGIN_SUCCESS', 'admin', { email }, null, req.ip);
-    res.json({ 
-        accessToken: tokens.accessToken, 
-        token: tokens.accessToken, // Compatibility with A-002
-        refreshToken: tokens.refreshToken,
-        user: { email, role: 'admin' }
-    });
+    logAudit('LOGIN_SUCCESS_TOTP', 'admin', { email }, null, req.ip);
+    res.json({ accessToken: tokens.accessToken, token: tokens.accessToken, refreshToken: tokens.refreshToken, user: { email, role: 'admin' } });
 }));
 
 /**
@@ -222,7 +216,17 @@ router.post('/admin/auth/verify-totp', authLimiter, asyncHandler(async (req, res
     if (!validTOTP) return next(new AppError('INVALID_OTP', 'Invalid 2FA code', 401));
 
     const tokens = generateTokens({ id: 0, email, role: 'admin' });
+
+    // Persist session so authenticateJWT session-DB check passes
+    const crypto = require('crypto');
+    const tokenHash = crypto.createHash('sha256').update(tokens.accessToken).digest('hex');
+    await pool.query(
+        "INSERT INTO geosurepath_sessions (user_email, token_hash, ip_address, user_agent, expires_at) VALUES ($1, $2, $3, $4, NOW() + INTERVAL '15 minutes')",
+        [email, tokenHash, req.ip, req.headers['user-agent']]
+    );
+
     res.cookie('adminToken', tokens.accessToken, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict', maxAge: 900000 });
+    logAudit('LOGIN_SUCCESS_TOTP', 'admin', { email }, null, req.ip);
     res.json({ accessToken: tokens.accessToken, token: tokens.accessToken, refreshToken: tokens.refreshToken, user: { email, role: 'admin' } });
 }));
 
@@ -269,6 +273,49 @@ router.delete('/admin/auth/totp-secret', adminAuth, asyncHandler(async (req, res
     logger.warn(`TOTP Secret cleared for ${email} by administrative request.`);
     logAudit('TOTP_RESET', 'admin', { email }, null, req.ip);
     res.json({ message: '2FA secret has been reset. You will need to setup 2FA again on next login.' });
+}));
+
+router.get('/admin/auth/totp-setup', adminAuth, asyncHandler(async (req, res) => {
+    const { generateTOTPSecret } = require('../services/authService');
+    const result = await generateTOTPSecret({ email: req.admin.email });
+    res.json(result);
+}));
+
+router.post('/admin/auth/refresh', asyncHandler(async (req, res, next) => {
+    const { refreshToken } = req.body;
+    if (!refreshToken) return next(new AppError('MISSING_FIELDS', 'Refresh token required', 400));
+
+    try {
+        const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+        const userRes = await pool.query('SELECT email FROM tc_users WHERE id = $1', [decoded.userId]);
+        
+        if (userRes.rowCount === 0) throw new Error('User not found');
+        const email = userRes.rows[0].email;
+
+        const tokens = generateTokens({ id: decoded.userId, email, role: 'admin' });
+        
+        // Update session persistence
+        const crypto = require('crypto');
+        const tokenHash = crypto.createHash('sha256').update(tokens.accessToken).digest('hex');
+        await pool.query(
+            "INSERT INTO geosurepath_sessions (user_email, token_hash, ip_address, user_agent, expires_at) VALUES ($1, $2, $3, $4, NOW() + INTERVAL '15 minutes')",
+            [email, tokenHash, req.ip, req.headers['user-agent']]
+        );
+
+        res.cookie('adminToken', tokens.accessToken, { 
+            httpOnly: true, 
+            secure: process.env.NODE_ENV === 'production', 
+            sameSite: 'strict', 
+            maxAge: 900000 
+        });
+
+        res.json({
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken
+        });
+    } catch (err) {
+        return next(new AppError('INVALID_TOKEN', 'Refresh token expired or invalid', 401));
+    }
 }));
 
 // --- CLIENT OTP AUTH ---

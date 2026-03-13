@@ -132,14 +132,41 @@ const AdminDashboardPage = () => {
         return Math.round(score);
     };
 
+  const authenticatedFetch = async (url, options = {}) => {
+    const fetchOptions = { ...options, credentials: 'include' };
+    let response = await fetch(url, fetchOptions);
+
+    if (response.status === 401) {
+      // Try refresh
+      const refreshRes = await fetch(`${API_BASE}/api/admin/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ refreshToken: localStorage.getItem('adminRefreshToken') })
+      });
+
+      if (refreshRes.ok) {
+        const data = await refreshRes.json();
+        if (data.accessToken) {
+          // Retry original request
+          response = await fetch(url, fetchOptions);
+        }
+      } else {
+        sessionStorage.removeItem('adminSessionActive');
+        localStorage.removeItem('adminRefreshToken');
+        navigate('/admin');
+      }
+    }
+    return response;
+  };
+
   const fetchStats = async () => {
     try {
-      const fetchOptions = { credentials: 'include' };
       const [healthRes, logsRes, traccarRes, tablesRes] = await Promise.all([
-        fetch(`${API_BASE}/api/admin/health`, fetchOptions),
-        fetch(`${API_BASE}/api/admin/logs`, fetchOptions),
-        fetch(`${API_BASE}/api/admin/traccar/status`, fetchOptions),
-        fetch(`${API_BASE}/api/admin/db/tables`, fetchOptions)
+        authenticatedFetch(`${API_BASE}/api/admin/health`),
+        authenticatedFetch(`${API_BASE}/api/admin/logs`),
+        authenticatedFetch(`${API_BASE}/api/admin/traccar/status`),
+        authenticatedFetch(`${API_BASE}/api/admin/db/tables`)
       ]);
 
       if (healthRes.ok) {
@@ -179,9 +206,7 @@ const AdminDashboardPage = () => {
   const handleSetup2FA = async () => {
     setActionLoading('totp');
     try {
-      const response = await fetch(`${API_BASE}/api/admin/auth/totp-setup`, {
-        credentials: 'include'
-      });
+      const response = await authenticatedFetch(`${API_BASE}/api/admin/auth/totp-setup`);
       if (response.ok) {
         const data = await response.json();
         setTotpDialog({ open: true, qrCode: data.qrCode, secret: data.secret });
@@ -205,9 +230,8 @@ const AdminDashboardPage = () => {
     if (!window.confirm(`Restart ${service}? This may impact active users.`)) return;
     setActionLoading(service);
     try {
-      const response = await fetch(`${API_BASE}/api/admin/restart/${service}`, {
-        method: 'POST',
-        credentials: 'include'
+      const response = await authenticatedFetch(`${API_BASE}/api/admin/restart/${service}`, {
+        method: 'POST'
       });
       if (response.ok) {
         setSnackbar({ open: true, message: `${service} restart signal sent.`, severity: 'success' });
@@ -226,9 +250,8 @@ const AdminDashboardPage = () => {
   const handleBackup = async () => {
     setActionLoading('backup');
     try {
-      const response = await fetch(`${API_BASE}/api/admin/backup`, {
-        method: 'POST',
-        credentials: 'include'
+      const response = await authenticatedFetch(`${API_BASE}/api/admin/backup`, {
+        method: 'POST'
       });
       if (response.ok) {
         setSnackbar({ open: true, message: 'Database backup initiated.', severity: 'success' });
@@ -244,12 +267,11 @@ const AdminDashboardPage = () => {
     e.preventDefault();
     setActionLoading('webhook');
     try {
-      const response = await fetch(`${API_BASE}/api/admin/alerts/config`, {
+      const response = await authenticatedFetch(`${API_BASE}/api/admin/alerts/config`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        credentials: 'include',
         body: JSON.stringify({ webhookUrl })
       });
       if (response.ok) {

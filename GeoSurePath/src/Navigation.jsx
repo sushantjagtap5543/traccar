@@ -1,6 +1,7 @@
-import { useNavigate, useLocation, Outlet } from 'react-router-dom';
+import { useNavigate, useLocation, Outlet, Routes, Route, useSearchParams } from 'react-router-dom';
 import { Box } from '@mui/material';
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense } from 'react';
+import { useDispatch } from 'react-redux';
 import MainPage from './main/MainPage';
 import { useEffectAsync } from './reactHelper';
 import { devicesActions } from './store';
@@ -80,12 +81,15 @@ const LegalPage = lazy(() => import('./LegalPage'));
 const AdminApp = () => {
     const navigate = useNavigate();
     const { pathname } = useLocation();
-    
+
+    // Guard: redirect to admin login if no active admin session
+    // Use plain useEffect (from React) since this check is synchronous
     useEffectAsync(async () => {
         if (sessionStorage.getItem('adminSessionActive') !== 'true') {
-            navigate('/admin/login');
+            navigate('/admin/login', { replace: true });
         }
-    }, [navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pathname]); // re-check on every route change within /admin
 
     return (
         <Suspense fallback={<Loader />}>

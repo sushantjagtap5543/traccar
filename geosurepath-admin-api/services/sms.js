@@ -30,13 +30,13 @@ const sendSMS = async (to, message) => {
         }
 
         // Try DB fallback if env not set
-        const res = await pool.query("SELECT key, value FROM geosurepath_settings WHERE key IN ('twilio_sid', 'twilio_auth_token', 'twilio_number')");
+        const res = await pool.query("SELECT key, value FROM geosurepath_settings WHERE key IN ('twilio_account_sid', 'twilio_auth_token', 'twilio_phone_number')");
         if (res.rowCount > 0) {
             const config = {};
             res.rows.forEach(r => config[r.key] = decrypt(r.value));
-            const dbSid = config.twilio_sid;
+            const dbSid = config.twilio_account_sid;
             const dbAuth = config.twilio_auth_token;
-            const dbFrom = config.twilio_number;
+            const dbFrom = config.twilio_phone_number;
 
             if (dbSid && dbAuth && dbFrom) {
                 const twilio = require('twilio');

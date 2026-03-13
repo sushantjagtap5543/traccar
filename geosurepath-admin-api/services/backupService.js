@@ -192,7 +192,16 @@ class BackupService {
     async encryptFile(inputPath, outputPath, key) {
         return new Promise((resolve, reject) => {
             const iv = crypto.randomBytes(16);
-            const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(key.padEnd(32).slice(0, 32)), iv);
+            // key may be a 64-char hex string (32 bytes) stored in DB or a raw 32-char string
+            let keyBuffer;
+            if (key && key.length === 64 && /^[0-9a-fA-F]+$/.test(key)) {
+                keyBuffer = Buffer.from(key, 'hex');
+            } else if (key && key.length >= 32) {
+                keyBuffer = Buffer.from(key.slice(0, 32), 'utf8');
+            } else {
+                return reject(new Error('Invalid backup encryption key length'));
+            }
+            const cipher = crypto.createCipheriv('aes-256-cbc', keyBuffer, iv);
 
             const input = fs.createReadStream(inputPath);
             const output = fs.createWriteStream(outputPath);

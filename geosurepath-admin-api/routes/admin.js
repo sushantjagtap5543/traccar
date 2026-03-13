@@ -187,11 +187,11 @@ router.post('/admin/backup', adminAuth, (req, res) => {
 /**
  * Sentry Diagnostics Endpoint (TM-004)
  */
-router.get('/admin/debug-sentry', adminAuth, (req, res) => {
+router.get('/admin/debug-sentry', adminAuth, asyncHandler(async (req, res) => {
     logger.info('Sentry diagnostics triggered by administrator');
-    // We throw a controlled error to verify Sentry capture
+    // Throw a controlled error so Sentry captures it; asyncHandler routes it to errorHandler gracefully
     throw new Error('GeoSurePath Sentry Diagnostic: Protocol Verification Successful');
-});
+}));
 
 /**
  * Health Check (Internal detailed)

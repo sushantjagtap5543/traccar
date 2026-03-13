@@ -118,7 +118,23 @@ const initWebSocket = (server) => {
 
 const startRedisListener = async () => {
     const subClient = redisClient.duplicate();
-    await subClient.connect();
+
+    subClient.on('error', (err) => {
+        logger.error('WebSocket: Redis subscriber error:', err.message);
+    });
+
+    subClient.on('reconnecting', () => {
+        logger.warn('WebSocket: Redis subscriber reconnecting...');
+    });
+
+    try {
+        await subClient.connect();
+    } catch (err) {
+        logger.error('WebSocket: Failed to connect Redis subscriber:', err.message);
+        // Retry after 5 seconds so transient startup ordering issues resolve
+        setTimeout(() => startRedisListener(), 5000);
+        return;
+    }
 
     // Listen for real-time alerts from monitor.js or alertEngine.js
     await subClient.subscribe('geosurepath_realtime_events', (message) => {

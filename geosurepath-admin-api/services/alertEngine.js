@@ -127,7 +127,7 @@ const processAlerts = async () => {
         // Batch fetch all user configs to avoid N+1 queries
         const userIds = [...new Set(ownerRes.rows.map(r => r.userid))];
         const configRes = await pool.query(
-            "SELECT user_id, value FROM geosurepath_settings WHERE key = 'alert_config' AND user_id = ANY($1)",
+            "SELECT user_id, value FROM geosurepath_settings WHERE key = 'alert_config' AND user_id = ANY($1::int[])",
             [userIds]
         );
         const userConfigMap = new Map(configRes.rows.map(r => [r.user_id, JSON.parse(r.value)]));
@@ -214,6 +214,52 @@ const processAlerts = async () => {
                 
                 if (currentGeoAlarm !== prevGeoAlarm) {
                     await redisClient.set(geofenceKey, currentGeoAlarm, { EX: 86400 });
+                }
+
+                // 10. GPS Signal Lost
+                if (pos.valid === false) {
+                    await sendAlert('GPS_SIGNAL_LOST', `Vehicle ${device.name} lost GPS fix.`, 'WARNING', device.id);
+                }
+
+                // 12. Harsh Braking/Acceleration
+                if (alarm === 'harshBraking' || alarm === 'harshAcceleration') {
+                    const type = alarm === 'harshBraking' ? 'Harsh Braking' : 'Harsh Acceleration';
+                    await sendAlert('DRIVING_BEHAVIOR', `${type} detected for vehicle ${device.name}.`, 'WARNING', device.id);
+                }
+
+                // 13. Fuel Drop
+                if (alarm === 'fuelDrop') {
+                    await sendAlert('FUEL_THEFT', `Rapid fuel level reduction detected for vehicle ${device.name}!`, 'CRITICAL', device.id);
+                }
+
+                // 14. Temperature
+                if (pos.attributes?.temp1 !== undefined) {
+                    const temp = parseFloat(pos.attributes.temp1);
+                    if (userConfig.temperature?.enabled && (temp > userConfig.temperature.max || temp < userConfig.temperature.min)) {
+                        await sendAlert('TEMPERATURE_VIOLATION', `Vehicle ${device.name} temperature is ${temp}°C (Range: ${userConfig.temperature.min}-${userConfig.temperature.max}°C).`, 'WARNING', device.id);
+                    }
+                }
+
+                // 16. Door Open
+                if (alarm === 'door' || pos.attributes?.door === true) {
+                    await sendAlert('DOOR_OPEN', `Unauthorized door access for vehicle ${device.name}.`, 'WARNING', device.id);
+                }
+
+                // 17. Maintenance Due
+                if (pos.attributes?.totalDistance !== undefined) {
+                    const distance = pos.attributes.totalDistance / 1000; // km
+                    if (userConfig.maintenance?.enabled && distance >= userConfig.maintenance.threshold) {
+                        await sendAlert('MAINTENANCE_DUE', `Vehicle ${device.name} has reached ${distance.toFixed(0)} km. Service required.`, 'INFO', device.id);
+                    }
+                }
+
+                // 3. Vibration & 4. Tow Alert
+                if (alarm === 'vibration') {
+                    await sendAlert('VIBRATION_ALERT', `Vibration/Tamper detected for vehicle ${device.name}.`, 'WARNING', device.id);
+                }
+                
+                if (pos.speed > 0.01 && !pos.attributes?.ignition) {
+                    await sendAlert('TOW_ALERT', `Unauthorized movement detected for vehicle ${device.name} (Ignition OFF).`, 'CRITICAL', device.id);
                 }
             } catch (deviceErr) {
                 logger.error(`Alert Engine: Failed to process device ${device.id}`, deviceErr.message);

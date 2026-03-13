@@ -63,7 +63,8 @@ router.post('/orders', authenticateJWT, asyncHandler(async (req, res, next) => {
         notes: {
             basePrice,
             gst,
-            planId
+            planId,
+            userId: String(userId)
         }
     };
 

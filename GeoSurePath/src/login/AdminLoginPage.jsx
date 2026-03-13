@@ -73,6 +73,9 @@ const AdminLoginPage = () => {
                     setStep(2);
                 } else {
                     // Direct login (No 2FA)
+                    if (data.refreshToken) {
+                        localStorage.setItem('adminRefreshToken', data.refreshToken);
+                    }
                     sessionStorage.setItem('adminSessionActive', 'true');
                     navigate('/admin/dashboard');
                 }
@@ -104,6 +107,7 @@ const AdminLoginPage = () => {
             const data = await response.json();
             if (response.ok) {
                 // Session indicator for UI state (Real auth handled by HttpOnly cookie)
+                if (data.refreshToken) localStorage.setItem('adminRefreshToken', data.refreshToken);
                 sessionStorage.setItem('adminSessionActive', 'true');
                 navigate('/admin/dashboard');
             } else {

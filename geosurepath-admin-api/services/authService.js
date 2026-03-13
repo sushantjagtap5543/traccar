@@ -34,11 +34,18 @@ const generateTOTPSecret = async (user) => {
     name: `GeoSurePath (${user.email})`,
     issuer: 'GeoSurePath'
   });
-  
+
+  // Resolve user_id explicitly first to give a clear error if the user doesn't exist
+  const userRes = await pool.query('SELECT id FROM tc_users WHERE email = $1 LIMIT 1', [user.email]);
+  if (userRes.rowCount === 0) {
+    throw new Error(`Cannot generate TOTP secret: user '${user.email}' not found in tc_users`);
+  }
+  const userId = userRes.rows[0].id;
+
   // Store secret in metadata table (Fix for NEW-008)
   await pool.query(
-    'INSERT INTO geosurepath_user_metadata (user_id, totp_secret, totp_enabled) VALUES ((SELECT id FROM tc_users WHERE email = $1), $2, true) ON CONFLICT (user_id) DO UPDATE SET totp_secret = $2, totp_enabled = true',
-    [user.email, secret.base32]
+    'INSERT INTO geosurepath_user_metadata (user_id, totp_secret, totp_enabled) VALUES ($1, $2, true) ON CONFLICT (user_id) DO UPDATE SET totp_secret = $2, totp_enabled = true',
+    [userId, secret.base32]
   );
   
   // Generate QR code

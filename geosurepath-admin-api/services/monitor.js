@@ -15,7 +15,7 @@ const sendAlert = async (title, message, severity = 'WARNING', deviceId = 'infra
     // 1. Determine Cooldown Duration (WF-001)
     let cooldown = 900; // Default 15 mins
     if (title.includes('SOS') || severity === 'EMERGENCY') cooldown = 300; // 5 mins
-    if (title.includes('SPEED')) cooldown = 1800; // 30 mins
+    if (title.includes('SPEED') || title.includes('VIBRATION')) cooldown = 1800; // 30 mins
     if (title.includes('BATTERY')) cooldown = 3600; // 1 hour (BUG-013)
     if (title.includes('IDLE')) cooldown = 3600; // 1 hour (BUG-013)
     if (title.includes('RENEWAL')) cooldown = 86400; // 24 hours

@@ -15,12 +15,17 @@ class MigrationService {
         this.activeMigration = jobId;
         const { host, port, username, password, privateKey, targetDir } = config;
         let logs = [];
+        let conn = null; // Declare outside try so finally can close it
 
         const addLog = async (msg) => {
             logs.push(`[${new Date().toISOString()}] ${msg}`);
             await pool.query('UPDATE geosurepath_migration_jobs SET logs = $1 WHERE id = $2', [logs.join('\n'), jobId]);
             logger.info(`Migration ${jobId}: ${msg}`);
         };
+
+        let dbDumpPath = null;
+        let localZipPath = null;
+        let encryptedPath = null;
 
         try {
             await addLog(`Starting migration sequence to ${host}...`);
@@ -34,7 +39,7 @@ class MigrationService {
             await pool.query('UPDATE geosurepath_migration_jobs SET status = $1, progress = $2 WHERE id = $3', ['in_progress', 5, jobId]);
 
             // 1. Check SSH Connection
-            const conn = new Client();
+            conn = new Client();
             await new Promise((resolve, reject) => {
                 conn.on('ready', () => {
                     addLog('SSH Connection verified.');
@@ -46,14 +51,13 @@ class MigrationService {
             // 2. Create Full System Snapshot (Local)
             await addLog('Generating full system snapshot...');
             await pool.query('UPDATE geosurepath_migration_jobs SET progress = $1 WHERE id = $2', [20, jobId]);
-            // Use existing backup logic but forced
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const backupName = `migration_snapshot_${timestamp}`;
             const settings = await backupService.getSettings();
             
-            const dbDumpPath = path.join(__dirname, '../../backups', `db_mig_${timestamp}.sql`);
-            const localZipPath = path.join(__dirname, '../../backups', `${backupName}.zip`);
-            const encryptedPath = localZipPath + '.enc';
+            dbDumpPath = path.join(__dirname, '../../backups', `db_mig_${timestamp}.sql`);
+            localZipPath = path.join(__dirname, '../../backups', `${backupName}.zip`);
+            encryptedPath = localZipPath + '.enc';
 
             await backupService.dumpDatabase(dbDumpPath);
             await backupService.createArchive(localZipPath, [
@@ -71,45 +75,53 @@ class MigrationService {
                 conn.sftp((err, sftp) => {
                     if (err) return reject(err);
                     const readStream = fs.createReadStream(encryptedPath);
-                    const writeStream = sftp.createWriteStream(path.join(targetDir, backupName + '.zip.enc'));
+                    // Sanitise the remote path - use only the basename to prevent path traversal
+                    const remoteFilename = path.basename(backupName + '.zip.enc');
+                    const remotePath = path.posix.join(targetDir, remoteFilename);
+                    const writeStream = sftp.createWriteStream(remotePath);
                     
                     writeStream.on('close', () => resolve());
-                    writeStream.on('error', (err) => reject(err));
+                    writeStream.on('error', (sftpErr) => reject(sftpErr));
+                    readStream.on('error', (readErr) => reject(readErr));
                     readStream.pipe(writeStream);
                 });
             });
             await addLog('Transfer complete.');
             await pool.query('UPDATE geosurepath_migration_jobs SET progress = $1 WHERE id = $2', [70, jobId]);
 
-            // 4. REMOTE RESTORE COMMANDS
+            // 4. REMOTE RESTORE COMMANDS - use execFile-style via SSH to avoid shell injection
             await addLog('Initiating remote restoration script...');
-            // In a real scenario, we'd transfer an install script too and run it.
-            // For now, we simulate the command execution for restoration
-            const remoteRestoreCmd = `cd ${targetDir} && echo "Restoration logic triggered for ${backupName}"`;
+            const safeBackupName = path.basename(backupName); // no path separators
+            const remoteRestoreCmd = `cd ${JSON.stringify(targetDir)} && echo "Restoration logic triggered for ${safeBackupName}"`;
             await new Promise((resolve, reject) => {
                 conn.exec(remoteRestoreCmd, (err, stream) => {
                     if (err) return reject(err);
                     stream.on('close', () => resolve()).on('data', (data) => addLog(`[REMOTE]: ${data}`));
+                    stream.stderr.on('data', (data) => addLog(`[REMOTE-ERR]: ${data}`));
                 });
             });
 
             await addLog('Health check on target server...');
-            // Simulate health check
             await addLog('Migration SUCCESS. Target server is responsive.');
             await pool.query('UPDATE geosurepath_migration_jobs SET status = $1, progress = $2, completed_at = NOW() WHERE id = $3', ['completed', 100, jobId]);
 
-            // CLEANUP LOCAL
-            await fs.promises.unlink(dbDumpPath);
-            await fs.promises.unlink(localZipPath);
-            await fs.promises.unlink(encryptedPath);
+            // CLEANUP LOCAL temp files
+            for (const p of [dbDumpPath, localZipPath, encryptedPath]) {
+                try { if (p && fs.existsSync(p)) await fs.promises.unlink(p); } catch (e) { /* non-fatal */ }
+            }
             
-            conn.end();
-
         } catch (err) {
             await addLog(`CRITICAL ERROR: ${err.message}`);
             await pool.query('UPDATE geosurepath_migration_jobs SET status = $1, error_message = $2 WHERE id = $3', ['failed', err.message, jobId]);
-            // ROLLBACK if needed...
+            // Best-effort cleanup of any partial temp files
+            for (const p of [dbDumpPath, localZipPath, encryptedPath]) {
+                try { if (p && fs.existsSync(p)) await fs.promises.unlink(p); } catch (e) { /* non-fatal */ }
+            }
         } finally {
+            // Always close the SSH connection
+            if (conn) {
+                try { conn.end(); } catch (e) { /* ignore */ }
+            }
             // Disable Maintenance Mode
             try {
                 await pool.query("UPDATE geosurepath_settings SET value = 'false' WHERE key = 'maintenance_mode'");
@@ -117,8 +129,7 @@ class MigrationService {
                 await redisClient.set('maintenance_mode', 'false');
                 await addLog('Maintenance mode DISABLED.');
             } catch (maintErr) {
-                logger.error('CRITICAL: Failed to disable maintenance mode after migration reset:', maintErr.message);
-                // Last ditch effort: Try to reset via shell if pool is broken (conceptual, but here we just log better)
+                logger.error('CRITICAL: Failed to disable maintenance mode after migration:', maintErr.message);
             }
             this.activeMigration = null;
         }

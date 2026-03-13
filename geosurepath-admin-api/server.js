@@ -53,6 +53,7 @@ const requiredEnvVars = [
     'ADMIN_EMAIL',
     'ADMIN_PASSWORD_HASH',
     'ENCRYPTION_KEY',
+    'ADMIN_API_KEY',
     'NODE_ENV'
 ];
 
@@ -94,7 +95,7 @@ if (allowedOrigins.length === 0 && process.env.NODE_ENV !== 'production') {
 
 // 4. Validate External Service Credentials (Warning only, don't crash unless strictly required)
 if (process.env.NODE_ENV === 'production') {
-    const externalVars = ['RAZORPAY_KEY_ID', 'RAZORPAY_SECRET', 'TWILIO_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_NUMBER'];
+    const externalVars = ['RAZORPAY_KEY_ID', 'RAZORPAY_SECRET', 'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_PHONE_NUMBER'];
     externalVars.forEach(v => {
         if (!process.env[v]) {
             logger.warn(`Production: Missing optional external service variable: ${v}`);
