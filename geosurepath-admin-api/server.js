@@ -65,9 +65,13 @@ if (process.env.JWT_SECRET.length < 64) {
 }
 
 // 3. Validate ALLOWED_ORIGINS in production
-if (process.env.NODE_ENV === 'production' && !process.env.ALLOWED_ORIGINS) {
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(o => o.length > 0);
+if (process.env.NODE_ENV === 'production' && allowedOrigins.length === 0) {
     logger.error('FATAL: ALLOWED_ORIGINS must be set in production');
     process.exit(1);
+}
+if (allowedOrigins.length === 0 && process.env.NODE_ENV !== 'production') {
+    allowedOrigins.push('http://localhost:3000', 'http://localhost:5173');
 }
 
 // 4. Validate External Service Credentials (Warning only, don't crash unless strictly required)
@@ -180,28 +184,39 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // --- MIDDLEWARE ---
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false, // Selective CSP
+  crossOriginEmbedderPolicy: false
+}));
+
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(o => o.length > 0);
-if (allowedOrigins.length === 0 && process.env.NODE_ENV !== 'production') {
-    allowedOrigins.push('http://localhost:3000', 'http://localhost:5173');
-}
 
 app.use(cors({
   origin: (origin, callback) => {
-    // allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (mobile apps, backend services)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
+    
+    if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
       callback(null, true);
     } else {
       logger.warn(`Blocked CORS request from origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error('Cross-Origin Request Blocked by GeoSurePath Policy'));
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-api-key', 'X-Refresh-Token']
 }));
+
+// Security headers extra layer
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
+});
 
 // --- ROUTES ---
 app.use('/api', authLimiter, authRoutes);
@@ -264,26 +279,8 @@ app.get('/api/health', async (req, res) => {
 });
 
 // --- GLOBAL ERROR HANDLER ---
-app.use((err, req, res, next) => {
-  const status = err.status || 500;
-  const message = err.message || 'Internal Server Error';
-  const requestId = req.id || 'unknown';
-
-  if (status >= 500) {
-    logger.error(`[${requestId}] Server Error:`, { status, message, stack: err.stack });
-  } else {
-    logger.warn(`[${requestId}] Client Error:`, { status, message });
-  }
-
-  res.status(status).json({
-    error: {
-      code: err.code || 'API_ERROR',
-      message,
-      requestId,
-      timestamp: new Date().toISOString()
-    }
-  });
-});
+const { errorHandler } = require('./middleware/errorHandler');
+app.use(errorHandler);
 
 // --- STARTUP ---
 const startServer = async () => {

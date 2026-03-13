@@ -49,6 +49,47 @@ const purgeOldData = async () => {
     }
 };
 
+/**
+ * Ensures all users with active devices have at least the inbuilt 1-year subscription.
+ * Implements "When device start automatically start one year subscription" requirement.
+ */
+const reconcileSubscriptions = async () => {
+    logger.info('Maintenance: Reconciling inbuilt subscriptions...');
+    try {
+        // Find users with devices but NO entry in geosurepath_subscriptions
+        const result = await pool.query(`
+            SELECT DISTINCT u.id, u.email 
+            FROM tc_users u
+            JOIN tc_user_device ud ON u.id = ud.userid
+            LEFT JOIN geosurepath_subscriptions s ON u.id = s.user_id
+            WHERE s.id IS NULL
+        `);
+
+        if (result.rowCount === 0) return;
+
+        logger.info(`Maintenance: Found ${result.rowCount} users with devices missing subscriptions. Provisioning...`);
+
+        // Fetch enterprise limit
+        const limitRes = await pool.query("SELECT value FROM geosurepath_settings WHERE key = 'plan_limit_enterprise' LIMIT 1");
+        const enterpriseLimit = limitRes.rowCount > 0 ? parseInt(limitRes.rows[0].value) : 50;
+        
+        const expiryDate = new Date();
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+
+        for (const user of result.rows) {
+            await pool.query(
+                `INSERT INTO geosurepath_subscriptions 
+                (user_id, plan_id, status, device_limit, amount_paid, razorpay_payment_id, expiry_date) 
+                VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [user.id, 'enterprise', 'active', enterpriseLimit, 0, 'INBUILT_PROVISION', expiryDate]
+            );
+            logger.info(`Maintenance: Provisioned 1-year sub for user ${user.id} (${user.email})`);
+        }
+    } catch (err) {
+        logger.error('Maintenance: Subscription reconciliation failed', err.message);
+    }
+};
+
 const ensureIndexes = async () => {
     logger.info('Maintenance: Verifying database indexes...');
     try {
@@ -81,6 +122,7 @@ const startMaintenanceTasks = () => {
         
         setTimeout(() => {
             purgeOldData();
+            reconcileSubscriptions(); // Also run on schedule
             setInterval(purgeOldData, 24 * 60 * 60 * 1000); // Repeat every 24h
         }, msTillNight);
     };

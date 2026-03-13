@@ -12,6 +12,10 @@ const { adminAuth } = require('../middleware/auth');
 
 const { encrypt } = require('../utils/crypto');
 const { logAudit } = require('../services/auditService');
+const { asyncHandler } = require('../middleware/errorHandler');
+const { AppError } = require('../utils/errors');
+const validate = require('../middleware/validate');
+const schemas = require('../validators/schemas');
 
 const restartSchema = Joi.object({
     service: Joi.string().valid('traccar', 'database', 'backend', 'cache').required()
@@ -20,98 +24,87 @@ const restartSchema = Joi.object({
 let ALERT_WEBHOOK = process.env.ALERT_WEBHOOK || '';
 
 // --- ADMIN DASHBOARD DATA ---
-router.get('/admin/health', adminAuth, async (req, res) => {
+router.get('/admin/health', adminAuth, asyncHandler(async (req, res) => {
+    const cpu = await si.currentLoad();
+    const mem = await si.mem();
+    const disk = await si.fsSize();
+    const network = await si.networkStats();
+
+    const start = Date.now();
+    let dbStatus = 'OFFLINE';
+    let dbLatency = 0;
+    let dbSize = 'Unknown';
     try {
-        const cpu = await si.currentLoad();
-        const mem = await si.mem();
-        const disk = await si.fsSize();
-        const network = await si.networkStats();
-
-        const start = Date.now();
-        let dbStatus = 'OFFLINE';
-        let dbLatency = 0;
-        let dbSize = 'Unknown';
-        try {
-            const dbRes = await pool.query('SELECT pg_size_pretty(pg_database_size(current_database())) as size');
-            if (dbRes.rowCount === 1) {
-                dbStatus = 'ONLINE';
-                dbLatency = Date.now() - start;
-                dbSize = dbRes.rows[0].size;
-            }
-        } catch (err) {
-            logger.error('Database Health Check Failed:', err);
+        const dbRes = await pool.query('SELECT pg_size_pretty(pg_database_size(current_database())) as size');
+        if (dbRes.rowCount === 1) {
+            dbStatus = 'ONLINE';
+            dbLatency = Date.now() - start;
+            dbSize = dbRes.rows[0].size;
         }
-
-        let redisStatus = 'OFFLINE';
-        try {
-            const ping = await redisClient.ping();
-            if (ping === 'PONG') redisStatus = 'ONLINE';
-        } catch (err) {
-            logger.error('Redis Health Check Failed:', err);
-        }
-
-        res.json({
-            cpu: cpu.currentLoad.toFixed(2),
-            ram: {
-                total: mem.total,
-                used: mem.active,
-                percent: ((mem.active / mem.total) * 100).toFixed(2)
-            },
-            disk: disk.map(d => ({
-                fs: d.fs,
-                size: d.size,
-                used: d.used,
-                percent: d.use,
-                mount: d.mount
-            })),
-            network: network.length > 0 ? {
-                rx: (network[0].rx_sec / 1024).toFixed(2),
-                tx: (network[0].tx_sec / 1024).toFixed(2)
-            } : { rx: 0, tx: 0 },
-            database: { status: dbStatus, latency: dbLatency, storage: dbSize },
-            cache: { status: redisStatus },
-            uptime: { 
-                process: Math.floor(process.uptime()),
-                formatted: new Date(process.uptime() * 1000).toISOString().substr(11, 8),
-                system: si.time().uptime 
-            },
-            timestamp: new Date().toISOString()
-        });
-    } catch (error) {
-        logger.error('System Info Error:', error);
-        res.status(500).json({ error: 'Failed to retrieve system health' });
+    } catch (err) {
+        logger.error('Database Health Check Failed:', err);
     }
-});
 
-router.get('/admin/logs', adminAuth, (req, res) => {
+    let redisStatus = 'OFFLINE';
+    try {
+        const ping = await redisClient.ping();
+        if (ping === 'PONG') redisStatus = 'ONLINE';
+    } catch (err) {
+        logger.error('Redis Health Check Failed:', err);
+    }
+
+    res.json({
+        cpu: cpu.currentLoad.toFixed(2),
+        ram: {
+            total: mem.total,
+            used: mem.active,
+            percent: ((mem.active / mem.total) * 100).toFixed(2)
+        },
+        disk: disk.map(d => ({
+            fs: d.fs,
+            size: d.size,
+            used: d.used,
+            percent: d.use,
+            mount: d.mount
+        })),
+        network: network.length > 0 ? {
+            rx: (network[0].rx_sec / 1024).toFixed(2),
+            tx: (network[0].tx_sec / 1024).toFixed(2)
+        } : { rx: 0, tx: 0 },
+        database: { status: dbStatus, latency: dbLatency, storage: dbSize },
+        cache: { status: redisStatus },
+        uptime: { 
+            process: Math.floor(process.uptime()),
+            formatted: new Date(process.uptime() * 1000).toISOString().substr(11, 8),
+            system: si.time().uptime 
+        },
+        timestamp: new Date().toISOString()
+    });
+}));
+
+router.get('/admin/logs', adminAuth, asyncHandler(async (req, res, next) => {
     const logDir = process.env.LOG_DIR || path.join(__dirname, '../logs');
     
     if (!fs.existsSync(logDir)) {
         return res.json({ logs: ['Log directory not found.'] });
     }
 
-    try {
-        const files = fs.readdirSync(logDir)
-            .filter(f => f.startsWith('application-'))
-            .sort()
-            .reverse();
+    const files = fs.readdirSync(logDir)
+        .filter(f => f.startsWith('application-'))
+        .sort()
+        .reverse();
 
-        if (files.length === 0) {
-            return res.json({ logs: ['No logs found.'] });
-        }
-
-        const content = fs.readFileSync(path.join(logDir, files[0]), 'utf8');
-        const lines = content.split('\n').filter(Boolean).slice(-100);
-        res.json({ logs: lines.reverse() });
-    } catch (err) {
-        logger.error('Log Read Error:', err);
-        res.status(500).json({ error: 'Failed to read logs' });
+    if (files.length === 0) {
+        return res.json({ logs: ['No logs found.'] });
     }
-});
 
-router.get('/admin/db/tables', adminAuth, async (req, res) => {
-    try {
-        const result = await pool.query(`
+    const content = fs.readFileSync(path.join(logDir, files[0]), 'utf8');
+    const lines = content.split('\n').filter(Boolean).slice(-100);
+    res.json({ logs: lines.reverse() });
+}));
+
+router.get('/admin/db/tables', adminAuth, asyncHandler(async (req, res) => {
+    const result = await pool.query(`
       SELECT table_name, 
       (xpath('/row/cnt/text()', xml_count))[1]::text::int as row_count
       FROM (
@@ -120,21 +113,13 @@ router.get('/admin/db/tables', adminAuth, async (req, res) => {
         WHERE table_schema = 'public'
       ) t
     `);
-        res.json({ tables: result.rows });
-    } catch (err) {
-        logger.error('DB Tables Error:', err);
-        res.status(500).json({ error: 'Failed to fetch table stats' });
-    }
-});
+    res.json({ tables: result.rows });
+}));
 
-router.get('/admin/redis/info', adminAuth, async (req, res) => {
-    try {
-        const info = await redisClient.info();
-        res.json({ info });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch Redis info' });
-    }
-});
+router.get('/admin/redis/info', adminAuth, asyncHandler(async (req, res) => {
+    const info = await redisClient.info();
+    res.json({ info });
+}));
 
 router.get('/admin/uptime', adminAuth, (req, res) => {
     const processUptime = Math.floor(process.uptime());
@@ -247,7 +232,7 @@ router.get('/admin/billing/overview', adminAuth, async (req, res) => {
 });
 
 // Record Manual Payment (Admin Only)
-router.post('/admin/billing/record-manual', adminAuth, async (req, res) => {
+router.post('/admin/billing/record-manual', adminAuth, asyncHandler(async (req, res, next) => {
     const schema = Joi.object({
         email: Joi.string().email().required(),
         planId: Joi.string().required(),
@@ -257,7 +242,7 @@ router.post('/admin/billing/record-manual', adminAuth, async (req, res) => {
     });
 
     const { error, value } = schema.validate(req.body);
-    if (error) return res.status(400).json({ error: error.details[0].message });
+    if (error) return next(new AppError('VALIDATION_ERROR', error.details[0].message, 400));
 
     const { email, planId, amount, transactionId, months } = value;
 
@@ -269,7 +254,7 @@ router.post('/admin/billing/record-manual', adminAuth, async (req, res) => {
         const userRes = await client.query('SELECT id FROM tc_users WHERE email = $1', [email]);
         if (userRes.rowCount === 0) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'User not found' });
+            return next(new AppError('NOT_FOUND', 'User not found', 404));
         }
         const userId = userRes.rows[0].id;
 
@@ -294,75 +279,48 @@ router.post('/admin/billing/record-manual', adminAuth, async (req, res) => {
         res.json({ message: 'Subscription record successfully updated.' });
     } catch (err) {
         await client.query('ROLLBACK');
-        logger.error('Manual Billing Record Error:', err);
-        res.status(500).json({ error: 'System failed to record manual payment' });
+        throw err;
     } finally {
         client.release();
     }
-});
+}));
 
 // --- SETTINGS MANAGEMENT ---
-router.post('/admin/settings/maintenance', adminAuth, async (req, res) => {
+router.post('/admin/settings/maintenance', adminAuth, validate(schemas.settingsMaintenance), asyncHandler(async (req, res) => {
     const { enabled } = req.body;
-    if (typeof enabled !== 'boolean') return res.status(400).json({ error: 'enabled (boolean) required' });
+    const val = enabled ? 'true' : 'false';
+    await pool.query(
+        "INSERT INTO geosurepath_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2",
+        ['maintenance_mode', val]
+    );
+    await redisClient.set('maintenance_mode', val);
+    
+    logAudit('TOGGLE_MAINTENANCE', 'system', { enabled }, null, req.ip);
+    res.json({ message: `Maintenance mode ${enabled ? 'enabled' : 'disabled'}`, status: enabled });
+}));
 
-    try {
-        const val = enabled ? 'true' : 'false';
-        await pool.query(
-            "INSERT INTO geosurepath_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2",
-            ['maintenance_mode', val]
-        );
-        await redisClient.set('maintenance_mode', val);
-        
-        logAudit('TOGGLE_MAINTENANCE', 'system', { enabled }, null, req.ip);
-        res.json({ message: `Maintenance mode ${enabled ? 'enabled' : 'disabled'}`, status: enabled });
-    } catch (err) {
-        logger.error('Failed to toggle maintenance mode:', err.message);
-        res.status(500).json({ error: 'Settings update failed' });
-    }
-});
-
-router.post('/admin/alerts/rules', adminAuth, async (req, res) => {
+router.post('/admin/alerts/rules', adminAuth, validate(schemas.alertRules), asyncHandler(async (req, res) => {
     const { config } = req.body;
-    if (typeof config !== 'object') return res.status(400).json({ error: 'Config object required' });
+    const configJson = JSON.stringify(config);
+    await pool.query(
+        "INSERT INTO geosurepath_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2",
+        ['alert_rules_config', configJson]
+    );
+    
+    logAudit('UPDATE_ALERT_RULES', 'geosurepath_settings', config, null, req.ip);
+    res.json({ message: 'Alert rules updated successfully' });
+}));
 
-    try {
-        const configJson = JSON.stringify(config);
-        await pool.query(
-            "INSERT INTO geosurepath_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2",
-            ['alert_rules_config', configJson]
-        );
-        
-        logAudit('UPDATE_ALERT_RULES', 'geosurepath_settings', config, null, req.ip);
-        res.json({ message: 'Alert rules updated successfully' });
-    } catch (err) {
-        logger.error('Failed to update alert rules:', err.message);
-        res.status(500).json({ error: 'Failed to save rules' });
-    }
-});
-
-router.post('/admin/alerts/config', adminAuth, async (req, res) => {
-    const schema = Joi.object({
-        webhookUrl: Joi.string().uri().required()
-    });
-
-    const { error, value } = schema.validate(req.body);
-    if (error) return res.status(400).json({ error: error.details[0].message });
-
-    const { webhookUrl } = value;
-    try {
-        await pool.query(
-            'INSERT INTO geosurepath_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
-            ['alert_webhook', webhookUrl]
-        );
-        ALERT_WEBHOOK = webhookUrl;
-        logger.info(`Emergency webhook configured and persisted: ${webhookUrl}`);
-        res.json({ message: 'Alerting system updated and saved.', url: ALERT_WEBHOOK });
-    } catch (err) {
-        logger.error('Failed to persist webhook:', err);
-        res.status(500).json({ error: 'Failed to save configuration' });
-    }
-});
+router.post('/admin/alerts/config', adminAuth, validate(schemas.alertConfig), asyncHandler(async (req, res) => {
+    const { webhookUrl } = req.body;
+    await pool.query(
+        'INSERT INTO geosurepath_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2',
+        ['alert_webhook', webhookUrl]
+    );
+    ALERT_WEBHOOK = webhookUrl;
+    logger.info(`Emergency webhook configured and persisted: ${webhookUrl}`);
+    res.json({ message: 'Alerting system updated and saved.', url: ALERT_WEBHOOK });
+}));
 
 // --- PLATFORM CONFIGURATION (CENTRAL PANEL) ---
 const SENSITIVE_KEYS = [

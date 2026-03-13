@@ -3,6 +3,8 @@ const router = express.Router();
 const { pool, logger } = require('../services/db');
 const { adminAuth } = require('../middleware/auth');
 const backupService = require('../services/backupService');
+const { asyncHandler } = require('../middleware/errorHandler');
+const { AppError } = require('../utils/errors');
 const fs = require('fs');
 const path = require('path');
 
@@ -12,14 +14,10 @@ const path = require('path');
  *   get:
  *     summary: List all backups
  */
-router.get('/admin/backups', adminAuth, async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM geosurepath_backups ORDER BY created_at DESC');
-        res.json(result.rows);
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch backups' });
-    }
-});
+router.get('/admin/backups', adminAuth, asyncHandler(async (req, res) => {
+    const result = await pool.query('SELECT * FROM geosurepath_backups ORDER BY created_at DESC');
+    res.json(result.rows);
+}));
 
 /**
  * @swagger
@@ -29,7 +27,7 @@ router.get('/admin/backups', adminAuth, async (req, res) => {
  */
 const backupCache = new Map();
 
-router.post('/admin/backups/run', adminAuth, async (req, res) => {
+router.post('/admin/backups/run', adminAuth, asyncHandler(async (req, res) => {
     const idempotencyKey = req.headers['idempotency-key'] || 'default';
     
     if (backupCache.has(idempotencyKey)) {
@@ -39,15 +37,11 @@ router.post('/admin/backups/run', adminAuth, async (req, res) => {
         }
     }
 
-    try {
-        const result = await backupService.runFullBackup(true); 
-        const response = { message: 'Backup task completed successfully', result };
-        backupCache.set(idempotencyKey, { time: Date.now(), result: response });
-        res.json(response);
-    } catch (err) {
-        res.status(400).json({ error: err.message });
-    }
-});
+    const result = await backupService.runFullBackup(true); 
+    const response = { message: 'Backup task completed successfully', result };
+    backupCache.set(idempotencyKey, { time: Date.now(), result: response });
+    res.json(response);
+}));
 
 /**
  * @swagger
@@ -55,19 +49,15 @@ router.post('/admin/backups/run', adminAuth, async (req, res) => {
  *   get:
  *     summary: Download a backup file
  */
-router.get('/admin/backups/download/:id', adminAuth, async (req, res) => {
-    try {
-        const result = await pool.query('SELECT filename FROM geosurepath_backups WHERE id = $1', [req.params.id]);
-        if (result.rowCount === 0) return res.status(404).json({ error: 'Backup not found' });
-        
-        const safeFilename = path.basename(result.rows[0].filename);
-        const filePath = path.join(__dirname, '../../backups', safeFilename);
-        if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File missing on server' });
-        
-        res.download(filePath);
-    } catch (err) {
-        res.status(500).json({ error: 'Download failed' });
-    }
-});
+router.get('/admin/backups/download/:id', adminAuth, asyncHandler(async (req, res, next) => {
+    const result = await pool.query('SELECT filename FROM geosurepath_backups WHERE id = $1', [req.params.id]);
+    if (result.rowCount === 0) return next(new AppError('NOT_FOUND', 'Backup record not found', 404));
+    
+    const safeFilename = path.basename(result.rows[0].filename);
+    const filePath = path.join(__dirname, '../../backups', safeFilename);
+    if (!fs.existsSync(filePath)) return next(new AppError('FILE_MISSING', 'File missing on server', 404));
+    
+    res.download(filePath);
+}));
 
 module.exports = router;

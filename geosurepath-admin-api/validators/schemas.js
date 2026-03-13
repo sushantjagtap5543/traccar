@@ -28,12 +28,42 @@ const schemas = {
         totpToken: Joi.string().length(6).optional()
     }),
 
+    // Migration Schemas
+    cloudMigrate: Joi.object({
+        host: Joi.string().required(),
+        port: Joi.number().integer().min(1).max(65535).default(22),
+        username: Joi.string().required(),
+        password: Joi.string().allow('', null).optional(),
+        privateKey: Joi.string().allow('', null).optional(),
+        targetDir: Joi.string().required()
+    }),
+
+    // Backup & Settings
+    backupConfig: Joi.object({
+        googleDriveClientId: Joi.string().optional(),
+        googleDriveClientSecret: Joi.string().optional(),
+        googleDriveRefreshToken: Joi.string().optional(),
+        encryptionKey: Joi.string().length(64).optional(),
+        frequency: Joi.string().valid('daily', 'weekly', 'monthly').optional()
+    }),
+
+    settingsMaintenance: Joi.object({
+        enabled: Joi.boolean().required()
+    }),
+
+    alertRules: Joi.object({
+        config: Joi.object().required()
+    }),
+
+    alertConfig: Joi.object({
+        webhookUrl: Joi.string().uri().required()
+    }),
+
     // Reporting Schemas
     reportFilter: Joi.object({
         deviceId: Joi.number().integer().optional(),
-        startDate: Joi.date().iso().optional(),
-        endDate: Joi.date().iso().optional(),
-        type: Joi.string().optional()
+        from: Joi.date().iso().required(),
+        to: Joi.date().iso().required()
     })
 };
 

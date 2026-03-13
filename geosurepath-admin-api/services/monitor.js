@@ -11,13 +11,18 @@ const sendAlert = async (title, message, severity = 'WARNING', deviceId = 'infra
     const { sendEmail } = require('./email');
 
     const alertKey = `alert_cooldown:${title}:${deviceId}`;
+    
+    // 1. Determine Cooldown Duration (WF-001)
+    let cooldown = 900; // Default 15 mins
+    if (title.includes('SOS') || severity === 'EMERGENCY') cooldown = 300; // 5 mins
+    if (title.includes('SPEED')) cooldown = 1800; // 30 mins
+    if (title.includes('RENEWAL')) cooldown = 86400; // 24 hours
 
-    // 1. Atomic Check & Set (Fix for BUG-003 Race Condition)
-    // Attempt to set key only if it doesn't exist, with 15-minute expiration
+    // Atomic Check & Set (Fix for BUG-003 Race Condition)
     try {
         const canDispatch = await redisClient.set(alertKey, '1', {
             NX: true,
-            EX: 900 // 15 minutes
+            EX: cooldown
         });
 
         if (!canDispatch) {
@@ -43,6 +48,7 @@ const sendAlert = async (title, message, severity = 'WARNING', deviceId = 'infra
             });
         } catch (err) {
             logger.error('Failed to dispatch alert webhook:', err.message);
+            await queueForRetry({ type: 'webhook', title, message, severity, deviceId, error: err.message });
         }
     }
 
@@ -51,15 +57,23 @@ const sendAlert = async (title, message, severity = 'WARNING', deviceId = 'infra
         try {
             const adminEmailRes = await pool.query("SELECT email FROM tc_users WHERE administrator = true LIMIT 1");
             if (adminEmailRes.rowCount > 0) {
-                await sendEmail(adminEmailRes.rows[0].email, `GeoSurePath EMERGENCY: ${title}`, `<h3>${title}</h3><p>${message}</p><p>Severity: ${severity}</p>`);
+                try {
+                    await sendEmail(adminEmailRes.rows[0].email, `GeoSurePath EMERGENCY: ${title}`, `<h3>${title}</h3><p>${message}</p><p>Severity: ${severity}</p>`);
+                } catch (emailErr) {
+                    await queueForRetry({ type: 'email', email: adminEmailRes.rows[0].email, title, message, severity, deviceId });
+                }
             }
             
             const adminPhoneRes = await pool.query("SELECT phone FROM tc_users WHERE administrator = true AND phone IS NOT NULL LIMIT 1");
             if (adminPhoneRes.rowCount > 0) {
-                await sendSMS(adminPhoneRes.rows[0].phone, `ALERT [${severity}]: ${title} - ${message}`);
+                try {
+                    await sendSMS(adminPhoneRes.rows[0].phone, `ALERT [${severity}]: ${title} - ${message}`);
+                } catch (smsErr) {
+                    await queueForRetry({ type: 'sms', phone: adminPhoneRes.rows[0].phone, title, message, severity, deviceId });
+                }
             }
         } catch (dispatchErr) {
-            logger.error('Emergency dispatch failure:', dispatchErr.message);
+            logger.error('Emergency lookup failure:', dispatchErr.message);
         }
     }
 
@@ -70,6 +84,68 @@ const sendAlert = async (title, message, severity = 'WARNING', deviceId = 'infra
         );
     } catch (err) {
         logger.error('Alert persistence error:', err.message);
+    }
+};
+
+const queueForRetry = async (payload) => {
+    const { redisClient } = require('./db');
+    payload.retryCount = (payload.retryCount || 0) + 1;
+    payload.nextRetry = Date.now() + (Math.pow(2, payload.retryCount) * 5000); // Exponential backoff
+    
+    if (payload.retryCount > 5) {
+        logger.error(`Alert permanently failed after ${payload.retryCount} retries`, { payload });
+        return;
+    }
+
+    try {
+        await redisClient.lPush('geosurepath_alert_retries', JSON.stringify(payload));
+        logger.info(`Alert queued for retry #${payload.retryCount}`);
+    } catch (err) {
+        logger.error('Failed to queue alert for retry:', err.message);
+    }
+};
+
+const processRetries = async () => {
+    const { redisClient } = require('./db');
+    const { sendSMS } = require('./sms');
+    const { sendEmail } = require('./email');
+
+    try {
+        const item = await redisClient.rPop('geosurepath_alert_retries');
+        if (!item) return;
+
+        const payload = JSON.parse(item);
+        if (Date.now() < payload.nextRetry) {
+            // Not time yet, push back
+            await redisClient.lPush('geosurepath_alert_retries', item);
+            return;
+        }
+
+        logger.info(`Processing alert retry #${payload.retryCount} for type ${payload.type}`);
+        
+        try {
+            switch (payload.type) {
+                case 'webhook':
+                    if (ALERT_WEBHOOK) {
+                        await axios.post(ALERT_WEBHOOK, {
+                            content: `🚨 **GS-RETRY ALERT [${payload.severity}]**\n**${payload.title}**: ${payload.message}`
+                        });
+                    }
+                    break;
+                case 'email':
+                    await sendEmail(payload.email, `RERUN: GeoSurePath EMERGENCY: ${payload.title}`, payload.message);
+                    break;
+                case 'sms':
+                    await sendSMS(payload.phone, `RERUN ALERT: ${payload.title}`);
+                    break;
+            }
+            logger.info('Retry successful.');
+        } catch (err) {
+            logger.warn(`Retry #${payload.retryCount} failed: ${err.message}`);
+            await queueForRetry(payload);
+        }
+    } catch (err) {
+        logger.error('Retry processor error:', err.message);
     }
 };
 
@@ -97,8 +173,13 @@ const runDailyTasks = async () => {
 
         for (const sub of expiringSubRes.rows) {
             logger.info(`Sending renewal reminder to ${sub.user_name} (User ${sub.user_actual_id})`);
-            // In a real system, send SMS/Email here
-            await sendAlert('RENEWAL_REMINDER', `Subscription for ${sub.user_name} expires in 3 days (Plan: ${sub.plan_id}). Renewal required.`, 'INFO', `user_${sub.user_actual_id}`);
+            const message = `Your GeoSurePath subscription for ${sub.user_name} (Plan: ${sub.plan_id}) expires in 3 days on ${new Date(sub.expiry_date).toLocaleDateString()}. Please renew at the billing portal.`;
+            
+            // Multichannel dispatch
+            await sendAlert('RENEWAL_REMINDER', message, 'INFO', `user_${sub.user_actual_id}`);
+            
+            // Direct email/SMS for renewal (Bypassing cooldown if needed, but sendAlert handles it)
+            // The 24h cooldown above ensures we don't spam them if this runs multiple times
         }
 
         // 2. Auto-deactivate Expired Subscriptions (After 3-day grace period)
@@ -126,6 +207,9 @@ const startMonitor = () => {
     setInterval(runDailyTasks, DAILY_TASKS_INTERVAL);
     // Also run once 1 minute after startup
     setTimeout(runDailyTasks, 60000);
+
+    // Periodic Retry Processor
+    setInterval(processRetries, 15000);
 
     setInterval(async () => {
         try {

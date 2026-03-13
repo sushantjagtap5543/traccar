@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const { logger, pool } = require('../services/db');
 const { isTokenBlacklisted } = require('../services/authService');
+const { AppError } = require('../utils/errors');
+const { asyncHandler } = require('./errorHandler');
 
 const expectedKey = process.env.ADMIN_API_KEY;
 
@@ -8,25 +10,25 @@ const expectedKey = process.env.ADMIN_API_KEY;
  * Production-Grade JWT Authenticator
  * Supports access/refresh separation and revocation checks.
  */
-const authenticateJWT = async (req, res, next) => {
+const authenticateJWT = asyncHandler(async (req, res, next) => {
     const authHeader = req.headers.authorization;
     const token = req.cookies.adminToken || (authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null);
 
     if (!token) {
-        return res.status(401).json({ error: 'No token provided' });
+        return next(new AppError('AUTH_REQUIRED', 'No token provided', 401));
     }
 
     if (!process.env.JWT_SECRET) {
         logger.error('FATAL: JWT_SECRET not configured');
-        return res.status(500).json({ error: 'Server configuration error' });
+        return next(new AppError('SERVER_CONFIG_ERROR', 'Server configuration error', 500));
+    }
+
+    // 1. Check Blacklist (Revocation)
+    if (await isTokenBlacklisted(token)) {
+        return next(new AppError('TOKEN_REVOKED', 'Token has been revoked', 401));
     }
 
     try {
-        // 1. Check Blacklist (Revocation)
-        if (await isTokenBlacklisted(token)) {
-            return res.status(401).json({ error: 'Token has been revoked', code: 'TOKEN_REVOKED' });
-        }
-
         // 2. Verify JWT
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
@@ -39,19 +41,20 @@ const authenticateJWT = async (req, res, next) => {
         );
 
         if (sessionRes.rowCount === 0) {
-            return res.status(401).json({ error: 'Session expired or revoked', code: 'SESSION_REVOKED' });
+            return next(new AppError('SESSION_REVOKED', 'Session expired or revoked', 401));
         }
 
         req.user = decoded;
+        req.admin = decoded; // For adminAuth compatibility
         next();
     } catch (err) {
         if (err.name === 'TokenExpiredError') {
-            return res.status(401).json({ error: 'Token expired', code: 'TOKEN_EXPIRED' });
+            return next(new AppError('TOKEN_EXPIRED', 'Token expired', 401));
         }
         logger.warn(`JWT Verification error from ${req.ip}: ${err.message}`);
-        return res.status(401).json({ error: 'Invalid token' });
+        return next(new AppError('AUTH_INVALID', 'Invalid token', 401));
     }
-};
+});
 
 /**
  * Role-Based Access Control Middleware
@@ -60,7 +63,7 @@ const requireRole = (...allowedRoles) => {
     return (req, res, next) => {
         if (!req.user || !allowedRoles.includes(req.user.role)) {
             logger.warn(`RBAC rejection for ${req.user?.email || 'Anonymous'} at ${req.path}`);
-            return res.status(403).json({ error: 'Insufficient permissions' });
+            return next(new AppError('INSUFFICIENT_PERMISSIONS', 'Insufficient permissions', 403));
         }
         next();
     };

@@ -1,0 +1,78 @@
+name: GeoSurePath Admin API CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    name: Run Unit & Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: traccar
+          POSTGRES_USER: traccar
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: 'npm'
+          cache-dependency-path: geosurepath-admin-api/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd geosurepath-admin-api
+          npm ci
+
+      - name: Run Linting
+        run: |
+          cd geosurepath-admin-api
+          npm run lint || true # Allow failure if not configured yet
+
+      - name: Run Migrations
+        run: |
+          cd geosurepath-admin-api
+          npx knex migrate:latest
+        env:
+          DATABASE_URL: postgres://traccar:password@localhost:5432/traccar
+
+      - name: Run Tests
+        run: |
+          cd geosurepath-admin-api
+          npm test
+        env:
+          DATABASE_URL: postgres://traccar:password@localhost:5432/traccar
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: c62f1c849e79435b863d60c4b18c5e63479b187515e0a0a0a0a0a0a0a0a0a0a0
+
+  deploy:
+    name: Deploy to Production (Staging Example)
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Production Deployment
+        run: echo "Deployment workflow triggered for production environment."
+        # In a real setup, we'd use ssh-action or similar to deploy to AWS/Hetzner
