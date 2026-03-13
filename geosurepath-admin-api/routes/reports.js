@@ -122,11 +122,80 @@ router.get('/idle-analysis', authProxy, validate(schemas.reportFilter, 'query'),
     const deviceRes = await pool.query(deviceNamesQuery, isAdmin ? [] : [userId]);
     const deviceMap = new Map(deviceRes.rows.map(d => [d.id, d.name]));
 
+    res.json(enriched);
+}));
+
+// 3. Combined Fleet Analytics (Fix for Phase 2 Item 1)
+router.get('/combined', authProxy, validate(schemas.reportFilter, 'query'), asyncHandler(async (req, res, next) => {
+    const { from, to, deviceId } = req.query;
+    const userId = req.traccarUser?.id;
+    const isAdmin = !!req.admin;
+
+    // Security check
+    if (!isAdmin && deviceId) {
+        const ownership = await pool.query("SELECT 1 FROM tc_user_device WHERE userid = $1 AND deviceid = $2", [userId, deviceId]);
+        if (ownership.rowCount === 0) return next(new AppError('UNAUTHORIZED', 'Unauthorized device access', 403));
+    }
+
+    // CTEs for Trip and Idle data
+    let baseQuery = `
+        WITH trip_data AS (
+            SELECT 
+                r.deviceid,
+                COUNT(*) as trip_count,
+                SUM(r.distance) / 1000 as total_distance_km,
+                SUM(r.duration) / 3600000 as total_duration_hours,
+                MAX(r.maxspeed) * 1.852 as max_speed_kph
+            FROM tc_reports_trips r
+            ${!isAdmin ? 'JOIN tc_user_device ud ON r.deviceid = ud.deviceid AND ud.userid = $3' : ''}
+            WHERE r.starttime >= $1 AND r.endtime <= $2
+            ${deviceId ? `AND r.deviceid = $${isAdmin ? 3 : 4}` : ''}
+            GROUP BY r.deviceid
+        ),
+        idle_data AS (
+            SELECT 
+                r.deviceid,
+                COUNT(*) as idle_incidents,
+                SUM(r.duration) / 60000 as total_idle_minutes
+            FROM tc_reports_stops r
+            ${!isAdmin ? 'JOIN tc_user_device ud ON r.deviceid = ud.deviceid AND ud.userid = $3' : ''}
+            WHERE r.starttime >= $1 AND r.endtime <= $2
+            ${deviceId ? `AND r.deviceid = $${isAdmin ? 3 : 4}` : ''}
+            GROUP BY r.deviceid
+        )
+        SELECT 
+            d.id as deviceid,
+            d.name as devicename,
+            COALESCE(t.trip_count, 0) as trip_count,
+            COALESCE(t.total_distance_km, 0) as total_distance_km,
+            COALESCE(t.total_duration_hours, 0) as total_duration_hours,
+            COALESCE(t.max_speed_kph, 0) as max_speed_kph,
+            COALESCE(i.idle_incidents, 0) as idle_incidents,
+            COALESCE(i.total_idle_minutes, 0) as total_idle_minutes
+        FROM tc_devices d
+        LEFT JOIN trip_data t ON d.id = t.deviceid
+        LEFT JOIN idle_data i ON d.id = i.deviceid
+    `;
+
+    const params = [from, to];
+    if (!isAdmin) params.push(userId);
+    if (deviceId) params.push(deviceId);
+
+    if (!isAdmin) {
+        baseQuery += " JOIN tc_user_device ud2 ON d.id = ud2.deviceid WHERE ud2.userid = $3";
+        if (deviceId) baseQuery += " AND d.id = $4";
+    } else if (deviceId) {
+        baseQuery += " WHERE d.id = $3";
+    }
+
+    const result = await pool.query(baseQuery, params);
+    
     const enriched = result.rows.map(row => ({
         ...row,
-        deviceName: deviceMap.get(row.deviceid) || `Device ${row.deviceid}`,
-        total_idle_minutes: Math.round(row.total_idle_minutes),
-        longest_idle_minutes: Math.round(row.longest_idle_minutes)
+        total_distance_km: parseFloat(parseFloat(row.total_distance_km).toFixed(2)),
+        total_duration_hours: parseFloat(parseFloat(row.total_duration_hours).toFixed(2)),
+        max_speed_kph: parseFloat(parseFloat(row.max_speed_kph).toFixed(2)),
+        total_idle_minutes: Math.round(row.total_idle_minutes)
     }));
 
     res.json(enriched);

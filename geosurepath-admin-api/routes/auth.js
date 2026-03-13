@@ -320,8 +320,14 @@ router.post('/admin/auth/refresh', asyncHandler(async (req, res, next) => {
 
 // --- CLIENT OTP AUTH ---
 router.post('/auth/send-otp', asyncHandler(async (req, res, next) => {
-    const { mobile } = req.body;
-    if (!mobile) return next(new AppError('MISSING_FIELDS', 'Mobile number required', 400));
+    const schema = Joi.object({
+        mobile: Joi.string().pattern(/^\+?[0-9]{10,15}$/).required()
+    });
+
+    const { error, value } = schema.validate(req.body);
+    if (error) return next(new AppError('VALIDATION_ERROR', error.details[0].message, 400));
+
+    const { mobile } = value;
 
     // Rate Limiting (NEW-004)
     const rateKey = `otp_rate:${mobile}`;
@@ -356,7 +362,30 @@ router.post('/auth/verify-otp', asyncHandler(async (req, res, next) => {
 
     if (isMatch) {
         await redisClient.del(`otp:${mobile}`);
-        res.json({ success: true, message: 'OTP verified' });
+        
+        // Issue tokens and session (Fix for Phase 2 Item 3)
+        // Find user by mobile
+        const userRes = await pool.query("SELECT id, email, name FROM tc_users WHERE phone = $1 OR email = (SELECT email FROM tc_users WHERE phone = $1 LIMIT 1)", [mobile]);
+        if (userRes.rowCount === 0) {
+            return next(new AppError('USER_NOT_FOUND', 'Mobile number not associated with any account', 404));
+        }
+
+        const user = userRes.rows[0];
+        const tokens = generateTokens({ id: user.id, email: user.email, role: 'user' });
+
+        const tokenHash = crypto.createHash('sha256').update(tokens.accessToken).digest('hex');
+        await pool.query(
+            "INSERT INTO geosurepath_sessions (user_email, token_hash, ip_address, user_agent, expires_at) VALUES ($1, $2, $3, $4, NOW() + INTERVAL '1 hour')",
+            [user.email, tokenHash, req.ip, req.headers['user-agent']]
+        );
+
+        res.json({ 
+            success: true, 
+            message: 'OTP verified successfully',
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+            user: { id: user.id, email: user.email, name: user.name }
+        });
     } else {
         return next(new AppError('INVALID_OTP', 'Invalid or expired OTP', 400));
     }

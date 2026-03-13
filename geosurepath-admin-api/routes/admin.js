@@ -139,48 +139,11 @@ router.get('/admin/uptime', adminAuth, (req, res) => {
     });
 });
 
-router.post('/admin/backup', adminAuth, (req, res) => {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `backup-${timestamp}.sql`;
-    const backupDir = process.env.BACKUP_DIR || path.join(__dirname, '../backups');
-    if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
-    const filePath = path.join(backupDir, filename);
-
-    const dbUrl = process.env.DATABASE_URL;
-    if (!dbUrl) return res.status(500).json({ error: 'DATABASE_URL not configured' });
-
-    // Retention: Delete files older than 30 days
-    const retentionDays = 30;
-    const now = Date.now();
-    try {
-        const files = fs.readdirSync(backupDir);
-        files.forEach(file => {
-            if (file.startsWith('backup-') && file.endsWith('.sql')) {
-                const fullPath = path.join(backupDir, file);
-                const stats = fs.statSync(fullPath);
-                const ageDays = (now - stats.mtimeMs) / (1000 * 60 * 60 * 24);
-                if (ageDays > retentionDays) {
-                    fs.unlinkSync(fullPath);
-                    logger.info(`Retention: Deleted old backup ${file}`);
-                }
-            }
-        });
-    } catch (err) {
-        logger.error(`Backup retention error: ${err.message}`);
-    }
-
-    const cmd = `pg_dump "${dbUrl}" -f "${filePath}"`;
-    logger.info(`Starting DB backup: ${filename}`);
-
-    exec(cmd, (error, stdout, stderr) => {
-        if (error) {
-            logger.error(`Backup failed: ${error.message}`);
-            return res.status(500).json({ error: 'Backup failed', details: stderr });
-        }
-        logger.info(`Backup completed: ${filename}`);
-        res.json({ message: 'Backup completed successfully', filename });
-    });
-});
+router.post('/admin/backup', adminAuth, asyncHandler(async (req, res) => {
+    const backupService = require('../services/backupService');
+    const result = await backupService.runFullBackup(true); 
+    res.json({ success: true, message: 'Backup completed successfully', result });
+}));
 
 // --- MAINTENANCE & DIAGNOSTICS ---
 
@@ -240,20 +203,15 @@ router.post('/admin/restart/:service', adminAuth, (req, res) => {
     });
 });
 
-router.get('/admin/billing/overview', adminAuth, async (req, res) => {
-    try {
-        const result = await pool.query(`
-            SELECT s.*, u.name as user_name, u.email as user_email 
-            FROM geosurepath_subscriptions s 
-            LEFT JOIN tc_users u ON s.user_id = u.id 
-            ORDER BY s.created_at DESC
-        `);
-        res.json(result.rows);
-    } catch (err) {
-        logger.error('Billing Overview Error:', err);
-        res.status(500).json({ error: 'Failed to fetch billing data' });
-    }
-});
+router.get('/admin/billing/overview', adminAuth, asyncHandler(async (req, res) => {
+    const result = await pool.query(`
+        SELECT s.*, u.name as user_name, u.email as user_email 
+        FROM geosurepath_subscriptions s 
+        LEFT JOIN tc_users u ON s.user_id = u.id 
+        ORDER BY s.created_at DESC
+    `);
+    res.json({ success: true, data: result.rows });
+}));
 
 // Record Manual Payment (Admin Only)
 router.post('/admin/billing/record-manual', adminAuth, asyncHandler(async (req, res, next) => {

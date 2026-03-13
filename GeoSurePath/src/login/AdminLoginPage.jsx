@@ -46,7 +46,7 @@ const AdminLoginPage = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [step, setStep] = useState(1); // 1: Credentials, 2: 2FA (TOTP mockup)
+    const [step, setStep] = useState(1); // 1: Credentials, 2: 2FA
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');

@@ -78,6 +78,8 @@ const ChangeServerPage = lazy(() => import('./login/ChangeServerPage'));
 const AdminLoginPage = lazy(() => import('./login/AdminLoginPage'));
 const LegalPage = lazy(() => import('./LegalPage'));
 
+const AdminAlertConsumer = lazy(() => import('./admin/AdminAlertConsumer'));
+
 const AdminApp = () => {
     const navigate = useNavigate();
     const { pathname } = useLocation();
@@ -93,6 +95,7 @@ const AdminApp = () => {
 
     return (
         <Suspense fallback={<Loader />}>
+            <AdminAlertConsumer />
             <Box sx={{ flexGrow: 1, overflow: 'auto', p: 3 }}>
                 <Outlet />
             </Box>

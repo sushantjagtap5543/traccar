@@ -28,19 +28,6 @@ const CombinedReportPage = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const itemsCoordinates = useMemo(() => items.flatMap((item) => item.route), [items]);
-
-  const createMarkers = () =>
-    items.flatMap((item) =>
-      item.events
-        .map((event) => item.positions.find((p) => event.positionId === p.id))
-        .filter((position) => position != null)
-        .map((position) => ({
-          latitude: position.latitude,
-          longitude: position.longitude,
-        })),
-    );
-
   const onShow = useCatch(async ({ deviceIds, groupIds, from, to }) => {
     const query = new URLSearchParams({ from, to });
     deviceIds.forEach((deviceId) => query.append('deviceId', deviceId));
@@ -57,24 +44,6 @@ const CombinedReportPage = () => {
   return (
     <PageLayout menu={<ReportsMenu />} breadcrumbs={['reportTitle', 'reportCombined']}>
       <div className={classes.container}>
-        {Boolean(items.length) && (
-          <div className={classes.containerMap}>
-            <MapView>
-              <MapGeofence />
-              {items.map((item) => (
-                <MapRouteCoordinates
-                  key={item.deviceId}
-                  name={devices[item.deviceId].name}
-                  coordinates={item.route}
-                  deviceId={item.deviceId}
-                />
-              ))}
-              <MapMarkers markers={createMarkers()} />
-            </MapView>
-            <MapScale />
-            <MapCamera coordinates={itemsCoordinates} />
-          </div>
-        )}
         <div className={classes.containerMain}>
           <div className={classes.header}>
             <ReportFilter onShow={onShow} deviceType="multiple" loading={loading} />
@@ -83,23 +52,29 @@ const CombinedReportPage = () => {
             <TableHead>
               <TableRow>
                 <TableCell>{t('sharedDevice')}</TableCell>
-                <TableCell>{t('positionFixTime')}</TableCell>
-                <TableCell>{t('sharedType')}</TableCell>
+                <TableCell>{t('reportTripCount') || 'Trips'}</TableCell>
+                <TableCell>{t('reportTotalDistance') || 'Distance (km)'}</TableCell>
+                <TableCell>{t('reportTotalDuration') || 'Duration (h)'}</TableCell>
+                <TableCell>{t('reportMaxSpeed') || 'Max Speed (kph)'}</TableCell>
+                <TableCell>{t('reportIdleEvents') || 'Idle Incidents'}</TableCell>
+                <TableCell>{t('reportIdleDuration') || 'Idle Time (min)'}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {!loading ? (
-                items.flatMap((item) =>
-                  item.events.map((event, index) => (
-                    <TableRow key={event.id}>
-                      <TableCell>{index ? '' : devices[item.deviceId].name}</TableCell>
-                      <TableCell>{formatTime(event.eventTime, 'seconds')}</TableCell>
-                      <TableCell>{t(prefixString('event', event.type))}</TableCell>
-                    </TableRow>
-                  )),
-                )
+                items.map((item) => (
+                  <TableRow key={item.deviceid}>
+                    <TableCell>{item.devicename}</TableCell>
+                    <TableCell>{item.trip_count}</TableCell>
+                    <TableCell>{item.total_distance_km}</TableCell>
+                    <TableCell>{item.total_duration_hours}</TableCell>
+                    <TableCell>{item.max_speed_kph}</TableCell>
+                    <TableCell>{item.idle_incidents}</TableCell>
+                    <TableCell>{item.total_idle_minutes}</TableCell>
+                  </TableRow>
+                ))
               ) : (
-                <TableShimmer columns={3} />
+                <TableShimmer columns={7} />
               )}
             </TableBody>
           </Table>
