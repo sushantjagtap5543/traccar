@@ -1,0 +1,45 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: "GeoSurePath System Alerts"
+    folder: "Infrastructure"
+    interval: 1m
+    rules:
+      - uid: "infra-disk-usage"
+        title: "Critical Disk Space"
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: "prometheus"
+            model:
+              expr: "node_filesystem_avail_bytes{mountpoint='/'} / node_filesystem_size_bytes{mountpoint='/'} * 100 < 10"
+              intervalMs: 1000
+              maxDataPoints: 43200
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "Disk space is below 10% on the root partition."
+          description: "Server is running out of disk space. This may impact database logging and backups."
+        labels:
+          severity: critical
+      - uid: "api-error-rate"
+        title: "API Error Spike"
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: "prometheus"
+            model:
+              expr: "rate(http_requests_total{status=~'5..'}[5m]) > 0.1"
+              intervalMs: 1000
+        for: 2m
+        annotations:
+          summary: "API is returning 5xx errors."
+        labels:
+          severity: warning

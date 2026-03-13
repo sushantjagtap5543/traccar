@@ -182,6 +182,30 @@ router.post('/admin/backup', adminAuth, (req, res) => {
     });
 });
 
+// --- MAINTENANCE & DIAGNOSTICS ---
+
+/**
+ * Sentry Diagnostics Endpoint (TM-004)
+ */
+router.get('/admin/debug-sentry', adminAuth, (req, res) => {
+    logger.info('Sentry diagnostics triggered by administrator');
+    // We throw a controlled error to verify Sentry capture
+    throw new Error('GeoSurePath Sentry Diagnostic: Protocol Verification Successful');
+});
+
+/**
+ * Health Check (Internal detailed)
+ */
+router.get('/admin/health/traccar', adminAuth, asyncHandler(async (req, res) => {
+    const TRACCAR_URL = process.env.TRACCAR_INTERNAL_URL || 'http://localhost:8082';
+    try {
+        const response = await axios.get(`${TRACCAR_URL}/api/server`);
+        res.json({ status: 'UP', version: response.data.version });
+    } catch (err) {
+        res.status(503).json({ status: 'DOWN', error: err.message });
+    }
+}));
+
 router.get('/admin/traccar/status', adminAuth, async (req, res) => {
     try {
         const traccarUrl = process.env.TRACCAR_INTERNAL_URL || 'http://traccar:8082';

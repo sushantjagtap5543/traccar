@@ -134,15 +134,27 @@ if [ ! -f "$APP_DIR/.env" ]; then
     # Generate secure random values
     DB_PASS=$(openssl rand -hex 16)
     ADMIN_KEY=$(openssl rand -hex 32)
-    JWT_SECRET=$(openssl rand -hex 32)
-    ENCRYPT_KEY=$(openssl rand -hex 16)
+    JWT_SECRET=$(openssl rand -hex 64)
+    ENCRYPT_KEY=$(openssl rand -hex 32)
     
-    sed -i "s/your_super_secure_db_password_here/$DB_PASS/" "$APP_DIR/.env"
-    sed -i "s/^ADMIN_API_KEY=.*$/ADMIN_API_KEY=$ADMIN_KEY/" "$APP_DIR/.env"
-    sed -i "s/your_random_jwt_secret_here_at_least_64_chars/$JWT_SECRET/" "$APP_DIR/.env"
-    sed -i "s/your_32byte_hex_key_here_replace_now/$ENCRYPT_KEY/" "$APP_DIR/.env"
+    cat > "$APP_DIR/.env" <<EOF
+# GeoSurePath Platinum - Auto-Generated Security Configuration
+NODE_ENV=production
+PORT=8083
+DATABASE_URL=postgres://traccar:${DB_PASS}@localhost:5432/traccar
+REDIS_URL=redis://localhost:6379
+ADMIN_API_KEY=${ADMIN_KEY}
+JWT_SECRET=${JWT_SECRET}
+ENCRYPTION_KEY=${ENCRYPT_KEY}
+ADMIN_EMAIL=${DEFAULT_ADMIN_EMAIL}
+ADMIN_PASSWORD_HASH=\$(node -e "console.log(require('bcryptjs').hashSync('${DEFAULT_ADMIN_PASS}', 12))")
+TRACCAR_INTERNAL_URL=http://localhost:8082
+TRACCAR_ADMIN_PASSWORD=admin
+ALLOWED_ORIGINS=https://localhost,http://localhost
+PUBLIC_URL=http://localhost
+EOF
     
-    # Bug #5: Create Prometheus API key file
+    # Create Prometheus API key file
     mkdir -p "$APP_DIR/prometheus"
     echo "$ADMIN_KEY" > "$APP_DIR/prometheus/api_key.txt"
     
@@ -174,7 +186,7 @@ rm -rf traccar-installer "$TRACCAR_PACKAGE"
 
 # Configure Traccar to use local Postgres
 sudo -u postgres psql -c "CREATE DATABASE traccar;" 2>/dev/null || true
-sudo -u postgres psql -c "CREATE USER traccar WITH PASSWORD '${DB_PASS:-traccar}';" 2>/dev/null || true
+sudo -u postgres psql -c "CREATE USER traccar WITH PASSWORD '${DB_PASS}';" 2>/dev/null || true
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE traccar TO traccar;" 2>/dev/null || true
 
 # Update traccar.xml
@@ -185,8 +197,10 @@ cat > /opt/traccar/conf/traccar.xml <<EOF
     <entry key='database.driver'>org.postgresql.Driver</entry>
     <entry key='database.url'>jdbc:postgresql://localhost:5432/traccar</entry>
     <entry key='database.user'>traccar</entry>
-    <entry key='database.password'>${DB_PASS:-traccar}</entry>
+    <entry key='database.password'>${DB_PASS}</entry>
     <entry key='web.port'>8082</entry>
+    <entry key='event.enable'>true</entry>
+    <entry key='logger.level'>info</entry>
 </properties>
 EOF
 
@@ -202,10 +216,11 @@ export NODE_OPTIONS="--max-old-space-size=2048"
 npm run build
 success "Frontend built successfully."
 
-# --- Step 6: Nginx Reverse Proxy ---
+# --- Step 6: Nginx Reverse Proxy (SSL Ready) ---
 log "[Step 6/11] Configuring Nginx Reverse Proxy..."
+apt-get install -y certbot python3-certbot-nginx
+
 cat > /etc/nginx/sites-available/geosurepath <<EOF
-# Bug #4 Harmony: Use mapping for device creation intercepted by Admin API
 map \$request_method \$devices_upstream_bm {
     POST    http://localhost:8083/api/devices;
     default http://localhost:8082/api/devices;
@@ -222,37 +237,24 @@ server {
         try_files \$uri \$uri/ /index.html;
     }
 
-    # Bug #4 Harmony: Intercept Device creation
-    location = /api/devices {
-        proxy_pass \$devices_upstream_bm;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
+    # API Proxy for Admin/Auth
+    location /api/auth/ { proxy_pass http://localhost:8083/api/auth/; }
+    location /api/admin/ { proxy_pass http://localhost:8083/api/admin/; }
+    location /api/payments/ { proxy_pass http://localhost:8083/api/payments/; }
 
-    # Bug #1: WebSocket headers for live tracking
+    # Traccar Core API with WebSocket
     location /api/ {
         proxy_pass http://localhost:8082/api/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host \$host;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_read_timeout 3600s;
     }
 
-    # Bug #2: Auth and Admin API routing
-    location /api/auth/ {
-        proxy_pass http://localhost:8083/api/auth/;
+    location = /api/devices {
+        proxy_pass \$devices_upstream_bm;
         proxy_set_header Host \$host;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    }
-
-    location /api/admin/ {
-        proxy_pass http://localhost:8083/api/admin/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     }
 }
 EOF
