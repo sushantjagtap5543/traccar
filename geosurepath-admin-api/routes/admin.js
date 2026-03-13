@@ -199,8 +199,8 @@ router.post('/admin/restart/:service', adminAuth, (req, res) => {
     const { service } = req.params;
     let command = '';
     switch (service) {
-        case 'traccar': command = process.platform === 'win32' ? 'net stop traccar && net start traccar' : 'sudo systemctl restart traccar'; break;
-        case 'database': command = process.platform === 'win32' ? 'net stop postgresql-x64-15 && net start postgresql-x64-15' : 'sudo systemctl restart postgresql'; break;
+        case 'traccar': command = process.platform === 'win32' ? 'net stop traccar && net start traccar' : 'echo "Service manager required for containerized Traccar"'; break;
+        case 'database': command = process.platform === 'win32' ? 'net stop postgresql-x64-15 && net start postgresql-x64-15' : 'echo "Service manager required for containerized Database"'; break;
         case 'backend': command = 'pm2 restart geosurepath-admin-api'; break;
         case 'cache': command = 'redis-cli flushall'; break;
     }

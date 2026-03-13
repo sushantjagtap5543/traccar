@@ -15,7 +15,7 @@ const POLL_INTERVAL = 30000; // 30 seconds
 const SESSION_REFRESH_MARGIN = 60 * 60 * 1000; // Refresh 1 hour before expiry
 
 const getClient = () => {
-    const traccarUrl = process.env.TRACCAR_URL || 'http://traccar:8082';
+    const traccarUrl = process.env.TRACCAR_INTERNAL_URL || 'http://traccar:8082';
     const config = {
         baseURL: traccarUrl,
         timeout: 10000,
@@ -41,7 +41,7 @@ const refreshSession = async () => {
     isRefreshing = true;
     try {
         const client = axios.create({
-            baseURL: process.env.TRACCAR_URL || 'http://traccar:8082',
+            baseURL: process.env.TRACCAR_INTERNAL_URL || 'http://traccar:8082',
             timeout: 10000,
             auth: {
                 username: process.env.TRACCAR_ADMIN_EMAIL || process.env.ADMIN_EMAIL,

@@ -16,7 +16,7 @@ const transport = new winston.transports.DailyRotateFile({
 });
 
 const maskSensitive = winston.format((info) => {
-    const sensitiveKeys = ['password', 'token', 'secret', 'key', 'auth', 'mobile', 'email'];
+    const sensitiveKeys = ['password', 'token', 'secret', 'key', 'auth']; // BUG-027: Removed email/mobile from broad masking
     const mask = (obj) => {
         for (const key in obj) {
             if (typeof obj[key] === 'object' && obj[key] !== null) {

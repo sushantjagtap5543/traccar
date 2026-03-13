@@ -185,7 +185,17 @@ if (process.env.NODE_ENV !== 'test') {
 
 // --- MIDDLEWARE ---
 app.use(helmet({
-  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false, // Selective CSP
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", 'checkout.razorpay.com'],
+      styleSrc: ["'self'", "'unsafe-inline'", 'fonts.googleapis.com'],
+      imgSrc: ["'self'", 'data:', '*.openstreetmap.org', '*.tile.opentopomap.org', 'checkout.razorpay.com'],
+      connectSrc: ["'self'", 'api.razorpay.com', 'lumberjack.razorpay.com'],
+      fontSrc: ["'self'", 'fonts.gstatic.com'],
+      frameSrc: ["'self'", 'checkout.razorpay.com'],
+    }
+  },
   crossOriginEmbedderPolicy: false
 }));
 

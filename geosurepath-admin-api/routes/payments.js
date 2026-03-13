@@ -32,7 +32,7 @@ const getRazorpayClient = async () => {
 };
 
 // 1. Create Order
-router.post('/orders', asyncHandler(async (req, res, next) => {
+router.post('/orders', authenticateJWT, asyncHandler(async (req, res, next) => {
     const schema = Joi.object({
         planId: Joi.string().valid('1month', '6month', '12month', 'enterprise').required(),
         userId: Joi.number().integer().positive().required()
@@ -71,7 +71,7 @@ router.post('/orders', asyncHandler(async (req, res, next) => {
 }));
 
 // 2. Verify Payment & Activate Plan
-router.post('/verify', asyncHandler(async (req, res, next) => {
+router.post('/verify', authenticateJWT, asyncHandler(async (req, res, next) => {
     const {
         razorpay_order_id,
         razorpay_payment_id,
@@ -182,7 +182,10 @@ router.post('/verify', asyncHandler(async (req, res, next) => {
 }));
 
 // 3. Get Subscription Status
-router.get('/subscription/:userId', asyncHandler(async (req, res) => {
+router.get('/subscription/:userId', authenticateJWT, asyncHandler(async (req, res, next) => {
+    if (req.user.role !== 'admin' && req.user.id !== parseInt(req.params.userId)) {
+        return next(new AppError('FORBIDDEN', 'Access denied to other user data', 403));
+    }
     const GRACE_PERIOD_DAYS = 3;
     const subRes = await pool.query(
         "SELECT *, (expiry_date - NOW()) as time_remaining FROM geosurepath_subscriptions WHERE user_id = $1 AND status = 'active' AND (expiry_date + INTERVAL '3 days') > NOW() ORDER BY created_at DESC LIMIT 1",
@@ -210,8 +213,12 @@ router.get('/subscription/:userId', asyncHandler(async (req, res) => {
 }));
 
 // 4. Cancel Subscription (With Churn Analytics)
-router.post('/cancel', asyncHandler(async (req, res) => {
+router.post('/cancel', authenticateJWT, asyncHandler(async (req, res, next) => {
     const { userId, reason } = req.body;
+    
+    if (req.user.role !== 'admin' && req.user.id !== parseInt(userId)) {
+        return next(new AppError('FORBIDDEN', 'Cannot cancel subscription for another user', 403));
+    }
     const result = await pool.query(
         "UPDATE geosurepath_subscriptions SET status = 'cancelled' WHERE user_id = $1 AND status = 'active' RETURNING id",
         [userId]
@@ -247,15 +254,58 @@ router.post('/webhook', verifyRazorpaySignature, asyncHandler(async (req, res) =
 async function handlePaymentCaptured(payment) {
     const { order_id, id: payment_id, amount, notes } = payment;
     const userId = notes?.userId;
+    const planId = notes?.planId;
     
-    if (!userId) {
-        logger.warn('Captured payment without userId in notes:', { order_id, payment_id });
+    if (!userId || !planId) {
+        logger.warn('Captured payment without metadata in notes:', { order_id, payment_id });
         return;
     }
 
-    // Logic similar to /verify would go here if we wanted to rely solely on webhooks
-    // For now, we log it. The /verify endpoint handles the activation for the UI.
-    logger.info('Payment captured via webhook confirmed', { order_id, payment_id, userId });
+    // REDUNDANT ACTIVATION (Fix for BUG-018): 
+    // This handles the case where the user closes the browser before /verify completes.
+    logger.info('Webhook: Triggering redundant subscription activation (BUG-018)', { order_id, payment_id, userId });
+    
+    const dbClient = await pool.connect();
+    try {
+        await dbClient.query('BEGIN');
+        
+        // Determing months (Logic duplicated from /verify for webhook resilience)
+        let months = 1;
+        if (planId === '6month') months = 6;
+        else if (planId === '12month' || planId === 'enterprise') months = 12;
+
+        const idempotencyCheck = await dbClient.query(
+            "SELECT id FROM geosurepath_subscriptions WHERE razorpay_payment_id = $1",
+            [payment_id]
+        );
+
+        if (idempotencyCheck.rowCount > 0) {
+            await dbClient.query('ROLLBACK');
+            return;
+        }
+
+        const expiryDate = new Date();
+        expiryDate.setMonth(expiryDate.getMonth() + months);
+
+        const limitKey = `plan_limit_${planId}`;
+        const limitRes = await dbClient.query("SELECT value FROM geosurepath_settings WHERE key = $1", [limitKey]);
+        const deviceLimit = limitRes.rowCount > 0 ? parseInt(limitRes.rows[0].value) : 25;
+
+        await dbClient.query(
+            `INSERT INTO geosurepath_subscriptions 
+            (user_id, plan_id, status, razorpay_order_id, razorpay_payment_id, expiry_date, device_limit, amount_paid, currency)
+            VALUES ($1, $2, 'active', $3, $4, $5, $6, $7, 'INR')`,
+            [userId, planId, order_id, payment_id, expiryDate, deviceLimit, amount / 100]
+        );
+
+        await dbClient.query('COMMIT');
+        logger.info(`Webhook: Successfully activated subscription for User ${userId}`);
+    } catch (err) {
+        await dbClient.query('ROLLBACK');
+        logger.error('Webhook: Activation failure:', err.message);
+    } finally {
+        dbClient.release();
+    }
 }
 
 async function handlePaymentFailed(payment) {
@@ -263,8 +313,8 @@ async function handlePaymentFailed(payment) {
     logger.error('Payment failed via webhook', { order_id, payment_id, error_description });
 }
 
-// 6. Styled Invoice Generator
-router.get('/invoice/:paymentId', asyncHandler(async (req, res, next) => {
+// 6. Styled Invoice Generator (Now Authenticated - BUG-019)
+router.get('/invoice/:paymentId', authenticateJWT, asyncHandler(async (req, res, next) => {
     const result = await pool.query(
         "SELECT s.*, u.name as user_name, u.email as user_email FROM geosurepath_subscriptions s JOIN tc_users u ON s.user_id = u.id WHERE s.razorpay_payment_id = $1",
         [req.params.paymentId]
@@ -272,6 +322,11 @@ router.get('/invoice/:paymentId', asyncHandler(async (req, res, next) => {
     if (result.rowCount === 0) return next(new AppError('NOT_FOUND', 'Invoice Not Found', 404));
 
     const sub = result.rows[0];
+    
+    // Ownership Check
+    if (req.user.role !== 'admin' && req.user.id !== sub.user_id) {
+        return next(new AppError('FORBIDDEN', 'Access denied to this invoice', 403));
+    }
     const total = parseFloat(sub.amount_paid) || (sub.plan_id === '1month' ? 236 : (sub.plan_id === 'enterprise' ? 5310 : 1770));
     const baseAmount = Math.round(total / 1.18);
     const gst = total - baseAmount;
@@ -350,14 +405,14 @@ router.get('/invoice/:paymentId', asyncHandler(async (req, res, next) => {
                     © 2026 GeoSurePath Global Tracking.
                 </div>
             </div>
-            <script>window.print();</script>
+            <!-- Auto-print disabled for better UX (BUG-023). Added manual print button if needed -->
         </body>
         </html>
     `);
 }));
 
-// 7. Refund & Dispute Handling (Admin Only)
-router.post('/refund/:paymentId', asyncHandler(async (req, res, next) => {
+// 7. Refund & Dispute Handling (Strict Admin Only - BUG-003)
+router.post('/refund/:paymentId', adminAuth, asyncHandler(async (req, res, next) => {
     const result = await pool.query(
         "UPDATE geosurepath_subscriptions SET status = 'refunded' WHERE razorpay_payment_id = $1 RETURNING user_id",
         [req.params.paymentId]
@@ -370,7 +425,10 @@ router.post('/refund/:paymentId', asyncHandler(async (req, res, next) => {
 }));
 
 // 8. Payment History for a specific User
-router.get('/history/:userId', asyncHandler(async (req, res) => {
+router.get('/history/:userId', authenticateJWT, asyncHandler(async (req, res, next) => {
+    if (req.user.role !== 'admin' && req.user.id !== parseInt(req.params.userId)) {
+        return next(new AppError('FORBIDDEN', 'Access denied to user history', 403));
+    }
     const result = await pool.query(
         "SELECT * FROM geosurepath_subscriptions WHERE user_id = $1 ORDER BY created_at DESC",
         [req.params.userId]

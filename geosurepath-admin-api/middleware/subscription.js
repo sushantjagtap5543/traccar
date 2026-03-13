@@ -37,23 +37,21 @@ const checkDeviceLimit = async (req, res, next) => {
         );
         const currentCount = parseInt(countRes.rows[0].count);
 
-        // 4. Auto-Provision Inbuilt Subscription if it's the first device and no sub exists
+        // 4. Auto-Provision Lite Subscription (Fix for BUG-016: Restricted to 2 devices)
         if (subRes.rowCount === 0 && currentCount === 0) {
-            logger.info(`Provisioning inbuilt 1-year subscription for new user ${user.id}`);
+            logger.info(`Provisioning light 1-year inbuilt subscription for new user ${user.id}`);
             const expiryDate = new Date();
             expiryDate.setFullYear(expiryDate.getFullYear() + 1);
 
-            // Fetch dynamic limit for enterprise plan
-            const limitRes = await pool.query("SELECT value FROM geosurepath_settings WHERE key = 'plan_limit_enterprise'");
-            const enterpriseLimit = limitRes.rowCount > 0 ? parseInt(limitRes.rows[0].value) : 50;
+            const starterLimit = 2; // BUG-016: Only give 2 for free
 
             await pool.query(
                 `INSERT INTO geosurepath_subscriptions 
                 (user_id, plan_id, status, device_limit, amount_paid, razorpay_payment_id, expiry_date) 
                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                [user.id, 'enterprise', 'active', enterpriseLimit, 0, 'INBUILT_PROMO', expiryDate]
+                [user.id, 'starter', 'active', starterLimit, 0, 'INBUILT_LITE', expiryDate]
             );
-            limit = enterpriseLimit; // Update local limit for this request
+            limit = starterLimit;
         }
 
         if (currentCount >= limit) {

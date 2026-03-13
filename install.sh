@@ -17,7 +17,7 @@ NODE_VERSION="20"
 JAVA_VERSION="17"
 LOG_FILE="/var/log/geosurepath_install.log"
 DEFAULT_ADMIN_EMAIL="admin@geosurepath.com"
-DEFAULT_ADMIN_PASS="Admin@1234"
+DEFAULT_ADMIN_PASS=$(openssl rand -base64 12) # BUG-015: Randomize default password
 
 # --- Colors for Output ---
 RED='\033[0;31m'

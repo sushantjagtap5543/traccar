@@ -30,8 +30,8 @@ const SubscriptionPage = () => {
         setLoading(true);
         try {
             const [subRes, historyRes] = await Promise.all([
-                fetch(`${API_BASE}/api/payments/subscription/${user.id}`),
-                fetch(`${API_BASE}/api/payments/history/${user.id}`)
+                fetch(`${API_BASE}/api/payments/subscription/${user.id}`, { credentials: 'include' }),
+                fetch(`${API_BASE}/api/payments/history/${user.id}`, { credentials: 'include' })
             ]);
 
             if (subRes.ok) setSub(await subRes.json());
@@ -48,7 +48,8 @@ const SubscriptionPage = () => {
             const orderRes = await fetch(`${API_BASE}/api/payments/orders`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ planId, userId: user.id })
+                body: JSON.stringify({ planId, userId: user.id }),
+                credentials: 'include'
             });
             const order = await orderRes.json();
 
@@ -67,7 +68,8 @@ const SubscriptionPage = () => {
                             ...response,
                             userId: user.id,
                             planId: planId
-                        })
+                        }),
+                        credentials: 'include'
                     });
                     if (verifyRes.ok) {
                         setSnackbar({ open: true, message: 'Payment Successful! Your plan is active.', severity: 'success' });
@@ -196,7 +198,8 @@ const SubscriptionPage = () => {
                                             const res = await fetch(`${API_BASE}/api/payments/cancel`, {
                                                 method: 'POST',
                                                 headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ userId: user.id })
+                                                body: JSON.stringify({ userId: user.id }),
+                                                credentials: 'include'
                                             });
                                             if (res.ok) {
                                                 setSnackbar({ open: true, message: 'Cancellation confirmed.', severity: 'info' });

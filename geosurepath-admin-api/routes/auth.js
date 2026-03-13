@@ -62,6 +62,7 @@ router.post('/admin/auth/login', asyncHandler(async (req, res, next) => {
     const { error, value } = schema.validate(req.body);
     if (error) return next(new AppError('VALIDATION_ERROR', error.details[0].message, 400));
 
+    const { email, password, totpToken } = value;
     const lockoutKey = `lockout:${email}`;
     const attemptsKey = `login_attempts:${email}`;
 
@@ -92,8 +93,11 @@ router.post('/admin/auth/login', asyncHandler(async (req, res, next) => {
     // Reset attempts on success
     await redisClient.del(attemptsKey);
 
-    // 2. 2FA Check (Persistence-based)
-    const userRes = await pool.query("SELECT totp_secret, totp_enabled FROM tc_users WHERE email = $1", [email]);
+    // 2. 2FA Check (Isolated Metadata - Fix for BUG-010)
+    const userRes = await pool.query(
+        "SELECT totp_secret, totp_enabled FROM geosurepath_user_metadata WHERE user_id = (SELECT id FROM tc_users WHERE email = $1 LIMIT 1)",
+        [email]
+    );
     const user = userRes.rows[0];
 
     if (user && user.totp_enabled) {
@@ -221,7 +225,7 @@ router.delete('/admin/auth/totp-secret', adminAuth, asyncHandler(async (req, res
 }));
 
 // --- CLIENT OTP AUTH ---
-router.post('/auth/send-otp', asyncHandler(async (req, res) => {
+router.post('/auth/send-otp', asyncHandler(async (req, res, next) => {
     const { mobile } = req.body;
     if (!mobile) return next(new AppError('MISSING_FIELDS', 'Mobile number required', 400));
 

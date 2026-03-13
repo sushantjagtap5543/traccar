@@ -8,7 +8,7 @@ const { pool, logger } = require('./db');
 const googleDriveService = require('./googleDriveService');
 const nodemailer = require('nodemailer');
 
-const BACKUP_DIR = path.join(__dirname, '../../backups');
+const BACKUP_DIR = process.env.BACKUP_DIR || path.join(__dirname, '../../backups');
 
 class BackupService {
     constructor() {

@@ -30,9 +30,9 @@ const tenantIsolation = async (req, res, next) => {
         const user = sessionRes.data;
         if (!user || !user.id) return res.status(401).json({ error: 'Invalid session' });
 
-        // 3. Fetch Client ID from database
+        // 3. Fetch Client ID from isolated metadata (Fix for BUG-010)
         const userRes = await pool.query(
-            "SELECT client_id FROM tc_users WHERE id = $1",
+            "SELECT client_id FROM geosurepath_user_metadata WHERE user_id = $1",
             [user.id]
         );
 
