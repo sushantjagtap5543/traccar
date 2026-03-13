@@ -14,7 +14,7 @@ const userConnections = new Map(); // Track connected users for clean teardown
 const initWebSocket = (server) => {
     io = socketIo(server, {
         cors: {
-            origin: (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()),
+            origin: (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean),
             methods: ["GET", "POST"],
             credentials: true
         },

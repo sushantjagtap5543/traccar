@@ -124,6 +124,16 @@ router.post('/devices/bulk-import', tenantIsolation, checkDeviceLimit, asyncHand
     
     for (const dev of devices) {
         try {
+            // BUG-017: Manual limit check per record in bulk import
+            const currentSub = await pool.query("SELECT device_limit FROM geosurepath_subscriptions WHERE user_id = $1 AND status = 'active' ORDER BY created_at DESC LIMIT 1", [req.user.id]);
+            const currentCount = await pool.query("SELECT COUNT(*) FROM tc_user_device WHERE userid = $1", [req.user.id]);
+            const limit = currentSub.rowCount > 0 ? currentSub.rows[0].device_limit : 2;
+            
+            if (parseInt(currentCount.rows[0].count) + results.success.length >= limit) {
+                results.failed.push({ uniqueId: dev.uniqueId, error: 'Subscription Limit Exceeded' });
+                continue;
+            }
+
             // Validate individual record
             const { error } = schemas.createDevice.validate(dev);
             if (error) {

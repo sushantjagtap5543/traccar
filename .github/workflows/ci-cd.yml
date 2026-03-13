@@ -66,6 +66,11 @@ jobs:
           DATABASE_URL: postgres://traccar:password@localhost:5432/traccar
           REDIS_URL: redis://localhost:6379
           JWT_SECRET: c62f1c849e79435b863d60c4b18c5e63479b187515e0a0a0a0a0a0a0a0a0a0a0
+          JWT_REFRESH_SECRET: c62f1c849e79435b863d60c4b18c5e63479b187515e0a0a0a0a0a0a0a0a0a0a0
+          ADMIN_EMAIL: admin@geosurepath.com
+          ADMIN_PASSWORD_HASH: $2a$12$R.S7u.BovV2M5c.x2mU6Z.5vQyV9y9y9y9y9y9y9y9y9y9y9y9y9y
+          ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          NODE_ENV: test
 
   deploy:
     name: Deploy to Production (Staging Example)

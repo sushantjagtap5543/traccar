@@ -13,6 +13,19 @@ const { authenticateJWT } = require('../middleware/auth');
 const { generateTokens, blacklistToken, verifyTOTPToken } = require('../services/authService');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { AppError } = require('../utils/errors');
+const rateLimit = require('express-rate-limit');
+const { RedisStore } = require('rate-limit-redis');
+const { ioRedisClient } = require('../services/db');
+
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5, // 5 attempts per 15 mins
+    store: new RedisStore({
+        sendCommand: (...args) => ioRedisClient.call(...args),
+    }),
+    skipSuccessfulRequests: true,
+    message: { error: 'Too many login attempts, please try again after 15 minutes' }
+});
 
 /**
  * @openapi
@@ -52,7 +65,7 @@ const { AppError } = require('../utils/errors');
  * Production Login Flow
  * Supports timing-safe passwords and 2FA challenges.
  */
-router.post('/admin/auth/login', asyncHandler(async (req, res, next) => {
+router.post('/admin/auth/login', authLimiter, asyncHandler(async (req, res, next) => {
     const schema = Joi.object({
         email: Joi.string().email().required(),
         password: Joi.string().min(8).required(),
@@ -185,7 +198,7 @@ router.get('/admin/auth/recovery-codes', adminAuth, asyncHandler(async (req, res
     res.json({ codes });
 }));
 
-router.post('/admin/auth/verify-totp', asyncHandler(async (req, res, next) => {
+router.post('/admin/auth/verify-totp', authLimiter, asyncHandler(async (req, res, next) => {
     const { token, email } = req.body;
     const challengeTokenHeader = req.headers['x-admin-token'];
 
@@ -213,7 +226,7 @@ router.post('/admin/auth/verify-totp', asyncHandler(async (req, res, next) => {
     res.json({ accessToken: tokens.accessToken, token: tokens.accessToken, refreshToken: tokens.refreshToken, user: { email, role: 'admin' } });
 }));
 
-router.post('/admin/auth/verify-recovery', asyncHandler(async (req, res, next) => {
+router.post('/admin/auth/verify-recovery', authLimiter, asyncHandler(async (req, res, next) => {
     const { email, code } = req.body;
     if (!email || !code) return next(new AppError('MISSING_FIELDS', 'Email and recovery code required', 400));
 
@@ -249,7 +262,10 @@ router.post('/admin/auth/verify-recovery', asyncHandler(async (req, res, next) =
 
 router.delete('/admin/auth/totp-secret', adminAuth, asyncHandler(async (req, res) => {
     const email = req.admin?.email || 'admin';
-    await redisClient.del(`totp_secret:${email}`);
+    await pool.query(
+        'UPDATE geosurepath_user_metadata SET totp_secret = NULL, totp_enabled = false WHERE user_id = (SELECT id FROM tc_users WHERE email = $1)',
+        [email]
+    );
     logger.warn(`TOTP Secret cleared for ${email} by administrative request.`);
     logAudit('TOTP_RESET', 'admin', { email }, null, req.ip);
     res.json({ message: '2FA secret has been reset. You will need to setup 2FA again on next login.' });

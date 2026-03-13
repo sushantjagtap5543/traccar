@@ -157,13 +157,13 @@ const processAlerts = async () => {
                     }
                 }
 
-                if (config.powerCut?.enabled && alarm === 'powerCut') {
+                if (userConfig.powerCut?.enabled && alarm === 'powerCut') {
                     await sendAlert('POWER_CUT', `External power disconnected for vehicle ${device.name}!`, 'CRITICAL', device.id);
                 }
-
-                if (config.deviceDisconnected?.enabled && device.status === 'offline') {
+ 
+                if (userConfig.deviceDisconnected?.enabled && device.status === 'offline') {
                     const lastUpdate = new Date(device.lastUpdate).getTime();
-                    const threshold = (config.deviceDisconnected.thresholdMinutes || 10) * 60000;
+                    const threshold = (userConfig.deviceDisconnected.thresholdMinutes || 10) * 60000;
                     if (Date.now() - lastUpdate > threshold) {
                         await sendAlert('DEVICE_OFFLINE', `Telemetry lost for vehicle ${device.name}.`, 'WARNING', device.id);
                     }

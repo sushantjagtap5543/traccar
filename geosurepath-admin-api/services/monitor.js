@@ -246,9 +246,12 @@ const startMonitor = () => {
 
             // Periodic Log of Active Cooldowns (Monitoring)
             const { redisClient } = require('./db');
-            const cooldownKeys = await redisClient.keys('alert_cooldown:*');
-            if (cooldownKeys.length > 0) {
-                logger.info(`Monitor: ${cooldownKeys.length} active alert cooldowns in Redis.`);
+            let count = 0;
+            for await (const key of redisClient.scanIterator({ MATCH: 'alert_cooldown:*' })) {
+                count++;
+            }
+            if (count > 0) {
+                logger.info(`Monitor: ${count} active alert cooldowns in Redis.`);
             }
 
             try {

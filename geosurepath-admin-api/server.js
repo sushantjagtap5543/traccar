@@ -1,7 +1,6 @@
 // Sentry initialized after express app creation (NEW-010)
 
 const Sentry = require('@sentry/node');
-const Tracing = require('@sentry/tracing');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -38,7 +37,7 @@ if (process.env.SENTRY_DSN) {
         environment: process.env.NODE_ENV || 'development',
         integrations: [
             new Sentry.Integrations.Http({ tracing: true }),
-            new Tracing.Integrations.Express({ app }),
+            new Sentry.Integrations.Express({ app }),
         ],
         tracesSampleRate: 1.0,
     });
@@ -50,6 +49,7 @@ const requiredEnvVars = [
     'DATABASE_URL',
     'REDIS_URL',
     'JWT_SECRET',
+    'JWT_REFRESH_SECRET',
     'ADMIN_EMAIL',
     'ADMIN_PASSWORD_HASH',
     'ENCRYPTION_KEY',
@@ -153,7 +153,7 @@ if (process.env.NODE_ENV !== 'test') {
   }));
 }
 
-// Maintenance Mode Middleware
+// Maintenance Mode Middleware (BUG-009 Resilience)
 app.use(async (req, res, next) => {
     if (req.path.startsWith('/api/admin') || req.path === '/api/health' || req.path === '/metrics') {
         return next();
@@ -165,10 +165,15 @@ app.use(async (req, res, next) => {
             return res.status(503).json({ error: 'System is under maintenance. Please try again later.' });
         }
     } catch (err) {
-        // Fallback to DB if Redis fails
-        const dbRes = await pool.query("SELECT value FROM geosurepath_settings WHERE key = 'maintenance_mode' LIMIT 1");
-        if (dbRes.rowCount > 0 && dbRes.rows[0].value === 'true') {
-            return res.status(503).json({ error: 'System is under maintenance. Please try again later.' });
+        logger.error('Maintenance check failed (Redis), falling back to DB:', err.message);
+        try {
+            const dbRes = await pool.query("SELECT value FROM geosurepath_settings WHERE key = 'maintenance_mode' LIMIT 1");
+            if (dbRes.rowCount > 0 && dbRes.rows[0].value === 'true') {
+                return res.status(503).json({ error: 'System is under maintenance. Please try again later.' });
+            }
+        } catch (dbErr) {
+            logger.error('Maintenance check failed (Postgres):', dbErr.message);
+            // Fail-open: proceed if both fail
         }
     }
     next();
@@ -218,7 +223,14 @@ app.use(helmet({
 }));
 
 app.use(cookieParser());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ 
+  limit: '10mb',
+  verify: (req, res, buf) => {
+    if (req.originalUrl.includes('/webhook')) {
+      req.rawBody = buf;
+    }
+  }
+}));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use(cors({
@@ -247,7 +259,7 @@ app.use((req, res, next) => {
 });
 
 // --- ROUTES ---
-app.use('/api', authLimiter, authRoutes);
+app.use('/api', authRoutes); // Auth limiter moved inside authRoutes for granularity (BUG-011)
 app.use('/api', adminRoutes);
 app.use('/api', backupRoutes);
 app.use('/api', migrationRoutes);
@@ -266,7 +278,8 @@ app.get('/metrics', adminAuth, async (req, res) => {
     res.set('Content-Type', registry.contentType);
     res.end(await registry.metrics());
   } catch (err) {
-    res.status(500).end(err);
+    logger.error('Metrics collection failure:', err.message);
+    res.status(500).json({ error: 'Failed to collect metrics' });
   }
 });
 
@@ -388,6 +401,8 @@ const startServer = async () => {
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 };
 
-startServer();
+if (process.env.NODE_ENV !== 'test') {
+  startServer();
+}
 
 module.exports = app;

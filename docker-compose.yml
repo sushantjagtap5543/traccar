@@ -77,7 +77,7 @@ services:
     command: [ "java", "-Xms1024m", "-Xmx2048m", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200", "-jar", "tracker-server.jar", "/app/traccar.xml" ]
     ports:
       - "8082:8082"
-      - "5000-5150:5000-5150"
+      - "5000-5150:5000-5150/tcp"
       - "5000-5150:5000-5150/udp"
     healthcheck:
       test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8082/api/server" ]

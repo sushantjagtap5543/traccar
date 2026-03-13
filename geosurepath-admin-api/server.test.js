@@ -167,6 +167,7 @@ describe('GeoSurePath Admin API', () => {
                 .get('/api/admin/health')
                 .set('x-api-key', API_KEY);
 
+            if (res.statusCode !== 200) console.log(JSON.stringify(res.body, null, 2));
             expect(res.statusCode).toBe(200);
             expect(res.body.cpu).toBe('10.00');
         });

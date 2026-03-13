@@ -118,7 +118,7 @@ router.post('/verify', authenticateJWT, asyncHandler(async (req, res, next) => {
         }
 
         const existingSub = await dbClient.query(
-            "SELECT id FROM geosurepath_subscriptions WHERE user_id = $1 AND status = 'active' AND expiry_date > NOW() FOR UPDATE",
+            "SELECT id, expiry_date FROM geosurepath_subscriptions WHERE user_id = $1 AND status = 'active' AND expiry_date > NOW() FOR UPDATE",
             [userId]
         );
 

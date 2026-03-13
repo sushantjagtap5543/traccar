@@ -117,7 +117,8 @@ class MigrationService {
                 await redisClient.set('maintenance_mode', 'false');
                 await addLog('Maintenance mode DISABLED.');
             } catch (maintErr) {
-                logger.error('Failed to disable maintenance mode after migration:', maintErr);
+                logger.error('CRITICAL: Failed to disable maintenance mode after migration reset:', maintErr.message);
+                // Last ditch effort: Try to reset via shell if pool is broken (conceptual, but here we just log better)
             }
             this.activeMigration = null;
         }

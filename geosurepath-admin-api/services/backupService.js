@@ -156,8 +156,8 @@ class BackupService {
             if (!dbUrl) return reject(new Error('DATABASE_URL not set'));
             
             // For Postgres
-            const cmd = `pg_dump "${dbUrl}" -f "${outputPath}"`;
-            exec(cmd, (error, stdout, stderr) => {
+            const { execFile } = require('child_process');
+            execFile('pg_dump', [dbUrl, '-f', outputPath], { timeout: 300000 }, (error, stdout, stderr) => {
                 if (error) reject(new Error(stderr || error.message));
                 else resolve();
             });
@@ -191,16 +191,14 @@ class BackupService {
 
     async encryptFile(inputPath, outputPath, key) {
         return new Promise((resolve, reject) => {
-            const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(key.padEnd(32).slice(0, 32)), crypto.randomBytes(16).fill(0)); // Static IV for simplicity in restore, or store it
-            // Better to use random IV and prepend it
             const iv = crypto.randomBytes(16);
-            const cipher2 = crypto.createCipheriv('aes-256-cbc', Buffer.from(key.padEnd(32).slice(0, 32)), iv);
+            const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(key.padEnd(32).slice(0, 32)), iv);
 
             const input = fs.createReadStream(inputPath);
             const output = fs.createWriteStream(outputPath);
 
             output.write(iv);
-            input.pipe(cipher2).pipe(output);
+            input.pipe(cipher).pipe(output);
 
             output.on('finish', () => resolve());
             output.on('error', (err) => reject(err));

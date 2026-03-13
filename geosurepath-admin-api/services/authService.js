@@ -12,7 +12,7 @@ const { pool, redisClient, logger } = require('./db');
 const generateTokens = (user) => {
   const accessToken = jwt.sign(
     { 
-      userId: user.id, 
+      id: user.id, 
       role: user.role || 'user',
       email: user.email 
     },
@@ -55,7 +55,7 @@ const verifyTOTPToken = (secret, token) => {
     secret,
     encoding: 'base32',
     token,
-    window: 2 // Allow 2 time steps before/after for clock drift
+    window: 1 // BUG-019: Reduced from 2 to 1 (±30s) per RFC 6238
   });
 };
 

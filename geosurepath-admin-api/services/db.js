@@ -54,7 +54,7 @@ if (process.env.NODE_ENV !== 'production') {
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
-    max: 100, // increased from 20
+    max: parseInt(process.env.DB_POOL_SIZE || '20'), // BUG-012: Reduced from 100 to 20 for stable scaling
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000, // increased from 2000
 });

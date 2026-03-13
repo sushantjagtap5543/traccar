@@ -26,9 +26,8 @@ const verifyRazorpaySignature = (req, res, next) => {
         });
     }
 
-    // Razorpay sends raw body usually, but in Express with json parser it's req.body
-    // For signature verification we need the exact string payload
-    const payload = JSON.stringify(req.body);
+    // Razorpay sends raw body. For signature verification we need the exact string payload (BUG-10)
+    const payload = req.rawBody ? req.rawBody.toString() : JSON.stringify(req.body);
     
     // Generate expected signature
     const expectedSignature = crypto
