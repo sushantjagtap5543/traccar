@@ -148,6 +148,32 @@ const processAlerts = async () => {
                 if (alarm === 'sos') {
                     await sendAlert('SOS_ALERT', `EMERGENCY: ${device.name} panic button activated!`, 'CRITICAL', device.id);
                 }
+
+                if (pos.attributes?.ignition !== undefined) {
+                    const prevState = await redisClient.get(`ignition:${device.id}`);
+                    const currentState = String(pos.attributes.ignition);
+                    if (prevState && prevState !== currentState) {
+                        const status = pos.attributes.ignition ? 'ON' : 'OFF';
+                        await sendAlert('IGNITION_STATUS', `Ignition turned ${status} for vehicle ${device.name}.`, 'INFO', device.id);
+                    }
+                    await redisClient.set(`ignition:${device.id}`, currentState, { EX: 86400 });
+                }
+
+                if (pos.speed < 0.1 && pos.attributes?.ignition) {
+                    const idleStart = await redisClient.get(`idle_start:${device.id}`);
+                    if (!idleStart) {
+                        await redisClient.set(`idle_start:${device.id}`, Date.now().toString(), { EX: 3600 });
+                    } else {
+                        const idleTime = (Date.now() - parseInt(idleStart)) / 60000;
+                        if (idleTime > (config.idleThresholdMinutes || 15)) {
+                            await sendAlert('VEHICLE_IDLE', `Vehicle ${device.name} has been idling for ${Math.floor(idleTime)} minutes.`, 'WARNING', device.id);
+                            // Reset to avoid spamming every cycle if needed, or use a flag
+                            await redisClient.set(`idle_start:${device.id}`, Date.now().toString(), { EX: 3600 });
+                        }
+                    }
+                } else {
+                    await redisClient.del(`idle_start:${device.id}`);
+                }
                 
                 // Geofence events
                 if (alarm === 'geofenceExit') {

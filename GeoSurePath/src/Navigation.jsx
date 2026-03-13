@@ -1,74 +1,81 @@
+import { lazy, Suspense } from 'react';
 import { Route, Routes, useSearchParams } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import MainPage from './main/MainPage';
-import CombinedReportPage from './reports/CombinedReportPage';
-import PositionsReportPage from './reports/PositionsReportPage';
-import ServerPage from './settings/ServerPage';
-import UsersPage from './settings/UsersPage';
-import DevicePage from './settings/DevicePage';
-import UserPage from './settings/UserPage';
-import NotificationsPage from './settings/NotificationsPage';
-import NotificationPage from './settings/NotificationPage';
-import GroupsPage from './settings/GroupsPage';
-import GroupPage from './settings/GroupPage';
-import PositionPage from './other/PositionPage';
-import NetworkPage from './other/NetworkPage';
-import EventReportPage from './reports/EventReportPage';
-import GeofenceReportPage from './reports/GeofenceReportPage';
-import ReplayPage from './other/ReplayPage';
-import TripReportPage from './reports/TripReportPage';
-import StopReportPage from './reports/StopReportPage';
-import SummaryReportPage from './reports/SummaryReportPage';
-import ChartReportPage from './reports/ChartReportPage';
-import DriversPage from './settings/DriversPage';
-import DriverPage from './settings/DriverPage';
-import CalendarsPage from './settings/CalendarsPage';
-import CalendarPage from './settings/CalendarPage';
-import ComputedAttributesPage from './settings/ComputedAttributesPage';
-import ComputedAttributePage from './settings/ComputedAttributePage';
-import MaintenancesPage from './settings/MaintenancesPage';
-import MaintenancePage from './settings/MaintenancePage';
-import CommandsPage from './settings/CommandsPage';
-import CommandPage from './settings/CommandPage';
-import StatisticsPage from './reports/StatisticsPage';
-import LoginPage from './login/LoginPage';
-import RegisterPage from './login/RegisterPage';
-import ResetPasswordPage from './login/ResetPasswordPage';
-import GeofencesPage from './other/GeofencesPage';
-import GeofencePage from './settings/GeofencePage';
 import { useEffectAsync } from './reactHelper';
 import { devicesActions } from './store';
-import EventPage from './other/EventPage';
-import PreferencesPage from './settings/PreferencesPage';
-import AccumulatorsPage from './settings/AccumulatorsPage';
-import CommandDevicePage from './settings/CommandDevicePage';
-import CommandGroupPage from './settings/CommandGroupPage';
 import App from './App';
-import ChangeServerPage from './login/ChangeServerPage';
-import DevicesPage from './settings/DevicesPage';
-import ScheduledPage from './reports/ScheduledPage';
-import DeviceConnectionsPage from './settings/DeviceConnectionsPage';
-import GroupConnectionsPage from './settings/GroupConnectionsPage';
-import UserConnectionsPage from './settings/UserConnectionsPage';
-import LogsPage from './reports/LogsPage';
-import SharePage from './settings/SharePage';
-import AnnouncementPage from './settings/AnnouncementPage';
-import EmulatorPage from './other/EmulatorPage';
+import LandingPage from './LandingPage';
 import Loader from './common/components/Loader';
 import { generateLoginToken } from './common/components/NativeInterface';
 import { useLocalization } from './common/components/LocalizationProvider';
 import fetchOrThrow from './common/util/fetchOrThrow';
-import AuditPage from './reports/AuditPage';
-import AdminDashboardPage from './admin/AdminDashboardPage';
-import AlertConfigPage from './settings/AlertConfigPage';
-import LandingPage from './LandingPage';
-import AdminLoginPage from './login/AdminLoginPage';
-import CentralConfigPage from './admin/CentralConfigPage';
-import BillingPage from './admin/BillingPage';
-import SubscriptionPage from './settings/SubscriptionPage';
-import BackupManagerPage from './admin/BackupManagerPage';
-import MigrationPage from './admin/CloudMigrationPage';
-import LegalPage from './LegalPage';
+
+// Lazy load heavy components
+const CombinedReportPage = lazy(() => import('./reports/CombinedReportPage'));
+const PositionsReportPage = lazy(() => import('./reports/PositionsReportPage'));
+const EventReportPage = lazy(() => import('./reports/EventReportPage'));
+const GeofenceReportPage = lazy(() => import('./reports/GeofenceReportPage'));
+const TripReportPage = lazy(() => import('./reports/TripReportPage'));
+const StopReportPage = lazy(() => import('./reports/StopReportPage'));
+const SummaryReportPage = lazy(() => import('./reports/SummaryReportPage'));
+const ChartReportPage = lazy(() => import('./reports/ChartReportPage'));
+const StatisticsPage = lazy(() => import('./reports/StatisticsPage'));
+const ScheduledPage = lazy(() => import('./reports/ScheduledPage'));
+const LogsPage = lazy(() => import('./reports/LogsPage'));
+const AuditPage = lazy(() => import('./reports/AuditPage'));
+
+const AdminDashboardPage = lazy(() => import('./admin/AdminDashboardPage'));
+const CentralConfigPage = lazy(() => import('./admin/CentralConfigPage'));
+const BillingPage = lazy(() => import('./admin/BillingPage'));
+const BackupManagerPage = lazy(() => import('./admin/BackupManagerPage'));
+const MigrationPage = lazy(() => import('./admin/CloudMigrationPage'));
+
+const ServerPage = lazy(() => import('./settings/ServerPage'));
+const UsersPage = lazy(() => import('./settings/UsersPage'));
+const DevicePage = lazy(() => import('./settings/DevicePage'));
+const UserPage = lazy(() => import('./settings/UserPage'));
+const NotificationsPage = lazy(() => import('./settings/NotificationsPage'));
+const NotificationPage = lazy(() => import('./settings/NotificationPage'));
+const GroupsPage = lazy(() => import('./settings/GroupsPage'));
+const GroupPage = lazy(() => import('./settings/GroupPage'));
+const DriversPage = lazy(() => import('./settings/DriversPage'));
+const DriverPage = lazy(() => import('./settings/DriverPage'));
+const CalendarsPage = lazy(() => import('./settings/CalendarsPage'));
+const CalendarPage = lazy(() => import('./settings/CalendarPage'));
+const ComputedAttributesPage = lazy(() => import('./settings/ComputedAttributesPage'));
+const ComputedAttributePage = lazy(() => import('./settings/ComputedAttributePage'));
+const MaintenancesPage = lazy(() => import('./settings/MaintenancesPage'));
+const MaintenancePage = lazy(() => import('./settings/MaintenancePage'));
+const CommandsPage = lazy(() => import('./settings/CommandsPage'));
+const CommandPage = lazy(() => import('./settings/CommandPage'));
+const GeofencePage = lazy(() => import('./settings/GeofencePage'));
+const DevicesPage = lazy(() => import('./settings/DevicesPage'));
+const DeviceConnectionsPage = lazy(() => import('./settings/DeviceConnectionsPage'));
+const GroupConnectionsPage = lazy(() => import('./settings/GroupConnectionsPage'));
+const UserConnectionsPage = lazy(() => import('./settings/UserConnectionsPage'));
+const SharePage = lazy(() => import('./settings/SharePage'));
+const AnnouncementPage = lazy(() => import('./settings/AnnouncementPage'));
+const AlertConfigPage = lazy(() => import('./settings/AlertConfigPage'));
+const SubscriptionPage = lazy(() => import('./settings/SubscriptionPage'));
+const PreferencesPage = lazy(() => import('./settings/PreferencesPage'));
+const AccumulatorsPage = lazy(() => import('./settings/AccumulatorsPage'));
+const CommandDevicePage = lazy(() => import('./settings/CommandDevicePage'));
+const CommandGroupPage = lazy(() => import('./settings/CommandGroupPage'));
+
+const PositionPage = lazy(() => import('./other/PositionPage'));
+const NetworkPage = lazy(() => import('./other/NetworkPage'));
+const ReplayPage = lazy(() => import('./other/ReplayPage'));
+const GeofencesPage = lazy(() => import('./other/GeofencesPage'));
+const EventPage = lazy(() => import('./other/EventPage'));
+const EmulatorPage = lazy(() => import('./other/EmulatorPage'));
+
+const LoginPage = lazy(() => import('./login/LoginPage'));
+const RegisterPage = lazy(() => import('./login/RegisterPage'));
+const ResetPasswordPage = lazy(() => import('./login/ResetPasswordPage'));
+const ChangeServerPage = lazy(() => import('./login/ChangeServerPage'));
+const AdminLoginPage = lazy(() => import('./login/AdminLoginPage'));
+const LegalPage = lazy(() => import('./LegalPage'));
 
 const Navigation = () => {
   const dispatch = useDispatch();
@@ -122,92 +129,94 @@ const Navigation = () => {
     return <Loader />;
   }
   return (
-    <Routes>
-      <Route path="/welcome" element={<LandingPage />} />
-      <Route path="/legal/:type" element={<LegalPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/admin/login" element={<AdminLoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/change-server" element={<ChangeServerPage />} />
-      <Route path="/" element={<App />}>
-        <Route index element={<MainPage />} />
+    <Suspense fallback={<Loader />}>
+      <Routes>
+        <Route path="/welcome" element={<LandingPage />} />
+        <Route path="/legal/:type" element={<LegalPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/admin/login" element={<AdminLoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/change-server" element={<ChangeServerPage />} />
+        <Route path="/" element={<App />}>
+          <Route index element={<MainPage />} />
 
-        <Route path="position/:id" element={<PositionPage />} />
-        <Route path="network/:positionId" element={<NetworkPage />} />
-        <Route path="event/:id" element={<EventPage />} />
-        <Route path="replay" element={<ReplayPage />} />
-        <Route path="geofences" element={<GeofencesPage />} />
-        <Route path="emulator" element={<EmulatorPage />} />
+          <Route path="position/:id" element={<PositionPage />} />
+          <Route path="network/:positionId" element={<NetworkPage />} />
+          <Route path="event/:id" element={<EventPage />} />
+          <Route path="replay" element={<ReplayPage />} />
+          <Route path="geofences" element={<GeofencesPage />} />
+          <Route path="emulator" element={<EmulatorPage />} />
 
-        <Route path="settings">
-          <Route path="accumulators/:deviceId" element={<AccumulatorsPage />} />
-          <Route path="announcement" element={<AnnouncementPage />} />
-          <Route path="calendars" element={<CalendarsPage />} />
-          <Route path="calendar/:id" element={<CalendarPage />} />
-          <Route path="calendar" element={<CalendarPage />} />
-          <Route path="commands" element={<CommandsPage />} />
-          <Route path="command/:id" element={<CommandPage />} />
-          <Route path="command" element={<CommandPage />} />
-          <Route path="attributes" element={<ComputedAttributesPage />} />
-          <Route path="attribute/:id" element={<ComputedAttributePage />} />
-          <Route path="attribute" element={<ComputedAttributePage />} />
-          <Route path="devices" element={<DevicesPage />} />
-          <Route path="device/:id/connections" element={<DeviceConnectionsPage />} />
-          <Route path="device/:id/command" element={<CommandDevicePage />} />
-          <Route path="device/:id/share" element={<SharePage />} />
-          <Route path="device/:id" element={<DevicePage />} />
-          <Route path="device" element={<DevicePage />} />
-          <Route path="drivers" element={<DriversPage />} />
-          <Route path="driver/:id" element={<DriverPage />} />
-          <Route path="driver" element={<DriverPage />} />
-          <Route path="geofence/:id" element={<GeofencePage />} />
-          <Route path="geofence" element={<GeofencePage />} />
-          <Route path="groups" element={<GroupsPage />} />
-          <Route path="group/:id/connections" element={<GroupConnectionsPage />} />
-          <Route path="group/:id/command" element={<CommandGroupPage />} />
-          <Route path="group/:id" element={<GroupPage />} />
-          <Route path="group" element={<GroupPage />} />
-          <Route path="maintenances" element={<MaintenancesPage />} />
-          <Route path="maintenance/:id" element={<MaintenancePage />} />
-          <Route path="maintenance" element={<MaintenancePage />} />
-          <Route path="notifications" element={<NotificationsPage />} />
-          <Route path="notification/:id" element={<NotificationPage />} />
-          <Route path="notification" element={<NotificationPage />} />
-          <Route path="preferences" element={<PreferencesPage />} />
-          <Route path="server" element={<ServerPage />} />
-          <Route path="users" element={<UsersPage />} />
-          <Route path="user/:id/connections" element={<UserConnectionsPage />} />
-          <Route path="user/:id" element={<UserPage />} />
-          <Route path="user" element={<UserPage />} />
-          <Route path="subscription" element={<SubscriptionPage />} />
+          <Route path="settings">
+            <Route path="accumulators/:deviceId" element={<AccumulatorsPage />} />
+            <Route path="announcement" element={<AnnouncementPage />} />
+            <Route path="calendars" element={<CalendarsPage />} />
+            <Route path="calendar/:id" element={<CalendarPage />} />
+            <Route path="calendar" element={<CalendarPage />} />
+            <Route path="commands" element={<CommandsPage />} />
+            <Route path="command/:id" element={<CommandPage />} />
+            <Route path="command" element={<CommandPage />} />
+            <Route path="attributes" element={<ComputedAttributesPage />} />
+            <Route path="attribute/:id" element={<ComputedAttributePage />} />
+            <Route path="attribute" element={<ComputedAttributePage />} />
+            <Route path="devices" element={<DevicesPage />} />
+            <Route path="device/:id/connections" element={<DeviceConnectionsPage />} />
+            <Route path="device/:id/command" element={<CommandDevicePage />} />
+            <Route path="device/:id/share" element={<SharePage />} />
+            <Route path="device/:id" element={<DevicePage />} />
+            <Route path="device" element={<DevicePage />} />
+            <Route path="drivers" element={<DriversPage />} />
+            <Route path="driver/:id" element={<DriverPage />} />
+            <Route path="driver" element={<DriverPage />} />
+            <Route path="geofence/:id" element={<GeofencePage />} />
+            <Route path="geofence" element={<GeofencePage />} />
+            <Route path="groups" element={<GroupsPage />} />
+            <Route path="group/:id/connections" element={<GroupConnectionsPage />} />
+            <Route path="group/:id/command" element={<CommandGroupPage />} />
+            <Route path="group/:id" element={<GroupPage />} />
+            <Route path="group" element={<GroupPage />} />
+            <Route path="maintenances" element={<MaintenancesPage />} />
+            <Route path="maintenance/:id" element={<MaintenancePage />} />
+            <Route path="maintenance" element={<MaintenancePage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="notification/:id" element={<NotificationPage />} />
+            <Route path="notification" element={<NotificationPage />} />
+            <Route path="preferences" element={<PreferencesPage />} />
+            <Route path="server" element={<ServerPage />} />
+            <Route path="users" element={<UsersPage />} />
+            <Route path="user/:id/connections" element={<UserConnectionsPage />} />
+            <Route path="user/:id" element={<UserPage />} />
+            <Route path="user" element={<UserPage />} />
+            <Route path="subscription" element={<SubscriptionPage />} />
+          </Route>
+
+          <Route path="reports">
+            <Route path="combined" element={<CombinedReportPage />} />
+            <Route path="chart" element={<ChartReportPage />} />
+            <Route path="events" element={<EventReportPage />} />
+            <Route path="geofences" element={<GeofenceReportPage />} />
+            <Route path="route" element={<PositionsReportPage />} />
+            <Route path="stops" element={<StopReportPage />} />
+            <Route path="summary" element={<SummaryReportPage />} />
+            <Route path="trips" element={<TripReportPage />} />
+            <Route path="scheduled" element={<ScheduledPage />} />
+            <Route path="statistics" element={<StatisticsPage />} />
+            <Route path="audit" element={<AuditPage />} />
+            <Route path="logs" element={<LogsPage />} />
+          </Route>
+
+          <Route path="admin">
+            <Route path="dashboard" element={<AdminDashboardPage />} />
+            <Route path="config" element={<CentralConfigPage />} />
+            <Route path="billing" element={<BillingPage />} />
+            <Route path="backups" element={<BackupManagerPage />} />
+            <Route path="migration" element={<MigrationPage />} />
+          </Route>
+          <Route path="settings/alerts" element={<AlertConfigPage />} />
         </Route>
-
-        <Route path="reports">
-          <Route path="combined" element={<CombinedReportPage />} />
-          <Route path="chart" element={<ChartReportPage />} />
-          <Route path="events" element={<EventReportPage />} />
-          <Route path="geofences" element={<GeofenceReportPage />} />
-          <Route path="route" element={<PositionsReportPage />} />
-          <Route path="stops" element={<StopReportPage />} />
-          <Route path="summary" element={<SummaryReportPage />} />
-          <Route path="trips" element={<TripReportPage />} />
-          <Route path="scheduled" element={<ScheduledPage />} />
-          <Route path="statistics" element={<StatisticsPage />} />
-          <Route path="audit" element={<AuditPage />} />
-          <Route path="logs" element={<LogsPage />} />
-        </Route>
-
-        <Route path="admin">
-          <Route path="dashboard" element={<AdminDashboardPage />} />
-          <Route path="config" element={<CentralConfigPage />} />
-          <Route path="billing" element={<BillingPage />} />
-          <Route path="backups" element={<BackupManagerPage />} />
-          <Route path="migration" element={<MigrationPage />} />
-        </Route>
-        <Route path="settings/alerts" element={<AlertConfigPage />} />
-      </Route>
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 };
 

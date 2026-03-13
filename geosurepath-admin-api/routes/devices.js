@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const { checkDeviceLimit } = require('../middleware/subscription');
+const { tenantIsolation } = require('../middleware/tenant');
 const { logger } = require('../services/db');
 
 const TRACCAR_URL = process.env.TRACCAR_INTERNAL_URL || 'http://traccar:8082';
@@ -14,7 +15,7 @@ const TRACCAR_URL = process.env.TRACCAR_INTERNAL_URL || 'http://traccar:8082';
 const Joi = require('joi');
 
 // 1. Create Device with Limit Check
-router.post('/devices', checkDeviceLimit, async (req, res) => {
+router.post('/devices', tenantIsolation, checkDeviceLimit, async (req, res) => {
     const schema = Joi.object({
         name: Joi.string().required(),
         uniqueId: Joi.string().required(),
@@ -49,7 +50,7 @@ router.post('/devices', checkDeviceLimit, async (req, res) => {
 });
 
 // 2. Bulk Delete
-router.post('/devices/bulk-delete', async (req, res) => {
+router.post('/devices/bulk-delete', tenantIsolation, async (req, res) => {
     const { ids } = req.body;
     if (!Array.isArray(ids)) return res.status(400).json({ error: 'IDs array required' });
 
@@ -72,7 +73,7 @@ router.post('/devices/bulk-delete', async (req, res) => {
 });
 
 // 3. Bulk Update
-router.post('/devices/bulk-update', async (req, res) => {
+router.post('/devices/bulk-update', tenantIsolation, async (req, res) => {
     const { ids, updates } = req.body;
     if (!Array.isArray(ids) || !updates) return res.status(400).json({ error: 'IDs array and updates object required' });
 

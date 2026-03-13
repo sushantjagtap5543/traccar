@@ -62,8 +62,13 @@ si.time.mockReturnValue({ uptime: 3600 });
 // Mock environment
 const API_KEY = 'test_key_32chars_minimum_here_must_be_long_entropy';
 process.env.ADMIN_API_KEY = API_KEY;
+process.env.ENCRYPTION_KEY = '0f662b904f3557b004faa263a6ad261d0f662b904f3557b004faa263a6ad261d';
+process.env.JWT_SECRET = 'test_secret_must_be_at_least_64_characters_long_for_security_reasons_1234567890';
 process.env.NODE_ENV = 'test';
-process.env.JWT_SECRET = 'test_secret';
+process.env.ADMIN_EMAIL = 'admin@geosurepath.com';
+process.env.ADMIN_PASSWORD_HASH = '$2a$10$abcdefghijklmnopqrstuvwxyz01234567890abcdefghijkl';
+process.env.DATABASE_URL = 'postgres://postgres:password@localhost:5432/traccar';
+process.env.REDIS_URL = 'redis://localhost:6379';
 
 const app = require('./server');
 

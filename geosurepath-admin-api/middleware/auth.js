@@ -15,10 +15,15 @@ const verifyAdminToken = (req, res, next) => {
         return res.status(500).json({ error: 'Server configuration error' });
     }
 
-    jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
-        if (err || decoded.role !== 'admin') {
-            logger.warn(`Invalid JWT attempt from ${req.ip}`);
-            return res.status(403).json({ error: 'Unauthorized session' });
+    jwt.verify(token, process.env.JWT_SECRET, { clockTolerance: 30 }, async (err, decoded) => {
+        if (err) {
+            logger.warn(`JWT Verification error from ${req.ip}: ${err.message}`);
+            return res.status(401).json({ error: 'Invalid or expired token', code: 'TOKEN_EXPIRED' });
+        }
+
+        if (decoded.role !== 'admin') {
+            logger.warn(`Unauthorized role ${decoded.role} from ${req.ip}`);
+            return res.status(403).json({ error: 'Unauthorized role assignment' });
         }
 
         // Verify session in DB
@@ -31,11 +36,11 @@ const verifyAdminToken = (req, res, next) => {
             );
             if (sessionRes.rowCount === 0) {
                 logger.warn(`Session revoked or expired for ${decoded.email} from ${req.ip}`);
-                return res.status(401).json({ error: 'Session expired or revoked' });
+                return res.status(401).json({ error: 'Session expired or revoked', code: 'SESSION_REVOKED' });
             }
         } catch (dbErr) {
             logger.error('Session verification DB error:', dbErr);
-            return res.status(500).json({ error: 'Internal auth error' });
+            return res.status(500).json({ error: 'Internal auth security error' });
         }
 
         req.admin = decoded;

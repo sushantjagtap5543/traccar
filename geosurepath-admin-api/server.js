@@ -95,7 +95,8 @@ const authLimiter = rateLimit({
   store: new RedisStore({
     sendCommand: (...args) => ioRedisClient.call(...args),
   }),
-  skipSuccessfulRequests: true
+  skipSuccessfulRequests: true,
+  message: { error: 'Too many login attempts, please try again after 15 minutes' }
 });
 
 const paymentLimiter = rateLimit({
@@ -265,11 +266,15 @@ app.use((err, req, res, next) => {
   const message = err.message || 'Internal Server Error';
   const requestId = req.id || 'unknown';
 
-  logger.error(`[${requestId}] Error:`, { status, message, stack: err.stack });
+  if (status >= 500) {
+    logger.error(`[${requestId}] Server Error:`, { status, message, stack: err.stack });
+  } else {
+    logger.warn(`[${requestId}] Client Error:`, { status, message });
+  }
 
   res.status(status).json({
     error: {
-      code: err.code || 'INTERNAL_ERROR',
+      code: err.code || 'API_ERROR',
       message,
       requestId,
       timestamp: new Date().toISOString()
