@@ -6,6 +6,13 @@ const { logger } = require('../services/db');
  * Catches all errors and returns a sanitized JSON response.
  */
 const errorHandler = (err, req, res, next) => {
+  if (process.env.NODE_ENV === 'test') {
+    const fs = require('fs');
+    const path = require('path');
+    try {
+      fs.appendFileSync(path.join(__dirname, '../../test_error.log'), `ERROR: ${err.message}\nSTACK: ${err.stack}\n\n`);
+    } catch (e) {}
+  }
   let statusCode = err.statusCode || 500;
   let message = err.message || 'Internal Server Error';
   let code = err.code || 'INTERNAL_ERROR';

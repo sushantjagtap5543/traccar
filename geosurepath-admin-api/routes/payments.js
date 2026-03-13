@@ -7,6 +7,7 @@ const { decrypt } = require('../utils/crypto');
 const Joi = require('joi');
 const { logAudit } = require('../services/auditService');
 const { verifyRazorpaySignature } = require('../middleware/razorpay');
+const { authenticateJWT, adminAuth } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { AppError } = require('../utils/errors');
 

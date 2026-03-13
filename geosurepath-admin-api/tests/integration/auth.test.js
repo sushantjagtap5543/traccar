@@ -3,6 +3,8 @@ process.env.JWT_SECRET = 'test_secret_must_be_at_least_64_characters_long_for_se
 process.env.NODE_ENV = 'test';
 process.env.ADMIN_EMAIL = 'admin@geosurepath.com';
 process.env.ADMIN_PASSWORD_HASH = '$2a$12$R.S7u.BovV2M5c.x2mU6Z.5vQyV9y9y9y9y9y9y9y9y9y9y9y9y9y';
+process.env.DATABASE_URL = 'postgres://postgres:password@localhost:5432/traccar';
+process.env.REDIS_URL = 'redis://localhost:6379';
 
 const request = require('supertest');
 const app = require('../../server');

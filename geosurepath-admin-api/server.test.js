@@ -9,16 +9,29 @@ const jwt = require('jsonwebtoken');
 // Mocks
 jest.mock('pg', () => {
     const mPool = {
-        query: jest.fn().mockResolvedValue({ rowCount: 1, rows: [] }),
+        query: jest.fn().mockResolvedValue({ rowCount: 1, rows: [{ size: '10 MB', value: '0' }] }),
         end: jest.fn().mockResolvedValue(null),
         on: jest.fn(),
     };
     return { Pool: jest.fn(() => mPool) };
 });
 jest.mock('child_process');
+jest.mock('knex', () => {
+    return jest.fn().mockReturnValue({
+        migrate: {
+            latest: jest.fn().mockResolvedValue(true)
+        },
+        destroy: jest.fn().mockResolvedValue(true)
+    });
+});
 jest.mock('systeminformation');
 jest.mock('axios');
 jest.mock('fs');
+jest.mock('winston-daily-rotate-file', () => {
+    const winston = require('winston');
+    winston.transports.DailyRotateFile = jest.fn().mockImplementation(() => new winston.transports.Console());
+    return winston.transports.DailyRotateFile;
+});
 jest.mock('morgan', () => () => (req, res, next) => next());
 jest.mock('prom-client', () => ({
     Registry: jest.fn().mockImplementation(() => ({
@@ -88,10 +101,10 @@ describe('GeoSurePath Admin API', () => {
         });
 
         it('should allow access via JWT token', async () => {
-            const token = jwt.sign({ role: 'admin' }, 'test_secret');
+            const token = jwt.sign({ role: 'admin' }, process.env.JWT_SECRET);
             const res = await request(app)
                 .get('/api/admin/health')
-                .set('x-admin-token', token);
+                .set('Authorization', `Bearer ${token}`);
 
             expect(res.statusCode).toBe(200);
         });
@@ -141,9 +154,9 @@ describe('GeoSurePath Admin API', () => {
     });
 
     describe('GET /api/admin/health', () => {
-        it('should return 403 without any auth', async () => {
+        it('should return 401 without any auth', async () => {
             const res = await request(app).get('/api/admin/health');
-            expect(res.statusCode).toBe(403);
+            expect(res.statusCode).toBe(401);
         });
 
         it('should return 200 with valid API key', async () => {
@@ -227,7 +240,7 @@ describe('GeoSurePath Admin API', () => {
 
     describe('COOKIE AUTH', () => {
         it('should allow access via cookie', async () => {
-            const token = jwt.sign({ role: 'admin' }, 'test_secret');
+            const token = jwt.sign({ role: 'admin' }, process.env.JWT_SECRET);
             const res = await request(app)
                 .get('/api/admin/health')
                 .set('Cookie', [`adminToken=${token}`]);
@@ -238,7 +251,7 @@ describe('GeoSurePath Admin API', () => {
     describe('METRICS PROTECTION', () => {
         it('should block metrics without auth', async () => {
             const res = await request(app).get('/metrics');
-            expect(res.statusCode).toBe(403);
+            expect(res.statusCode).toBe(401);
         });
 
         it('should allow metrics with API key in Authorization header', async () => {

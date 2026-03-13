@@ -1,19 +1,7 @@
+// Sentry initialized after express app creation (NEW-010)
+
 const Sentry = require('@sentry/node');
 const Tracing = require('@sentry/tracing');
-
-// Initialize Sentry (NEW-010)
-if (process.env.SENTRY_DSN) {
-    Sentry.init({
-        dsn: process.env.SENTRY_DSN,
-        environment: process.env.NODE_ENV || 'development',
-        integrations: [
-            new Sentry.Integrations.Http({ tracing: true }),
-            new Tracing.Integrations.Express({ app: express() }),
-        ],
-        tracesSampleRate: 1.0,
-    });
-}
-
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -42,6 +30,19 @@ const { adminAuth } = require('./middleware/auth');
 const backupService = require('./services/backupService');
 
 const app = express();
+
+// Initialize Sentry (NEW-010)
+if (process.env.SENTRY_DSN) {
+    Sentry.init({
+        dsn: process.env.SENTRY_DSN,
+        environment: process.env.NODE_ENV || 'development',
+        integrations: [
+            new Sentry.Integrations.Http({ tracing: true }),
+            new Tracing.Integrations.Express({ app }),
+        ],
+        tracesSampleRate: 1.0,
+    });
+}
 const PORT = process.env.PORT || 8083;
 
 // --- ENV VALIDATION ---
@@ -140,7 +141,7 @@ app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
     const duration = Date.now() - start;
-    res.setHeader('x-response-time', `${duration}ms`);
+    logger.debug(`Request ${req.id} finished in ${duration}ms`);
   });
   next();
 });
@@ -328,11 +329,13 @@ const startServer = async () => {
   await init();
 
   // --- START BACKGROUND TASKS ---
-  const { startAlertEngine } = require('./services/alertEngine');
-  startAlertEngine();
-  startMonitor();
-  startMaintenanceTasks();
-  backupService.startCron();
+  if (process.env.NODE_ENV !== 'test') {
+    const { startAlertEngine } = require('./services/alertEngine');
+    startAlertEngine();
+    startMonitor();
+    startMaintenanceTasks();
+    backupService.startCron();
+  }
 
   // 3. Listen
   // 3. Listen with WebSocket support
