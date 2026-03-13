@@ -1,243 +1,52 @@
-version: '3.8'
+version: "3.9"
+
 services:
-  db:
-    image: postgres:15-alpine
+
+  postgres:
+    image: postgres:15
+    container_name: traccar-db
     restart: always
     environment:
-      - POSTGRES_DB=traccar
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    # BUG-005: Removed public port exposure for database safety.
-    # ports:
-    #   - "5432:5432"
+      POSTGRES_DB: traccar
+      POSTGRES_USER: traccar
+      POSTGRES_PASSWORD: traccar_secure_password
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - ./database:/var/lib/postgresql/data
     networks:
-      - database
-      - backend
-
-  redis:
-    image: redis:7-alpine
-    restart: always
-    command: redis-server --save 60 1 --loglevel warning --appendonly yes
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    volumes:
-      - redis_data:/data
-    networks:
-      - backend
-
-  prometheus:
-    image: prom/prometheus:latest
-    restart: always
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus/api_key.txt:/etc/prometheus/api_key.txt:ro
-      - prometheus_data:/prometheus
-    networks:
-      - backend
-    depends_on:
-      admin-api:
-        condition: service_healthy
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+      - gps-network
 
   traccar:
-    image: traccar/traccar:latest
+    image: traccar/traccar:6.7
+    container_name: traccar-server
     restart: always
-    env_file: .env
     depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - ./traccar.xml.template:/app/traccar.xml.template:ro
-      - ./entrypoint.sh:/app/entrypoint.sh:ro
-      - ./data:/opt/traccar/data
-      - ./logs:/opt/traccar/logs
-    entrypoint: [ "/bin/sh", "/app/entrypoint.sh" ]
-    command: [ "/opt/traccar/jre/bin/java", "-Xms1024m", "-Xmx2048m", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200", "-jar", "tracker-server.jar", "/app/traccar.xml" ]
+      - postgres
     ports:
       - "8082:8082"
-      - "5000-5150:5000-5150/tcp"
+      - "5000-5150:5000-5150"
       - "5000-5150:5000-5150/udp"
-    healthcheck:
-      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8082/api/server" ]
-      interval: 30s
-      timeout: 10s
-      retries: 10
-      start_period: 60s
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - backend
-      - database
-
-  admin-api:
-    build:
-      context: ./geosurepath-admin-api
-    restart: always
-    env_file: .env
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8083/api/health" ]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
     volumes:
-      - ./geosurepath-admin-api/logs:/app/logs
-      - ./backups:/app/backups
-    environment:
-      - DATABASE_URL=postgres://postgres:${DB_PASSWORD}@db:5432/traccar
-      - REDIS_URL=redis://redis:6379
-      - ADMIN_API_KEY=${ADMIN_API_KEY}
+      - ./traccar/conf/traccar.xml:/opt/traccar/conf/traccar.xml
+      - ./traccar/data:/opt/traccar/data
+      - ./traccar/logs:/opt/traccar/logs
     networks:
-      - backend
-      - database
-
-  frontend:
-    build:
-      context: ./GeoSurePath
-    environment:
-      - VITE_ADMIN_API_URL=/api/admin
-      - VITE_RAZORPAY_KEY=${RAZORPAY_KEY_ID}
-    depends_on:
-      admin-api:
-        condition: service_healthy
-    networks:
-      - frontend
-      - backend
-    healthcheck:
-      test: [ "CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost || exit 1" ]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+      - gps-network
 
   nginx:
-    build:
-      context: ./nginx
+    image: nginx:latest
+    container_name: gps-nginx
+    restart: always
+    depends_on:
+      - traccar
     ports:
       - "80:80"
       - "443:443"
-    networks:
-      - frontend
-      - backend
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf.template:ro
-      - ./nginx/entrypoint.sh:/entrypoint.sh:ro
-      - certbot-etc:/etc/letsencrypt
-      - certbot-var:/var/lib/letsencrypt
-      - webroot:/var/www/certbot
-    entrypoint: ["/bin/sh", "/entrypoint.sh"]
-    environment:
-      - DOMAIN=${DOMAIN:-localhost}
-    healthcheck:
-      # BUG-006: Use http instead of https for healthcheck to avoid deadlock on first deployment.
-      test: [ "CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost || exit 1" ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-    depends_on:
-      frontend:
-        condition: service_healthy
-      admin-api:
-        condition: service_healthy
-      traccar:
-        condition: service_healthy
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  certbot:
-    image: certbot/certbot:latest
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
     networks:
-      - frontend
-    volumes:
-      - certbot-etc:/etc/letsencrypt
-      - certbot-var:/var/lib/letsencrypt
-      - webroot:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  grafana:
-    image: grafana/grafana-oss:latest
-    restart: always
-    ports:
-      - "127.0.0.1:3001:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD} # BUG-008: Removed default fallback
-      - GF_AUTH_ANONYMOUS_ENABLED=false
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-    networks:
-      - backend
-    depends_on:
-      - prometheus
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+      - gps-network
 
 networks:
-  frontend:
+  gps-network:
     driver: bridge
-  backend:
-    driver: bridge
-  database:
-    driver: bridge
-    internal: true
-
-volumes:
-  db_data:
-  redis_data:
-  grafana_data:
-  prometheus_data:
-  certbot-etc:
-  certbot-var:
-  webroot:
