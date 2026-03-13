@@ -34,8 +34,14 @@ const BackupManagerPage = () => {
                 fetch(`${API_BASE}/api/admin/backups`, { credentials: 'include' }),
                 fetch(`${API_BASE}/api/admin/config`, { credentials: 'include' })
             ]);
-            if (backupRes.ok) setBackups(await backupRes.json());
-            if (configRes.ok) setSettings(prev => ({ ...prev, ...(await configRes.json()) }));
+            if (backupRes.ok) {
+                const backupData = await backupRes.json();
+                setBackups(backupData);
+            }
+            if (configRes.ok) {
+                const configData = await configRes.json();
+                setSettings(prev => ({ ...prev, ...configData }));
+            }
         } catch (err) {
             setSnackbar({ open: true, message: 'Failed to load backup data', severity: 'error' });
         } finally {
