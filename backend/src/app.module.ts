@@ -14,6 +14,9 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
 import { BillingModule } from './modules/billing/billing.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { StatsModule } from './modules/stats/stats.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { GeofencesModule } from './modules/geofences/geofences.module';
+import { RedisModule } from './modules/redis/redis.module';
 
 @Module({
   imports: [
@@ -41,6 +44,9 @@ import { StatsModule } from './modules/stats/stats.module';
     BillingModule,
     ClientsModule,
     StatsModule,
+    ReportsModule,
+    GeofencesModule,
+    RedisModule,
   ],
   controllers: [AppController],
   providers: [AppService],

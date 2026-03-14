@@ -4,6 +4,8 @@ import { Repository, Between } from 'typeorm';
 import { Device } from '../devices/entities/device.entity';
 import { Client } from '../clients/entities/client.entity';
 import { Alert } from '../alerts/entities/alert.entity';
+import { RedisService } from '../redis/redis.service';
+import { TraccarService } from '../traccar/traccar.service';
 
 @Injectable()
 export class StatsService {
@@ -14,9 +16,15 @@ export class StatsService {
     private clientRepository: Repository<Client>,
     @InjectRepository(Alert)
     private alertRepository: Repository<Alert>,
+    private redisService: RedisService,
+    private traccarService: TraccarService,
   ) {}
 
   async getAdminStats() {
+    const cacheKey = 'stats:admin';
+    const cached = await this.redisService.get(cacheKey);
+    if (cached) return cached;
+
     const totalVehicles = await this.deviceRepository.count();
     const onlineVehicles = await this.deviceRepository.count({ where: { status: 'moving' } });
     const offlineVehicles = await this.deviceRepository.count({ where: { status: 'offline' } });
@@ -28,28 +36,38 @@ export class StatsService {
       where: { createdAt: Between(todayStart, new Date()) }
     });
 
-    return {
+    const stats = {
       totalVehicles,
       onlineVehicles,
       offlineVehicles,
       activeClients,
       alertsToday,
-      distanceToday: 0, // Placeholder
+      distanceToday: 0, 
     };
+
+    await this.redisService.set(cacheKey, stats, 300); // 5 minutes cache
+    return stats;
   }
 
   async getClientStats(clientId: string) {
+    const cacheKey = `stats:client:${clientId}`;
+    const cached = await this.redisService.get(cacheKey);
+    if (cached) return cached;
+
     const totalVehicles = await this.deviceRepository.count({ where: { clientId } });
     const alertsCount = await this.alertRepository.count({
       where: { device: { clientId } }
     });
 
-    return {
+    const stats = {
       myVehicles: totalVehicles,
       alerts: alertsCount,
       tripHistory: [],
       fuelReports: [],
       driverBehaviour: 'Good',
     };
+
+    await this.redisService.set(cacheKey, stats, 300); // 5 minutes cache
+    return stats;
   }
 }

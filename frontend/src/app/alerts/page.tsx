@@ -7,18 +7,20 @@ import { cn } from '@/lib/utils';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
+import { useAuthStore } from '@/store/useAuthStore';
+
 export default function AlertsPage() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const { token } = useAuthStore();
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || '';
 
   useEffect(() => {
-    fetchAlerts();
-  }, []);
+    if (token) fetchAlerts();
+  }, [token]);
 
   const fetchAlerts = async () => {
     try {
-      const token = localStorage.getItem('auth-storage') ? JSON.parse(localStorage.getItem('auth-storage')).state.token : '';
       const res = await axios.get(`${apiBase}/alerts`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -32,7 +34,6 @@ export default function AlertsPage() {
 
   const markAsRead = async (id: string) => {
     try {
-      const token = localStorage.getItem('auth-storage') ? JSON.parse(localStorage.getItem('auth-storage')).state.token : '';
       await axios.patch(`${apiBase}/alerts/${id}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -115,7 +116,7 @@ export default function AlertsPage() {
                         )}
                         <div className="flex items-center gap-2 text-[10px] text-muted font-bold">
                             <Shield className="w-3 h-3" />
-                            Vehicle: {alert.vehicleId.split('-')[0]}...
+                            Device: {alert.deviceId?.split('-')[0] || 'Unknown'}...
                         </div>
                     </div>
                   </div>

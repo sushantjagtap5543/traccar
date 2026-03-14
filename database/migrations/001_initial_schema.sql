@@ -92,6 +92,24 @@ CREATE TABLE IF NOT EXISTS command_logs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 7. Geofences Table
+CREATE TABLE IF NOT EXISTS geofences (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_id UUID REFERENCES clients(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    area JSONB NOT NULL,
+    alert_type VARCHAR(20) DEFAULT 'both',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 8. Geofence-Device Junction Table
+CREATE TABLE IF NOT EXISTS geofence_devices (
+    geofence_id UUID REFERENCES geofences(id) ON DELETE CASCADE,
+    device_id UUID REFERENCES devices(id) ON DELETE CASCADE,
+    PRIMARY KEY (geofence_id, device_id)
+);
+
 -- ... (Subscriptions)
 
 -- --- TRIGGERS ---

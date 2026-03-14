@@ -5,6 +5,7 @@ import { Device } from './entities/device.entity';
 import { ApprovedDevice } from './entities/approved-device.entity';
 import { TraccarService } from '../traccar/traccar.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class DevicesService {
@@ -15,9 +16,12 @@ export class DevicesService {
     private approvedDeviceRepository: Repository<ApprovedDevice>,
     private traccarService: TraccarService,
     private subscriptionsService: SubscriptionsService,
+    private usersService: UsersService,
   ) {}
 
   async register(userId: string, data: { name: string; imei: string; model?: string }): Promise<Device> {
+    const user = await this.usersService.findOneById(userId);
+    
     // 1. Check if IMEI is approved (Only GeoSurePath devices allowed)
     const approved = await this.approvedDeviceRepository.findOne({ where: { imei: data.imei } });
     if (!approved) {
@@ -37,6 +41,7 @@ export class DevicesService {
     const device = this.deviceRepository.create({
       ...data,
       userId,
+      clientId: user.clientId,
       traccarDeviceId: traccarDevice.id,
       model: data.model || approved.model || 'unknown',
     });

@@ -74,4 +74,43 @@ export class TraccarService {
       return [];
     }
   }
+
+  async getTripReport(deviceId: number, from: string, to: string): Promise<any[]> {
+    try {
+      const response = await axios.get(`${this.baseUrl}/reports/trips`, {
+        params: { deviceId, from, to },
+        headers: { Authorization: `Basic ${this.auth}` },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Traccar getTripReport error:', error.response?.data || error.message);
+      return [];
+    }
+  }
+
+  async getStopReport(deviceId: number, from: string, to: string): Promise<any[]> {
+    try {
+      const response = await axios.get(`${this.baseUrl}/reports/stops`, {
+        params: { deviceId, from, to },
+        headers: { Authorization: `Basic ${this.auth}` },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Traccar getStopReport error:', error.response?.data || error.message);
+      return [];
+    }
+  }
+
+  async getSummaryReport(deviceId: number, from: string, to: string): Promise<any[]> {
+    try {
+      const response = await axios.get(`${this.baseUrl}/reports/summary`, {
+        params: { deviceId, from, to },
+        headers: { Authorization: `Basic ${this.auth}` },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Traccar getSummaryReport error:', error.response?.data || error.message);
+      return [];
+    }
+  }
 }

@@ -16,7 +16,7 @@ export class ClientsService {
   }
 
   async findOne(id: string) {
-    return this.clientsRepository.findOne({ where: { id }, relations: ['users', 'vehicles'] });
+    return this.clientsRepository.findOne({ where: { id }, relations: ['users', 'devices'] });
   }
 
   async findAll() {

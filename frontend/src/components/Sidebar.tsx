@@ -11,7 +11,9 @@ import {
   ShieldCheck, 
   LogOut,
   Car,
-  Users
+  Users,
+  FileText,
+  Globe
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { cn } from '@/lib/utils';
@@ -19,7 +21,9 @@ import { cn } from '@/lib/utils';
 const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Live Map', href: '/map', icon: MapIcon },
-  { name: 'Vehicles', href: '/vehicles', icon: Car },
+  { name: 'Devices', href: '/devices', icon: Car },
+  { name: 'Geofences', href: '/geofences', icon: Globe },
+  { name: 'Reports', href: '/reports', icon: FileText },
   { name: 'Alerts', href: '/alerts', icon: Bell },
   { name: 'Clients', href: '/admin/clients', icon: Users, adminOnly: true },
   { name: 'Admin', href: '/admin', icon: ShieldCheck, adminOnly: true },
@@ -31,7 +35,7 @@ export function Sidebar() {
   const { user, logout } = useAuthStore();
 
   const filteredItems = navItems.filter(item => 
-    !item.adminOnly || user?.role === 'admin'
+    !item.adminOnly || user?.role === 'ADMIN'
   );
 
   return (
