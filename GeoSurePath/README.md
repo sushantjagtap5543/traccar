@@ -1,28 +1,66 @@
-# [Traccar Web Interface](https://www.traccar.org)
+# GeoSurePath GPS SaaS Platform
 
-## Overview
+GeoSurePath is a production-ready, premium GPS tracking platform built for high performance and scalability. This platform provides real-time vehicle tracking, advanced alerting, and a robust administrative dashboard—all powered by open-source and free technologies.
 
-Traccar is open source server for various GPS tracking devices. This repository contains web interface for the Traccar platform. For back-end checkout [main Traccar repository](https://github.com/tananaev/traccar).
+## 🚀 Key Features
 
-The app uses React, Material UI and MapLibre. For more information on how to build it please check the [web app documentation](https://www.traccar.org/build-web-app/).
+- **Real-time Tracking**: Live vehicle positions on MapLibre GL with zero-latency WebSocket updates.
+- **Advanced Alert Engine**: 18 pre-configured business rules (Overspeed, Power Cut, Geofence, etc.).
+- **Smart Device Binding**: OTP-based user registration and instant device linking.
+- **Admin Command Center**: Centralized management for users, devices, and subscriptions.
+- **Freemium by Default**: Built-in 1-year free subscription management for every registered device.
+- **Dockerized Architecture**: Deployable to AWS Lightsail, Oracle Cloud, or any VPS in minutes.
 
-## Team
+## 🛠 Tech Stack
 
-- Anton Tananaev ([anton@traccar.org](mailto:anton@traccar.org))
-- Andrey Kunitsyn ([andrey@traccar.org](mailto:andrey@traccar.org))
+- **Frontend**: Next.js 14, React, TailwindCSS, MapLibre GL, Zustand, Socket.io-client.
+- **Backend**: NestJS, TypeORM, PostgreSQL, Redis, Socket.io, Traccar API.
+- **Device Engine**: Traccar Server (Supports 2000+ protocols like GT06, TK103, H02).
+- **Environment**: Docker, Nginx, Let's Encrypt SSL.
 
-## License
+## 📦 Project Structure
 
-    Apache License, Version 2.0
+```bash
+GeoSurePath/
+├── backend/            # NestJS API & Telemetry Engine
+├── frontend/           # Next.js Client & Admin Portals
+├── traccar/            # Device Server configuration
+├── database/           # SQL Migrations & Triggers
+├── docker/             # Docker Compose orchestration
+└── deployment/         # SSL & Proxy configuration
+```
 
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
+## 🚦 Quick Start (Local Development)
 
-        http://www.apache.org/licenses/LICENSE-2.0
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/your-username/geosurepath-gps-platform-free.git
+   cd GeoSurePath
+   ```
 
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
+2. **Environment Setup**:
+   Copy `.env.example` to `.env` in both `backend/` and `frontend/` and configure your keys.
+
+3. **Launch with Docker**:
+   ```bash
+   docker-compose -f docker/docker-compose.yml up --build -d
+   ```
+
+4. **Access the Portals**:
+   - Client/Admin Portal: `http://localhost:3000`
+   - Backend API: `http://localhost:3001`
+   - Traccar Web: `http://localhost:8082`
+
+## 🛡 Security & Restrictions
+
+- **IMEI Filtering**: Only approved GeoSurePath devices are allowed to connect to the Traccar server.
+- **Authentication**: JWT-based session management with mobile OTP verification.
+- **Rate Limiting**: Integrated backend protection against API abuse.
+
+## 📜 18 Alert Rules Implemented
+
+- Overspeed, Power Cut, Vibration, Towing, Low Battery, Engine ON/OFF, Geofence Entry/Exit, Route Deviation, GPS Lost, Device Offline, Harsh Braking/Acceleration, Fuel Drop (Sensor based), Temperature, SOS/Panic, Door Open, Maintenance Due, Route Delay.
+
+## 📄 License
+
+This project is licensed under the MIT License - See the [LICENSE](LICENSE) file for details.
