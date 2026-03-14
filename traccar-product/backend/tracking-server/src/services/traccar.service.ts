@@ -113,4 +113,30 @@ export class TraccarService {
       return [];
     }
   }
+
+  async getEventReport(deviceId: number, from: string, to: string): Promise<any[]> {
+    try {
+      const response = await axios.get(`${this.baseUrl}/reports/events`, {
+        params: { deviceId, from, to },
+        headers: { Authorization: `Basic ${this.auth}` },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Traccar getEventReport error:', error.response?.data || error.message);
+      return [];
+    }
+  }
+
+  async getRouteReport(deviceId: number, from: string, to: string): Promise<any[]> {
+    try {
+      const response = await axios.get(`${this.baseUrl}/reports/route`, {
+        params: { deviceId, from, to },
+        headers: { Authorization: `Basic ${this.auth}` },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Traccar getRouteReport error:', error.response?.data || error.message);
+      return [];
+    }
+  }
 }

@@ -18,8 +18,17 @@ interface StatsState {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+const initialStats: AdminStats = {
+  totalVehicles: 0,
+  onlineVehicles: 0,
+  offlineVehicles: 0,
+  activeClients: 0,
+  alertsToday: 0,
+  distanceToday: 0
+};
+
 export const useStatsStore = create<StatsState>((set) => ({
-  adminStats: null,
+  adminStats: initialStats,
   loading: false,
   fetchAdminStats: async (token: string) => {
     set({ loading: true });
@@ -30,7 +39,7 @@ export const useStatsStore = create<StatsState>((set) => ({
       set({ adminStats: response.data, loading: false });
     } catch (e) {
       console.error('Failed to fetch stats', e);
-      set({ loading: false });
+      set({ adminStats: initialStats, loading: false });
     }
   }
 }));

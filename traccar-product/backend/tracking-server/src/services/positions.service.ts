@@ -33,6 +33,8 @@ export class PositionsService implements OnModuleInit, OnModuleDestroy {
 
   private async pollTraccar() {
     try {
+      // Optmization: Potentially fetch only active devices from DB first?
+      // For now, we continue fetching all but ensure cleanup of stale data.
       const positions = await this.traccarService.getLatestPositions([]); 
       const now = Date.now();
       
@@ -59,21 +61,31 @@ export class PositionsService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
-      // Check for offline devices
-      await this.checkOffline(now);
+      // Check for offline devices and cleanup stale tracking data
+      await this.checkOfflineAndCleanup(now);
     } catch (e) {
       console.error('Position polling error:', e.message);
     }
   }
 
-  private async checkOffline(now: number) {
+  private async checkOfflineAndCleanup(now: number) {
     const offlineThreshold = this.configService.get<number>('OFFLINE_THRESHOLD') || 300000; // 5 minutes
+    const cleanupThreshold = 24 * 60 * 60 * 1000; // 24 hours of inactivity
     
     for (const [deviceId, lastSeen] of this.lastUpdate.entries()) {
+      // 1. Alert if offline
       if (now - lastSeen > offlineThreshold && !this.offlineAlertsSent.has(deviceId)) {
         const device = await this.devicesService.findOne(deviceId);
-        await this.alertsService.createOfflineAlert(deviceId, device.userId, device.clientId);
-        this.offlineAlertsSent.add(deviceId);
+        if (device) {
+          await this.alertsService.createOfflineAlert(deviceId, device.userId, device.clientId);
+          this.offlineAlertsSent.add(deviceId);
+        }
+      }
+
+      // 2. Cleanup stale data to prevent memory leaks
+      if (now - lastSeen > cleanupThreshold) {
+        this.lastUpdate.delete(deviceId);
+        this.offlineAlertsSent.delete(deviceId);
       }
     }
   }

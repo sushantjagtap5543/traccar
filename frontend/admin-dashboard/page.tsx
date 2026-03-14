@@ -91,7 +91,11 @@ export default function AdminDashboardPage() {
 
             <div className="glass p-4 rounded-xl border border-border">
               <p className="text-[9px] font-bold text-blue-400 mb-1 uppercase tracking-widest">Efficiency</p>
-              <p className="text-xl font-black">99.9%</p>
+              <p className="text-xl font-black">
+                {adminStats?.totalVehicles > 0 
+                  ? `${Math.round((adminStats.onlineVehicles / adminStats.totalVehicles) * 100)}%`
+                  : '100%'}
+              </p>
             </div>
           </div>
 
@@ -142,7 +146,7 @@ export default function AdminDashboardPage() {
           <div className="glass rounded-2xl border border-border p-6 font-mono text-[9px] text-muted space-y-2 bg-slate-900/50">
             <h3 className="text-xs font-bold text-white mb-4 uppercase tracking-[0.3em]">Kernel Output</h3>
             <p className="text-emerald-500/70">{`[${new Date().toLocaleTimeString()}] SUCCESS: WebSocket Position Cluster initialized.`}</p>
-            <p className="text-blue-500/70">{`[${new Date().toLocaleTimeString()}] INFO: Polling Traccar Core at ${process.env.NEXT_PUBLIC_API_URL}`}</p>
+            <p className="text-blue-500/70">{`[${new Date().toLocaleTimeString()}] INFO: API Gateway: ${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}`}</p>
             <p className="text-amber-500/70">{`[${new Date().toLocaleTimeString()}] WARN: SMTP Gateway in test mode.`}</p>
           </div>
         </div>

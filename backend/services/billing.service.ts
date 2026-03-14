@@ -1,12 +1,12 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Payment } from './entities/payment.entity';
+import { Payment } from '../database/entities/payment.entity';
 import { ConfigService } from '@nestjs/config';
 const Razorpay = require('razorpay');
 import * as crypto from 'crypto';
 
-import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { SubscriptionsService } from './subscriptions.service';
 
 @Injectable()
 export class BillingService {

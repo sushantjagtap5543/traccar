@@ -1,17 +1,17 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-// import { Payment } from './entities/payment.entity'; // Maintain existing entity if needed
-import { BillingService } from '../../billing/billingService';
-import { InvoiceController } from '../../billing/invoiceController';
-import { SubscriptionService } from '../../billing/subscriptionService';
-import { PaymentService } from '../../billing/paymentService';
+import { Payment } from '../../database/entities/payment.entity'; 
+import { BillingService } from '../../services/billing.service';
+import { BillingController } from '../../api/billing.controller';
+import { SubscriptionsModule } from './subscriptions.module';
 
 @Module({
   imports: [
-    // TypeOrmModule.forFeature([Payment]),
+    TypeOrmModule.forFeature([Payment]),
+    SubscriptionsModule,
   ],
-  providers: [BillingService, SubscriptionService, PaymentService],
-  controllers: [InvoiceController],
-  exports: [BillingService, SubscriptionService, PaymentService],
+  providers: [BillingService],
+  controllers: [BillingController],
+  exports: [BillingService],
 })
 export class BillingModule {}

@@ -68,15 +68,19 @@ export default function ClientDashboard() {
                  </div>
               </div>
 
-              <div className="glass p-6 rounded-2xl border border-border flex items-center gap-6 hover:border-blue-500/50 transition-all">
-                 <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20">
-                   <TrendingUp className="w-6 h-6" />
-                 </div>
-                 <div>
-                   <p className="text-[10px] font-bold text-muted uppercase tracking-widest">Efficiency</p>
-                   <p className="text-2xl font-black text-blue-400">94%</p>
-                 </div>
-              </div>
+               <div className="glass p-6 rounded-2xl border border-border flex items-center gap-6 hover:border-blue-500/50 transition-all">
+                  <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20">
+                    <TrendingUp className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-muted uppercase tracking-widest">Efficiency</p>
+                    <p className="text-2xl font-black text-blue-400">
+                      {adminStats?.totalVehicles > 0 
+                        ? `${Math.round((adminStats.onlineVehicles / adminStats.totalVehicles) * 100)}%`
+                        : '100%'}
+                    </p>
+                  </div>
+               </div>
            </div>
 
            {/* Graphs Section */}
@@ -111,10 +115,14 @@ export default function ClientDashboard() {
               <div className="glass p-8 rounded-3xl border border-border">
                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] mb-8 italic">Fleet status</h3>
                  <div className="space-y-6">
-                    <div className="flex justify-between items-end border-b border-border pb-4">
-                       <span className="text-xs text-muted font-bold uppercase">Online</span>
-                       <span className="text-lg font-black text-emerald-400">{Math.round((adminStats?.onlineVehicles / (adminStats?.totalVehicles || 1)) * 100)}%</span>
-                    </div>
+                     <div className="flex justify-between items-end border-b border-border pb-4">
+                        <span className="text-xs text-muted font-bold uppercase">Online</span>
+                        <span className="text-lg font-black text-emerald-400">
+                          {adminStats?.totalVehicles > 0 
+                            ? `${Math.round((adminStats.onlineVehicles / adminStats.totalVehicles) * 100)}%`
+                            : '0%'}
+                        </span>
+                     </div>
                     <div className="flex justify-between items-end border-b border-border pb-4">
                        <span className="text-xs text-muted font-bold uppercase">Alert Ratio</span>
                        <span className="text-lg font-black text-blue-400">1.2/dev</span>

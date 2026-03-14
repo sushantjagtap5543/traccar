@@ -34,6 +34,17 @@ services:
     networks:
       - traccar-network
 
+  redis:
+    image: redis:alpine
+    container_name: redis
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - traccar-network
+
   postgres:
     image: postgres:15
     container_name: postgres
@@ -42,6 +53,8 @@ services:
       POSTGRES_DB: ${DB_NAME:-traccar}
       POSTGRES_USER: ${DB_USER:-traccar}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-traccar}
+    ports:
+      - "5432:5432"
     volumes:
       - ./database/data:/var/lib/postgresql/data
       - ./database/schema:/docker-entrypoint-initdb.d
@@ -60,6 +73,7 @@ services:
   backend:
     build:
       context: ./traccar-product/backend/tracking-server
+      dockerfile: ../../../infrastructure/docker/backend.Dockerfile
     container_name: backend
     environment:
       DB_HOST: postgres
@@ -83,6 +97,7 @@ services:
   frontend:
     build:
       context: ./traccar-product/frontend
+      dockerfile: ../../infrastructure/docker/frontend.Dockerfile
     container_name: frontend
     networks:
       - traccar-network

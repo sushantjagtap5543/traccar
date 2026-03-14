@@ -1,5 +1,5 @@
 const axios = require('axios');
-require('dotenv').config({ path: './backend/tracking-server/.env' });
+require('dotenv').config({ path: './traccar-product/backend/tracking-server/.env' });
 
 const API_URL = 'http://localhost:8083/api';
 

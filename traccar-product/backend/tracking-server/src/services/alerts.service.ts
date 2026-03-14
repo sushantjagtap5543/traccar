@@ -35,10 +35,19 @@ export class AlertsService {
     const attributes = telemetry.attributes || {};
     const alarm = attributes.alarm;
     
-    // 1. Overspeed
-    if (telemetry.speed > (telemetry.speedLimit || 80)) {
+    // 1. Overspeed (Convert knots to km/h if needed, Traccar usually returns knots or km/h based on config, but we ensure km/h here)
+    const speedKmh = telemetry.speed * 1.852; // Assuming knots for standard GPS output, else use telemetry.speed directly if configured
+    const speedLimit = telemetry.speedLimit || 80;
+
+    if (speedKmh > speedLimit) {
        if (!this.isCooldownActive(deviceId, 'overspeed')) {
-         alertsToCreate.push({ type: 'overspeed', message: `Vehicle exceeded speed limit: ${Math.round(telemetry.speed)} km/h`, deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
+         alertsToCreate.push({ 
+           type: 'overspeed', 
+           message: `Vehicle exceeded speed limit: ${Math.round(speedKmh)} km/h`, 
+           deviceId, 
+           latitude: telemetry.latitude, 
+           longitude: telemetry.longitude 
+         });
        }
     }
 
@@ -61,9 +70,15 @@ export class AlertsService {
       }
     });
 
-    // 5. Low Battery
-    if (attributes.batteryLevel < 20 && !this.isCooldownActive(deviceId, 'low_battery')) {
-      alertsToCreate.push({ type: 'low_battery', message: `Device battery is low (${attributes.batteryLevel}%)`, deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
+    // 4. Power Restored
+    if (alarm === 'powerRestored' && !this.isCooldownActive(deviceId, 'power_restored')) {
+      alertsToCreate.push({ type: 'power_restored', message: 'Main power supply restored', deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
+    }
+
+    // 5. Low Battery (Ensure batteryLevel exists and is numeric)
+    const batLevel = parseFloat(attributes.batteryLevel);
+    if (!isNaN(batLevel) && batLevel < 20 && !this.isCooldownActive(deviceId, 'low_battery')) {
+      alertsToCreate.push({ type: 'low_battery', message: `Device battery is low (${Math.round(batLevel)}%)`, deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
     }
 
     // 6. Ignition Change (State aware)
@@ -112,9 +127,23 @@ export class AlertsService {
        alertsToCreate.push({ type: 'gps_lost', message: 'GPS satellite signal lost', deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
     }
 
-    // 16. Door
-    if (attributes.door === true && !this.isCooldownActive(deviceId, 'door_open')) {
+    // 16. Door (Improved check for boolean or string 'true')
+    const doorOpen = attributes.door === true || attributes.door === 'true';
+    if (doorOpen && !this.isCooldownActive(deviceId, 'door_open')) {
        alertsToCreate.push({ type: 'door_open', message: 'Unauthorized door access detected', deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
+    }
+
+    // 17. Idling (Ignition ON but speed is 0 for more than 10 mins)
+    if (currentIgnition && speedKmh < 1) {
+       const key = `${deviceId}:idling_start`;
+       const idleStart = this.lastAlertTimes.get(key) || Date.now();
+       if (!this.lastAlertTimes.has(key)) this.lastAlertTimes.set(key, idleStart);
+       
+       if (Date.now() - idleStart > 10 * 60 * 1000 && !this.isCooldownActive(deviceId, 'idling')) {
+         alertsToCreate.push({ type: 'idling', message: 'Excessive idling detected (>10 mins)', deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
+       }
+    } else {
+       this.lastAlertTimes.delete(`${deviceId}:idling_start`);
     }
 
     for (const alertData of alertsToCreate) {
