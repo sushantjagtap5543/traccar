@@ -2,55 +2,59 @@ const express = require('express');
 const router = express.Router();
 const { pool, logger } = require('../services/db');
 const { asyncHandler } = require('../middleware/errorHandler');
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { authenticateJWT, adminAuth } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 
 // --- CLIENT MANAGEMENT (ADMIN ONLY) ---
 
-// List all clients/users
-router.get('/', authenticateToken, isAdmin, asyncHandler(async (req, res) => {
-    const result = await pool.query('SELECT id, name, email, mobile, company, role, is_otp_verified, created_at FROM users WHERE role != \'admin\' ORDER BY created_at DESC');
+// --- CLIENT (TENANT) MANAGEMENT ---
+
+// List all clients
+router.get('/tenants', authenticateJWT, adminAuth, asyncHandler(async (req, res) => {
+    const result = await pool.query('SELECT * FROM clients ORDER BY created_at DESC');
     res.json(result.rows);
 }));
 
-// Create a new client
-router.post('/', authenticateToken, isAdmin, asyncHandler(async (req, res) => {
-    const { name, email, mobile, company, address, password, role } = req.body;
-    
-    // Hash password if provided, otherwise random one for OTP flow
-    const hashedPassword = password ? await bcrypt.hash(password, 12) : null;
-    
+// Create a new client (Tenant)
+router.post('/tenants', authenticateJWT, adminAuth, asyncHandler(async (req, res) => {
+    const { name, email } = req.body;
     const result = await pool.query(
-        'INSERT INTO users (name, email, mobile, company, address, password, role) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, name, email, mobile',
-        [name, email, mobile, company, address, hashedPassword, role || 'user']
+        'INSERT INTO clients (name, email) VALUES ($1, $2) RETURNING *',
+        [name, email]
     );
-    
     res.status(201).json(result.rows[0]);
 }));
 
-// Get specific client details
-router.get('/:id', authenticateToken, isAdmin, asyncHandler(async (req, res) => {
-    const result = await pool.query('SELECT id, name, email, mobile, company, address, role, is_otp_verified, created_at FROM users WHERE id = $1', [req.params.id]);
-    if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
-    res.json(result.rows[0]);
+// --- USER MANAGEMENT ---
+
+// List all users with client info
+router.get('/users', authenticateJWT, adminAuth, asyncHandler(async (req, res) => {
+    const result = await pool.query(`
+        SELECT u.id, u.name, u.email, u.mobile, u.role, c.name as client_name, u.created_at 
+        FROM users u 
+        LEFT JOIN clients c ON u.client_id = c.id 
+        WHERE u.role != 'admin' 
+        ORDER BY u.created_at DESC
+    `);
+    res.json(result.rows);
 }));
 
-// Update client
-router.put('/:id', authenticateToken, isAdmin, asyncHandler(async (req, res) => {
-    const { name, company, address, role, status } = req.body;
+// Create a new user linked to a client
+router.post('/users', authenticateJWT, adminAuth, asyncHandler(async (req, res) => {
+    const { name, email, mobile, password, clientId, role } = req.body;
+    const hashedPassword = await bcrypt.hash(password || 'GeoSurePath123!', 12);
+    
     const result = await pool.query(
-        'UPDATE users SET name = COALESCE($1, name), company = COALESCE($2, company), address = COALESCE($3, address), role = COALESCE($4, role) WHERE id = $5 RETURNING id, name',
-        [name, company, address, role, req.params.id]
+        'INSERT INTO users (name, email, mobile, password, client_id, role) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, email, client_id',
+        [name, email, mobile, hashedPassword, clientId, role || 'user']
     );
-    if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
-    res.json(result.rows[0]);
+    res.status(201).json(result.rows[0]);
 }));
 
-// Delete client
-router.delete('/:id', authenticateToken, isAdmin, asyncHandler(async (req, res) => {
-    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [req.params.id]);
-    if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
-    res.json({ message: 'User deleted successfully' });
+// Delete client (And cascade delete users/vehicles)
+router.delete('/tenants/:id', authenticateJWT, adminAuth, asyncHandler(async (req, res) => {
+    await pool.query('DELETE FROM clients WHERE id = $1', [req.params.id]);
+    res.json({ message: 'Client and all associated data deleted' });
 }));
 
 module.exports = router;

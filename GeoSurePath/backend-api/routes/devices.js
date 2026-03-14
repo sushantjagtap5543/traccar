@@ -40,7 +40,17 @@ router.post('/', authenticateJWT, checkDeviceLimit, asyncHandler(async (req, res
 
 router.post('/devices', (req, res) => res.redirect(307, '/api/devices')); // Backward compatibility
 
-router.get('/devices', authenticateJWT, asyncHandler(async (req, res) => {
+router.get('/', authenticateJWT, asyncHandler(async (req, res) => {
+    // Return vehicles belonging to the authenticated client/tenant
+    const result = await pool.query(
+        'SELECT * FROM vehicles WHERE client_id = $1 ORDER BY created_at DESC',
+        [req.user.client_id]
+    );
+    res.json(result.rows);
+}));
+
+router.get('/traccar', authenticateJWT, asyncHandler(async (req, res) => {
+    // Fetch directly from Traccar (raw view)
     const response = await axios.get(`${TRACCAR_URL}/api/devices`, {
         headers: { 'Cookie': req.headers.cookie }
     });
