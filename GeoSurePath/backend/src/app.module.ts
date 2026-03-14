@@ -12,6 +12,7 @@ import { AlertsModule } from './modules/alerts/alerts.module';
 import { CommandsModule } from './modules/commands/commands.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { BillingModule } from './modules/billing/billing.module';
+import { ClientsModule } from './modules/clients/clients.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { BillingModule } from './modules/billing/billing.module';
     CommandsModule,
     SubscriptionsModule,
     BillingModule,
+    ClientsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,10 +1,18 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, ManyToOne } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { Client } from '../../clients/entities/client.entity';
 
 @Entity('vehicles')
 export class Vehicle {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ nullable: true })
+  clientId: string;
+
+  @ManyToOne(() => Client, (client) => client.vehicles, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'clientId' })
+  client: Client;
 
   @Column()
   name: string;

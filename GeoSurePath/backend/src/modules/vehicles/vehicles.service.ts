@@ -49,16 +49,28 @@ export class VehiclesService {
     return savedVehicle;
   }
 
-  async findAllByUser(userId: string): Promise<Vehicle[]> {
-    return this.vehicleRepository.find({ where: { userId } });
+  async findByUser(userId: string, clientId?: string): Promise<Vehicle[]> {
+    const where: any = { userId };
+    if (clientId) {
+      where.clientId = clientId;
+    }
+    return this.vehicleRepository.find({ where });
   }
 
-  async findOne(id: string, userId: string): Promise<Vehicle> {
-    const vehicle = await this.vehicleRepository.findOne({ where: { id, userId } });
+  async findOne(id: string, userId?: string, clientId?: string): Promise<Vehicle> {
+    const where: any = { id };
+    if (userId) where.userId = userId;
+    if (clientId) where.clientId = clientId;
+
+    const vehicle = await this.vehicleRepository.findOne({ where });
     if (!vehicle) {
-      throw new NotFoundException('Vehicle not found');
+      throw new NotFoundException('Vehicle not found or unauthorized access');
     }
     return vehicle;
+  }
+
+  async findByTraccarId(traccarDeviceId: number): Promise<Vehicle> {
+    return this.vehicleRepository.findOne({ where: { traccarDeviceId } });
   }
 
   async remove(id: string, userId: string): Promise<void> {

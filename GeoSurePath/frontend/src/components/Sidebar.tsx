@@ -10,7 +10,8 @@ import {
   Settings, 
   ShieldCheck, 
   LogOut,
-  Car
+  Car,
+  Users
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { cn } from '@/lib/utils';
@@ -20,6 +21,7 @@ const navItems = [
   { name: 'Live Map', href: '/map', icon: MapIcon },
   { name: 'Vehicles', href: '/vehicles', icon: Car },
   { name: 'Alerts', href: '/alerts', icon: Bell },
+  { name: 'Clients', href: '/admin/clients', icon: Users, adminOnly: true },
   { name: 'Admin', href: '/admin', icon: ShieldCheck, adminOnly: true },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

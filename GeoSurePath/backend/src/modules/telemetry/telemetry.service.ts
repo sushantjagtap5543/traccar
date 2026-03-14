@@ -44,11 +44,22 @@ export class TelemetryService implements OnModuleInit, OnModuleDestroy {
       // Group positions by device and broadcast to the users who own them
       // In a real implementation, we'd have a mapping of traccarDeviceId -> userId
       
-      // For demonstration:
-      // positions.forEach(pos => {
-      //    const userId = getUserIdByTraccarId(pos.deviceId);
-      //    this.telemetryGateway.broadcastToUser(userId, 'position_update', pos);
-      // });
+      const positions = await this.traccarService.getLatestPositions([]); 
+      
+      for (const pos of positions) {
+        const vehicle = await this.vehiclesService.findByTraccarId(pos.deviceId);
+        if (vehicle && vehicle.clientId) {
+          this.telemetryGateway.broadcastToClient(vehicle.clientId, 'position_update', {
+            vehicleId: vehicle.id,
+            latitude: pos.latitude,
+            longitude: pos.longitude,
+            speed: pos.speed,
+            course: pos.course,
+            attributes: pos.attributes,
+            serverTime: pos.serverTime,
+          });
+        }
+      }
     } catch (e) {
       console.error('Telemetry polling error:', e.message);
     }

@@ -31,10 +31,14 @@ export class TelemetryGateway implements OnGatewayConnection, OnGatewayDisconnec
 
       const payload = await this.jwtService.verifyAsync(token);
       client.data.userId = payload.sub;
+      client.data.clientId = payload.clientId;
       
-      // Join a room specific to the user
+      // Join rooms for user and client
       client.join(`user_${payload.sub}`);
-      console.log(`Client connected: ${client.id} (User: ${payload.sub})`);
+      if (payload.clientId) {
+        client.join(`client_${payload.clientId}`);
+      }
+      console.log(`Client connected: ${client.id} (User: ${payload.sub}, Client: ${payload.clientId})`);
     } catch (e) {
       console.error('WebSocket connection error:', e.message);
       client.disconnect();
@@ -47,6 +51,10 @@ export class TelemetryGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   broadcastToUser(userId: string, event: string, data: any) {
     this.server.to(`user_${userId}`).emit(event, data);
+  }
+
+  broadcastToClient(clientId: string, event: string, data: any) {
+    this.server.to(`client_${clientId}`).emit(event, data);
   }
 
   @SubscribeMessage('ping')

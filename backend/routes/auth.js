@@ -63,7 +63,7 @@ router.post('/verify-otp', asyncHandler(async (req, res) => {
     const user = result.rows[0];
     
     // Generate JWTs
-    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role, client_id: user.client_id }, JWT_SECRET, { expiresIn: '1h' });
     const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: '7d' });
 
     // Cleanup OTP
@@ -81,10 +81,10 @@ router.post('/login', loginLimiter, asyncHandler(async (req, res) => {
         return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role, client_id: user.client_id }, JWT_SECRET, { expiresIn: '1h' });
     const refreshToken = jwt.sign({ id: user.id }, JWT_REFRESH_SECRET, { expiresIn: '7d' });
 
-    res.json({ token, refreshToken, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+    res.json({ token, refreshToken, user: { id: user.id, email: user.email, name: user.name, role: user.role, client_id: user.client_id } });
 }));
 
 module.exports = router;

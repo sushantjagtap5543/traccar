@@ -10,17 +10,16 @@ const authenticateJWT = async (req, res, next) => {
     if (authHeader) {
         const token = authHeader.split(' ')[1];
 
-        jwt.verify(token, JWT_SECRET, async (err, user) => {
+        jwt.verify(token, JWT_SECRET, async (err, decoded) => {
             if (err) {
                 return next(new AppError('UNAUTHORIZED', 'Invalid or expired token', 401));
             }
 
-            req.user = user;
+            req.user = decoded;
             
-            // Fetch traccar user id from metadata if available
-            const metadata = await pool.query("SELECT client_id FROM geosurepath_user_metadata WHERE user_id = $1", [user.id]);
-            if (metadata.rowCount > 0) {
-                req.traccarUser = { id: metadata.rows[0].client_id };
+            // Backward compatibility for traccarUser id if needed in downstream middlewares
+            if (decoded.client_id) {
+                req.traccarUser = { id: decoded.client_id };
             }
 
             next();

@@ -1,7 +1,9 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
+import { Client } from '../../clients/entities/client.entity';
 
 export enum UserRole {
   ADMIN = 'admin',
+  CLIENT_ADMIN = 'client_admin',
   USER = 'user',
 }
 
@@ -9,6 +11,13 @@ export enum UserRole {
 export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ nullable: true })
+  clientId: string;
+
+  @ManyToOne(() => Client, (client) => client.users, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'clientId' })
+  client: Client;
 
   @Column({ nullable: true })
   name: string;

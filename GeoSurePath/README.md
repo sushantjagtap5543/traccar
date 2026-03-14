@@ -1,15 +1,16 @@
 # GeoSurePath GPS SaaS Platform
 
-GeoSurePath is a production-ready, premium GPS tracking platform built for high performance and scalability. This platform provides real-time vehicle tracking, advanced alerting, and a robust administrative dashboard—all powered by open-source and free technologies.
+GeoSurePath is a **100% production-ready**, premium GPS SaaS platform built for high performance and multi-tenant scalability. It transforms the Traccar engine into a full-scale commercial platform.
 
 ## 🚀 Key Features
 
-- **Real-time Tracking**: Live vehicle positions on MapLibre GL with zero-latency WebSocket updates.
-- **Advanced Alert Engine**: 18 pre-configured business rules (Overspeed, Power Cut, Geofence, etc.).
-- **Smart Device Binding**: OTP-based user registration and instant device linking.
-- **Admin Command Center**: Centralized management for users, devices, and subscriptions.
-- **Freemium by Default**: Built-in 1-year free subscription management for every registered device.
-- **Dockerized Architecture**: Deployable to AWS Lightsail, Oracle Cloud, or any VPS in minutes.
+- **Multi-Tenant SaaS**: Complete Admin + Client portal separation.
+- **Client Management**: Admins can manage multiple independent client fleets.
+- **Real-time Tracking**: Live vehicle positions on MapLibre GL with smooth heading rotation.
+- **Advanced Alert Engine**: 18 business rules (Overspeed, Power Cut, Geofence, etc.).
+- **Smart Device Binding**: OTP-based registration and instant automated device linking.
+- **Role-Based Access**: Granular control for Admins, Client Admins, and Users.
+- **Billing Ready**: Integrated payment tracking system ready for commercial use.
 
 ## 🛠 Tech Stack
 

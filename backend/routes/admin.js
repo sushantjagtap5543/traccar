@@ -3,9 +3,9 @@ const router = express.Router();
 const { pool, logger } = require('../services/db');
 const { asyncHandler } = require('../middleware/errorHandler');
 
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const { authenticateJWT, adminAuth } = require('../middleware/auth');
 
-router.get('/stats', authenticateToken, isAdmin, asyncHandler(async (req, res) => {
+router.get('/stats', authenticateJWT, adminAuth, asyncHandler(async (req, res) => {
     // 1. Client & User Counts
     const clientCount = await pool.query('SELECT COUNT(*) FROM clients');
     const userCount = await pool.query('SELECT COUNT(*) FROM users WHERE role = \'user\'');
@@ -22,9 +22,13 @@ router.get('/stats', authenticateToken, isAdmin, asyncHandler(async (req, res) =
     
     // 3. Alerts & Activity
     const alertsToday = await pool.query('SELECT COUNT(*) FROM alerts WHERE created_at > CURRENT_DATE');
+    const geofenceViolations = await pool.query('SELECT COUNT(*) FROM alerts WHERE type LIKE \'%geofence%\' AND created_at > CURRENT_DATE');
     const activeSubs = await pool.query('SELECT COUNT(*) FROM subscriptions WHERE status = \'active\' AND end_date > NOW()');
     
-    // 4. Financials
+    // 4. Distance Calculation (Mocked or sum of pre-calculated daily distance)
+    const distanceToday = await pool.query('SELECT COALESCE(SUM((attributes->>\'distance\')::numeric), 0) / 1000 as total_km FROM telemetry WHERE server_time > CURRENT_DATE');
+
+    // 5. Financials
     const revenue = await pool.query('SELECT COUNT(*) * 1500 as total FROM subscriptions WHERE status = \'active\'');
 
     res.json({
@@ -34,6 +38,8 @@ router.get('/stats', authenticateToken, isAdmin, asyncHandler(async (req, res) =
         onlineVehicles: parseInt(onlineVehicles.rows[0].count),
         offlineVehicles: parseInt(totalVehicles.rows[0].count) - parseInt(onlineVehicles.rows[0].count),
         alertsToday: parseInt(alertsToday.rows[0].count),
+        geofenceViolations: parseInt(geofenceViolations.rows[0].count),
+        distanceTodayKm: parseFloat(distanceToday.rows[0].total_km).toFixed(2),
         activeSubscriptions: parseInt(activeSubs.rows[0].count),
         estimatedRevenue: parseInt(revenue.rows[0].total)
     });
