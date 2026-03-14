@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS users (
     is_otp_verified BOOLEAN DEFAULT FALSE,
     otp_code VARCHAR(10),
     otp_expires_at TIMESTAMP,
-    role VARCHAR(50) DEFAULT 'user',
+    role VARCHAR(50) DEFAULT 'CLIENT',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS positions (
 );
 
 CREATE INDEX idx_device_positions ON positions(device_id, server_time);
+CREATE INDEX idx_positions_device_time ON positions(device_id, device_time);
 
 -- 5. Alerts Table
 CREATE TABLE IF NOT EXISTS alerts (
