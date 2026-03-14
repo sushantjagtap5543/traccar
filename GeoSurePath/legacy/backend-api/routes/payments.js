@@ -30,8 +30,10 @@ router.post('/orders', authenticateJWT, asyncHandler(async (req, res) => {
     res.json(order);
 }));
 
-router.post('/verify', authenticateJWT, asyncHandler(async (req, res) => {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, planId } = req.body;
+const { generateInvoice } = require('../services/invoiceService');
+
+router.post('/verify', authenticateToken, asyncHandler(async (req, res) => {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, planId, imei } = req.body;
 
     const sign = razorpay_order_id + "|" + razorpay_payment_id;
     const expectedSign = crypto
@@ -40,17 +42,27 @@ router.post('/verify', authenticateJWT, asyncHandler(async (req, res) => {
         .digest("hex");
 
     if (razorpay_signature === expectedSign) {
-        // Success: Update subscription
-        const userId = req.user.id;
+        // 1. Update/Extend subscription in DB
         const months = planId === '1month' ? 1 : (planId === '6month' ? 6 : 12);
-        const deviceLimit = planId === 'enterprise' ? 100 : 50;
+        const amount = planId === '1month' ? 236 : (planId === '6month' ? 1121 : 1770); // Incl. GST
 
         await pool.query(
-            "INSERT INTO geosurepath_subscriptions (user_id, plan_id, status, expiry_date, device_limit, razorpay_payment_id) VALUES ($1, $2, 'active', NOW() + INTERVAL '$3 month', $4, $5)",
-            [userId, planId, months, deviceLimit, razorpay_payment_id]
+            "INSERT INTO subscriptions (imei, start_date, end_date, status) VALUES ($1, NOW(), NOW() + INTERVAL '$2 month', 'active')",
+            [imei, months]
         );
 
-        res.json({ success: true });
+        // 2. Generate PDF Invoice
+        const invoicePath = await generateInvoice({
+            clientName: req.user.name,
+            email: req.user.email,
+            planName: planId,
+            amount: amount,
+            paymentId: razorpay_payment_id
+        });
+
+        logger.info(`Payment verified and invoice generated: ${invoicePath}`);
+
+        res.json({ success: true, invoice: `/invoices/${path.basename(invoicePath)}` });
     } else {
         res.status(400).json({ error: 'Invalid signature' });
     }

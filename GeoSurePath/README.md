@@ -22,7 +22,8 @@ GeoSurePath is a production-ready, premium GPS tracking platform built for high 
 
 ```bash
 GeoSurePath/
-├── backend/            # NestJS API & Telemetry Engine
+├── backend-api/        # Express API & Telemetry Engine (Primary SaaS Layer)
+├── backend/            # Native NestJS implementation (Alternative)
 ├── frontend/           # Next.js Client & Admin Portals
 ├── traccar/            # Device Server configuration
 ├── database/           # SQL Migrations & Triggers

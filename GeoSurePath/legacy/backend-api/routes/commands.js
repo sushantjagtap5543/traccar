@@ -13,8 +13,8 @@ router.post('/commands/send', authenticateJWT, tenantIsolation, asyncHandler(asy
     const { deviceId, type, attributes } = req.body;
     const userId = req.user.id;
 
-    // Verify ownership
-    const ownership = await pool.query("SELECT 1 FROM tc_user_device WHERE userid = $1 AND deviceid = $2", [userId, deviceId]);
+    // Verify ownership using our local vehicles table
+    const ownership = await pool.query("SELECT id FROM vehicles WHERE id = $1 AND user_id = $2", [deviceId, userId]);
     if (ownership.rowCount === 0 && req.user.role !== 'admin') {
         return next(new AppError('FORBIDDEN', 'Device does not belong to user', 403));
     }
@@ -25,8 +25,8 @@ router.post('/commands/send', authenticateJWT, tenantIsolation, asyncHandler(asy
         }, { headers: { 'Cookie': req.headers.cookie } });
 
         await pool.query(
-            "INSERT INTO geosurepath_commands (user_id, device_id, type, attributes, status) VALUES ($1, $2, $3, $4, $5)",
-            [userId, deviceId, type, JSON.stringify(attributes || {}), 'sent']
+            "INSERT INTO command_logs (vehicle_id, type, status, result) VALUES ($1, $2, $3, $4)",
+            [deviceId, type, 'sent', JSON.stringify(attributes || {})]
         );
 
         res.json(response.data);
