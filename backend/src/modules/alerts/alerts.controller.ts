@@ -13,7 +13,7 @@ export class AlertsController {
   @Get()
   @ApiOperation({ summary: 'Get recent alerts for the user' })
   async findAll(@Req() req) {
-    return this.alertsService.findAllByUser(req.user.userId);
+    return this.alertsService.findAllByUser(req.user.userId, req.user.clientId);
   }
 
   @Patch(':id/read')

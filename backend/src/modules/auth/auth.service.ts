@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
+import { ClientsService } from '../clients/clients.service';
 import { User } from '../users/entities/user.entity';
 import * as bcrypt from 'bcryptjs';
 
@@ -8,6 +9,7 @@ import * as bcrypt from 'bcryptjs';
 export class AuthService {
   constructor(
     private usersService: UsersService,
+    private clientsService: ClientsService,
     private jwtService: JwtService,
   ) {}
 
@@ -51,18 +53,28 @@ export class AuthService {
       otpExpiresAt: null,
     });
 
-    const payload = { sub: user.id, mobile: user.mobile, role: user.role };
+    const payload = { sub: user.id, mobile: user.mobile, role: user.role, clientId: user.clientId };
     return {
       accessToken: this.jwtService.sign(payload),
     };
   }
 
   async completeProfile(userId: string, profileData: { name: string; email: string; company: string; address: string; password?: string }): Promise<User> {
+    const user = await this.usersService.findOneById(userId);
+    if (!user) throw new BadRequestException('User not found');
+
     const hashedPassword = profileData.password ? await bcrypt.hash(profileData.password, 10) : undefined;
     
+    let clientId = user.clientId;
+    if (!clientId && profileData.company) {
+      const client = await this.clientsService.create(profileData.company, profileData.email);
+      clientId = client.id;
+    }
+
     return this.usersService.update(userId, {
       ...profileData,
       password: hashedPassword,
+      clientId,
     });
   }
 
@@ -81,7 +93,7 @@ export class AuthService {
       throw new BadRequestException('Password required');
     }
 
-    const payload = { sub: user.id, mobile: user.mobile, role: user.role };
+    const payload = { sub: user.id, mobile: user.mobile, role: user.role, clientId: user.clientId };
     return {
       accessToken: this.jwtService.sign(payload),
     };

@@ -19,13 +19,13 @@ export class VehiclesController {
   @Get()
   @ApiOperation({ summary: 'Get all vehicles for the current user' })
   async findAll(@Req() req) {
-    return this.vehiclesService.findAllByUser(req.user.userId);
+    return this.vehiclesService.findByUser(req.user.userId, req.user.clientId);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a specific vehicle' })
   async findOne(@Req() req, @Param('id') id: string) {
-    return this.vehiclesService.findOne(id, req.user.userId);
+    return this.vehiclesService.findOne(id, req.user.userId, req.user.clientId);
   }
 
   @Delete(':id')

@@ -3,8 +3,7 @@ import { Client } from '../../clients/entities/client.entity';
 
 export enum UserRole {
   ADMIN = 'admin',
-  CLIENT_ADMIN = 'client_admin',
-  USER = 'user',
+  CLIENT = 'client',
 }
 
 @Entity('users')
