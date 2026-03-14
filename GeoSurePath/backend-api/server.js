@@ -20,6 +20,7 @@ const { startMonitor } = require('./services/monitor');
 const { startMaintenanceTasks } = require('./services/maintenance');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
+const clientManagementRoutes = require('./routes/clientManagement');
 const alertsRouter = require('./routes/alerts');
 const backupRoutes = require('./routes/backup');
 const migrationRoutes = require('./routes/migration');
@@ -89,6 +90,7 @@ app.use((req, res, next) => {
 // --- ROUTES ---
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminAuth, adminRoutes);
+app.use('/api/admin/clients', clientManagementRoutes);
 app.use('/api', migrationRoutes);
 app.use('/api', reportRoutes);
 app.use('/api', require('./routes/devices'));

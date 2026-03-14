@@ -22,25 +22,46 @@ export class CommandsService {
 
     const type = state ? 'engineResume' : 'engineStop';
     const log = this.commandLogRepository.create({
-      type,
       vehicleId,
+      type,
       status: 'pending',
     });
-    
     const savedLog = await this.commandLogRepository.save(log);
 
     try {
+      const vehicle = await this.vehiclesService.findOne(vehicleId);
       const result = await this.traccarService.sendCommand(vehicle.traccarDeviceId, type);
+      
       savedLog.status = 'success';
       savedLog.result = result;
-    } catch (e) {
+      return await this.commandLogRepository.save(savedLog);
+    } catch (error) {
       savedLog.status = 'failed';
-      savedLog.result = { error: e.message };
+      savedLog.lastError = error.message;
+      savedLog.retryCount = 0; // Initial fail
+      return await this.commandLogRepository.save(savedLog);
     }
-
-    return this.commandLogRepository.save(savedLog);
   }
 
+  async retryCommand(logId: string) {
+    const log = await this.commandLogRepository.findOne({ where: { id: logId } });
+    if (!log || log.status === 'success') return log;
+
+    log.status = 'retrying';
+    log.retryCount += 1;
+    await this.commandLogRepository.save(log);
+
+    try {
+      const vehicle = await this.vehiclesService.findOne(log.vehicleId);
+      const result = await this.traccarService.sendCommand(vehicle.traccarDeviceId, log.type);
+      log.status = 'success';
+      log.result = result;
+    } catch (error) {
+      log.status = 'failed';
+      log.lastError = error.message;
+    }
+    return this.commandLogRepository.save(log);
+  }
   async getLogs(userId: string, vehicleId: string): Promise<CommandLog[]> {
     await this.vehiclesService.findOne(vehicleId, userId); // Verify ownership
     return this.commandLogRepository.find({

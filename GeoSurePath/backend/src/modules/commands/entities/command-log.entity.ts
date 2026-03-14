@@ -9,11 +9,17 @@ export class CommandLog {
   @Column()
   type: string; // engineStop, engineResume
 
-  @Column({ nullable: true })
-  status: string; // pending, success, failed
+  @Column({ default: 'pending' })
+  status: string; // pending, sent, success, failed, retrying
 
   @Column({ type: 'jsonb', nullable: true })
   result: any;
+
+  @Column({ default: 0 })
+  retryCount: number;
+
+  @Column({ nullable: true })
+  lastError: string;
 
   @ManyToOne(() => Vehicle, { onDelete: 'CASCADE' })
   vehicle: Vehicle;

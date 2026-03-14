@@ -15,6 +15,23 @@ router.post('/devices', authenticateJWT, checkDeviceLimit, asyncHandler(async (r
     res.json(response.data);
 }));
 
+const { provisionDefaultSubscription } = require('../services/subscriptionService');
+
+router.post('/', authenticateJWT, asyncHandler(async (req, res) => { // Changed authenticateToken to authenticateJWT and added asyncHandler
+    const { name, uniqueId } = req.body;
+    
+    // 1. Create in database
+    const result = await pool.query(
+        'INSERT INTO vehicles (name, imei, user_id) VALUES ($1, $2, $3) RETURNING *',
+        [name, uniqueId, req.user.id]
+    );
+    
+    // 2. Provision 12-month subscription automatically
+    await provisionDefaultSubscription(uniqueId);
+    
+    res.status(201).json(result.rows[0]);
+}));
+
 router.get('/devices', authenticateJWT, asyncHandler(async (req, res) => {
     const response = await axios.get(`${TRACCAR_URL}/api/devices`, {
         headers: { 'Cookie': req.headers.cookie }

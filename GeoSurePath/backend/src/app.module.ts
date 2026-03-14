@@ -11,6 +11,7 @@ import { TelemetryModule } from './modules/telemetry/telemetry.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
 import { CommandsModule } from './modules/commands/commands.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { BillingModule } from './modules/billing/billing.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
     AlertsModule,
     CommandsModule,
     SubscriptionsModule,
+    BillingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
