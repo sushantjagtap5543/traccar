@@ -1,16 +1,16 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { CommandLog } from './entities/command-log.entity';
-import { CommandsService } from './commands.service';
-import { CommandsController } from './commands.controller';
-import { TraccarModule } from '../traccar/traccar.module';
-import { VehiclesModule } from '../vehicles/vehicles.module';
+import { CommandLog } from '../../src/database/entities/command-log.entity';
+import { CommandsService } from '../../src/services/commands.service';
+import { CommandsController } from '../../src/api/commands.controller';
+import { TraccarModule } from './traccar.module';
+import { DevicesModule } from './devices.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([CommandLog]),
     TraccarModule,
-    VehiclesModule,
+    DevicesModule,
   ],
   providers: [CommandsService],
   controllers: [CommandsController],

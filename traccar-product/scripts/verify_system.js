@@ -1,7 +1,8 @@
 const axios = require('axios');
-require('dotenv').config({ path: './GeoSurePath/backend-api/.env' });
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
-const API_URL = 'http://localhost:8083/api';
+const API_URL = process.env.API_URL || 'http://localhost:8083/api';
 
 async function testSystem() {
     console.log('--- GeoSurePath System Verification ---');

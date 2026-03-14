@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Geofence } from './entities/geofence.entity';
+import { Geofence } from '../database/entities/geofence.entity';
 
 @Injectable()
 export class GeofencesService {

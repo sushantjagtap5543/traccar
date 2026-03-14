@@ -10,6 +10,18 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 export class BillingController {
   constructor(private readonly billingService: BillingService) {}
 
+  @Get('plans')
+  @ApiOperation({ summary: 'Get all billing plans' })
+  async getPlans() {
+    return await this.billingService.getPlans();
+  }
+
+  @Post('plans')
+  @ApiOperation({ summary: 'Create a new billing plan' })
+  async createPlan(@Body() planData: any) {
+    return await this.billingService.createPlan(planData);
+  }
+
   @Post('order')
   @ApiOperation({ summary: 'Create a new payment order' })
   async createOrder(@Req() req, @Body() body: { planId: string }) {

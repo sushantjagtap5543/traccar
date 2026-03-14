@@ -1,21 +1,18 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 // import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { InvoiceService } from './invoiceService';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 
+@ApiTags('Invoices')
+@ApiBearerAuth()
 @Controller('invoices')
 // @UseGuards(JwtAuthGuard)
 export class InvoiceController {
-  @Post('generate')
-  async generateInvoice(@Body() data: any) {
-    return { message: 'Invoice generated successfully' };
-  }
+  constructor(private readonly invoiceService: InvoiceService) {}
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get invoice by ID' })
   async getInvoice(@Param('id') id: string) {
-    return { id, status: 'unpaid', amount: 0 };
-  }
-
-  @Get('client/:clientId')
-  async getClientInvoices(@Param('clientId') clientId: string) {
-    return [];
+    return await this.invoiceService.getInvoiceById(parseInt(id, 10));
   }
 }

@@ -24,7 +24,10 @@ export default function ClientDashboard() {
   const { token } = useAuthStore();
 
   useEffect(() => {
-    if (token) fetchAdminStats(token);
+    if (token) {
+      fetchAdminStats(token);
+      // Logic to fetch today's alerts count could be added here
+    }
   }, [token]);
 
   return (

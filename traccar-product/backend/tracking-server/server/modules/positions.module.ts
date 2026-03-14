@@ -2,10 +2,10 @@ import { forwardRef, Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PositionsGateway } from './positions.gateway';
-import { PositionsService } from './positions.service';
-import { TraccarModule } from '../traccar/traccar.module';
-import { DevicesModule } from '../devices/devices.module';
-import { AlertsModule } from '../alerts/alerts.module';
+import { PositionsService } from '../../src/services/positions.service';
+import { TraccarModule } from './traccar.module';
+import { DevicesModule } from './devices.module';
+import { AlertsModule } from './alerts.module';
 
 @Module({
   imports: [

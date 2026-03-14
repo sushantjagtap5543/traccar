@@ -1,9 +1,9 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CommandLog } from './entities/command-log.entity';
-import { TraccarService } from '../traccar/traccar.service';
-import { VehiclesService } from '../vehicles/vehicles.service';
+import { CommandLog } from '../database/entities/command-log.entity';
+import { TraccarService } from './traccar.service';
+import { DevicesService } from './devices.service';
 
 @Injectable()
 export class CommandsService {
@@ -11,26 +11,25 @@ export class CommandsService {
     @InjectRepository(CommandLog)
     private commandLogRepository: Repository<CommandLog>,
     private traccarService: TraccarService,
-    private vehiclesService: VehiclesService,
+    private devicesService: DevicesService,
   ) {}
 
-  async sendIgnitionCommand(userId: string, vehicleId: string, state: boolean): Promise<CommandLog> {
-    const vehicle = await this.vehiclesService.findOne(vehicleId, userId);
-    if (!vehicle.traccarDeviceId) {
+  async sendIgnitionCommand(userId: string, deviceId: string, state: boolean): Promise<CommandLog> {
+    const device = await this.devicesService.findOne(deviceId, userId);
+    if (!device.traccarDeviceId) {
       throw new BadRequestException('Vehicle is not linked to Traccar server');
     }
 
     const type = state ? 'engineResume' : 'engineStop';
     const log = this.commandLogRepository.create({
-      vehicleId,
+      deviceId,
       type,
       status: 'pending',
     });
-    const savedLog = await this.commandLogRepository.save(log);
+    let savedLog = await this.commandLogRepository.save(log);
 
     try {
-      const vehicle = await this.vehiclesService.findOne(vehicleId);
-      const result = await this.traccarService.sendCommand(vehicle.traccarDeviceId, type);
+      const result = await this.traccarService.sendCommand(device.traccarDeviceId, type);
       
       savedLog.status = 'success';
       savedLog.result = result;
@@ -52,8 +51,8 @@ export class CommandsService {
     await this.commandLogRepository.save(log);
 
     try {
-      const vehicle = await this.vehiclesService.findOne(log.vehicleId);
-      const result = await this.traccarService.sendCommand(vehicle.traccarDeviceId, log.type);
+      const device = await this.devicesService.findOne(log.deviceId);
+      const result = await this.traccarService.sendCommand(device.traccarDeviceId, log.type);
       log.status = 'success';
       log.result = result;
     } catch (error) {
@@ -62,10 +61,10 @@ export class CommandsService {
     }
     return this.commandLogRepository.save(log);
   }
-  async getLogs(userId: string, vehicleId: string): Promise<CommandLog[]> {
-    await this.vehiclesService.findOne(vehicleId, userId); // Verify ownership
+  async getLogs(userId: string, deviceId: string): Promise<CommandLog[]> {
+    await this.devicesService.findOne(deviceId, userId); // Verify ownership
     return this.commandLogRepository.find({
-      where: { vehicleId },
+      where: { deviceId },
       order: { createdAt: 'DESC' },
       take: 20,
     });

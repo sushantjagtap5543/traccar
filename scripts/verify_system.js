@@ -1,5 +1,5 @@
 const axios = require('axios');
-require('dotenv').config({ path: './GeoSurePath/backend-api/.env' });
+require('dotenv').config({ path: './backend/tracking-server/.env' });
 
 const API_URL = 'http://localhost:8083/api';
 

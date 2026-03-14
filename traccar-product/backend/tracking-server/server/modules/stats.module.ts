@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { StatsService } from './stats.service';
-import { StatsController } from './stats.controller';
-import { Device } from '../devices/entities/device.entity';
-import { Client } from '../clients/entities/client.entity';
-import { Alert } from '../alerts/entities/alert.entity';
-import { TraccarModule } from '../traccar/traccar.module';
+import { StatsService } from '../../src/services/stats.service';
+import { StatsController } from '../../src/api/stats.controller';
+import { Device } from '../../src/database/entities/device.entity';
+import { Client } from '../../src/database/entities/client.entity';
+import { Alert } from '../../src/database/entities/alert.entity';
+import { TraccarModule } from './traccar.module';
 
 @Module({
   imports: [

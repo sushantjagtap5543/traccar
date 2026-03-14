@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { ReportsService } from './reports.service';
-import { ReportsController } from './reports.controller';
-import { TraccarModule } from '../traccar/traccar.module';
-import { DevicesModule } from '../devices/devices.module';
+import { ReportsService } from '../../src/services/reports.service';
+import { ReportsController } from '../../src/api/reports.controller';
+import { TraccarModule } from './traccar.module';
+import { DevicesModule } from './devices.module';
 
 @Module({
   imports: [TraccarModule, DevicesModule],

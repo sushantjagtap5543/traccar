@@ -1,9 +1,9 @@
 import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Alert } from './entities/alert.entity';
-import { PositionsGateway } from '../positions/positions.gateway';
-import { GeofencesService } from '../geofences/geofences.service';
+import { Alert } from '../database/entities/alert.entity';
+import { PositionsGateway } from '../../server/modules/positions.gateway';
+import { GeofencesService } from './geofences.service';
 
 @Injectable()
 export class AlertsService {
@@ -42,7 +42,7 @@ export class AlertsService {
        }
     }
 
-    // 2. Power Cut / Vibration / Tow / SOS / Signal Lost / Harsh Braking
+    // 2. Power Cut / Vibration / Tow / SOS / Signal Lost / Harsh Braking / Tampering
     const commonAlarms = [
       { key: 'powerCut', type: 'power_cut', msg: 'Main power supply disconnected' },
       { key: 'vibration', type: 'vibration', msg: 'Vibration detected while parked' },
@@ -51,7 +51,8 @@ export class AlertsService {
       { key: 'jamming', type: 'jamming', msg: 'Signal jamming detected' },
       { key: 'hardBraking', type: 'harsh_braking', msg: 'Harsh braking detected' },
       { key: 'hardAcceleration', type: 'harsh_acceleration', msg: 'Harsh acceleration detected' },
-      { key: 'hardCornering', type: 'harsh_cornering', msg: 'Harsh cornering detected' }
+      { key: 'hardCornering', type: 'harsh_cornering', msg: 'Harsh cornering detected' },
+      { key: 'tampering', type: 'tampering', msg: 'Device tampering detected' }
     ];
 
     commonAlarms.forEach(a => {
@@ -65,13 +66,14 @@ export class AlertsService {
       alertsToCreate.push({ type: 'low_battery', message: `Device battery is low (${attributes.batteryLevel}%)`, deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
     }
 
-    // 6. Ignition Change (State aware, usually no cooldown wanted but we can add one if user insists)
+    // 6. Ignition Change (State aware)
     const currentIgnition = attributes.ignition;
     if (currentIgnition !== undefined) {
       const lastState = this.lastIgnitionState.get(deviceId);
       if (lastState !== undefined && lastState !== currentIgnition) {
+        const type = currentIgnition ? 'ignition_on' : 'ignition_off';
         alertsToCreate.push({ 
-          type: 'ignition', 
+          type, 
           message: `Engine turned ${currentIgnition ? 'ON' : 'OFF'}`, 
           deviceId, 
           latitude: telemetry.latitude, 

@@ -1,8 +1,8 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Inject, forwardRef } from '@nestjs/common';
-import { PositionsGateway } from './positions.gateway';
-import { TraccarService } from '../traccar/traccar.service';
-import { DevicesService } from '../devices/devices.service';
-import { AlertsService } from '../alerts/alerts.service';
+import { PositionsGateway } from '../../server/modules/positions.gateway';
+import { TraccarService } from './traccar.service';
+import { DevicesService } from './devices.service';
+import { AlertsService } from './alerts.service';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()

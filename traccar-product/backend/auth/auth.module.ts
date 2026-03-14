@@ -4,8 +4,8 @@ import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { UsersModule } from '../users/users.module';
-import { ClientsModule } from '../clients/clients.module';
+import { UsersModule } from '../tracking-server/server/modules/users.module';
+import { ClientsModule } from '../tracking-server/server/modules/clients.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({

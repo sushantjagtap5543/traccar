@@ -1,22 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Plan } from '../tracking-server/src/database/entities/plan.entity';
 
 @Injectable()
 export class BillingService {
   constructor(
-    // Repositories will be added here once entities are created
+    @InjectRepository(Plan)
+    private planRepository: Repository<Plan>,
   ) {}
 
   async createPlan(data: any) {
-    // Logic to create a billing plan
+    const plan = this.planRepository.create(data);
+    return await this.planRepository.save(plan);
   }
 
   async getPlans() {
-    // Logic to retrieve all plans
+    return await this.planRepository.find();
   }
 
   async processPayment(paymentData: any) {
     // Logic to interface with payment gateway
+    // This will be expanded in PaymentService
   }
 }

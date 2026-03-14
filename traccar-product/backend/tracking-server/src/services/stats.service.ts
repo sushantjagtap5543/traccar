@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
-import { Device } from '../devices/entities/device.entity';
-import { Client } from '../clients/entities/client.entity';
-import { Alert } from '../alerts/entities/alert.entity';
-import { RedisService } from '../redis/redis.service';
-import { TraccarService } from '../traccar/traccar.service';
+import { Device } from '../database/entities/device.entity';
+import { Client } from '../database/entities/client.entity';
+import { Alert } from '../database/entities/alert.entity';
+import { RedisService } from './redis.service';
+import { TraccarService } from './traccar.service';
 
 @Injectable()
 export class StatsService {

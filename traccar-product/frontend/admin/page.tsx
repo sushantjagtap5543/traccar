@@ -31,6 +31,16 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleControl = (clientId: string) => {
+    // Logic to navigate to client control or open modal
+    console.log('Controlling client:', clientId);
+  };
+
+  const handleApproveIMEI = () => {
+    // Logic to open IMEI approval modal
+    console.log('Opening IMEI approval modal');
+  };
+
   return (
     <main className="flex min-h-screen bg-background overflow-hidden font-sans">
       <Sidebar />
@@ -47,7 +57,10 @@ export default function AdminDashboardPage() {
                 className="bg-white/5 border border-border rounded-lg pl-10 pr-4 py-2 text-xs outline-none focus:border-primary transition-all w-64"
               />
             </div>
-            <button className="bg-primary text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-primary/90 transition-all">
+            <button 
+              onClick={handleApproveIMEI}
+              className="bg-primary text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-primary/90 transition-all"
+            >
               <Plus className="w-4 h-4" />
               Approve New IMEI
             </button>
@@ -124,7 +137,12 @@ export default function AdminDashboardPage() {
                       </td>
                       <td className="px-6 py-4 text-muted">{new Date(client.createdAt).toLocaleDateString()}</td>
                       <td className="px-6 py-4">
-                        <button className="text-primary hover:underline font-bold text-[10px] uppercase">Control</button>
+                        <button 
+                          onClick={() => handleControl(client.id)}
+                          className="text-primary hover:underline font-bold text-[10px] uppercase"
+                        >
+                          Control
+                        </button>
                       </td>
                     </tr>
                   ))}

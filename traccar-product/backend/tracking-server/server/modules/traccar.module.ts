@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { TraccarService } from './traccar.service';
+import { TraccarService } from '../../src/services/traccar.service';
 
 @Module({
   imports: [ConfigModule],
