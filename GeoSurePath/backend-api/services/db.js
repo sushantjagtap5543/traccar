@@ -35,4 +35,9 @@ const init = async () => {
   }
 };
 
-module.exports = { pool, redisClient, ioRedisClient, logger, init };
+const getClientByUserId = async (userId) => {
+  const result = await pool.query('SELECT c.* FROM clients c JOIN users u ON u.client_id = c.id WHERE u.id = $1', [userId]);
+  return result.rows[0];
+};
+
+module.exports = { pool, redisClient, ioRedisClient, logger, init, getClientByUserId };

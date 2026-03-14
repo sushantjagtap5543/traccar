@@ -7,12 +7,16 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 
+const { bruteForceProtection } = require('../middleware/rateLimiter');
 const { sendSMS } = require('../services/sms');
 const bcrypt = require('bcryptjs');
 
+const loginLimiter = bruteForceProtection('login', 5, 300); // 5 attempts per 5 mins
+const otpLimiter = bruteForceProtection('otp', 3, 600); // 3 OTP requests per 10 mins
+
 // --- OTP REGISTRATION ---
 
-router.post('/register-otp', asyncHandler(async (req, res) => {
+router.post('/register-otp', otpLimiter, asyncHandler(async (req, res) => {
     const { mobile } = req.body;
     if (!mobile) return res.status(400).json({ error: 'Mobile number is required' });
 
@@ -39,14 +43,21 @@ router.post('/verify-otp', asyncHandler(async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password || 'GeoSurePath123!', 12);
 
-    // Create or update user
+    // 1. Create Client for the user (Tenant)
+    const clientResult = await pool.query(
+        'INSERT INTO clients (name, email) VALUES ($1, $2) RETURNING id',
+        [company || `${name}'s Company`, email]
+    );
+    const clientId = clientResult.rows[0].id;
+
+    // 2. Create or update user
     const result = await pool.query(
-        `INSERT INTO users (name, email, mobile, company, address, password, is_otp_verified) 
-         VALUES ($1, $2, $3, $4, $5, $6, TRUE) 
+        `INSERT INTO users (client_id, name, email, mobile, company, address, password, is_otp_verified) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE) 
          ON CONFLICT (mobile) DO UPDATE SET 
-            name = EXCLUDED.name, email = EXCLUDED.email, company = EXCLUDED.company, address = EXCLUDED.address, is_otp_verified = TRUE 
-         RETURNING id, name, email, mobile, role`,
-        [name, email, mobile, company, address, hashedPassword]
+            client_id = EXCLUDED.client_id, name = EXCLUDED.name, email = EXCLUDED.email, company = EXCLUDED.company, address = EXCLUDED.address, is_otp_verified = TRUE 
+         RETURNING id, name, email, mobile, role, client_id`,
+        [clientId, name, email, mobile, company, address, hashedPassword]
     );
 
     const user = result.rows[0];
@@ -61,7 +72,7 @@ router.post('/verify-otp', asyncHandler(async (req, res) => {
     res.json({ token, refreshToken, user });
 }));
 
-router.post('/login', asyncHandler(async (req, res) => {
+router.post('/login', loginLimiter, asyncHandler(async (req, res) => {
     const { email, password } = req.body;
     const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
     const user = result.rows[0];

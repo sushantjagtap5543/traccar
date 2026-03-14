@@ -22,8 +22,8 @@ router.post('/', authenticateJWT, checkDeviceLimit, asyncHandler(async (req, res
 
     // 2. Create in GeoSurePath Database
     const result = await pool.query(
-        'INSERT INTO vehicles (name, imei, user_id, traccar_device_id, model) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [name, uniqueId, req.user.id, traccarDevice.id, model || 'unknown']
+        'INSERT INTO vehicles (name, imei, user_id, traccar_device_id, model, client_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [name, uniqueId, req.user.id, traccarDevice.id, model || 'unknown', req.user.client_id]
     );
 
     // 3. Provision 12-month subscription automatically

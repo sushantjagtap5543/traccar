@@ -3,9 +3,20 @@
 -- Enable PostGIS if available (for future geospatial enhancements, though MapLibre handles most)
 -- CREATE EXTENSION IF NOT EXISTS postgis;
 
--- 1. Users Table
+-- 1. Clients Table (Multi-tenant)
+CREATE TABLE IF NOT EXISTS clients (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE,
+    status VARCHAR(50) DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. Users Table
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_id UUID REFERENCES clients(id) ON DELETE CASCADE,
     name VARCHAR(255),
     email VARCHAR(255) UNIQUE,
     mobile VARCHAR(20) UNIQUE NOT NULL,
@@ -20,13 +31,14 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Vehicles Table
+-- 3. Vehicles Table
 CREATE TABLE IF NOT EXISTS vehicles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_id UUID REFERENCES clients(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     imei VARCHAR(50) UNIQUE NOT NULL,
     traccar_device_id INTEGER UNIQUE,
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL, -- Keeping for historical reference
     model VARCHAR(100) DEFAULT 'unknown',
     status VARCHAR(50) DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
