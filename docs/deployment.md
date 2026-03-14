@@ -1,35 +1,47 @@
-# GeoSurePath Deployment Guide
+# GeoSurePath Production Deployment Guide
 
 ## Prerequisites
-- Ubuntu 22.04 LTS
-- Docker & Docker Compose
-- AWS Lightsail instance (Recommended: 4GB RAM, 2vCPU)
+- Ubuntu 22.04+ Recommended
+- Docker & Docker Compose installed
+- Domain name with A-record pointing to server IP
+- Ports 80, 443, and 5000-5150 open in firewall
 
-## Installation
-1. Clone the repository:
+## Step-by-Step Setup
+
+1. **Clone the repository**
    ```bash
-   git clone https://github.com/sushantjagtap5543/traccar
-   cd traccar
-   ```
-2. Start the services:
-   ```bash
-   bash scripts/start.sh
+   git clone <repo-url>
+   cd traccar-product
    ```
 
-## Configuration
-- **Traccar Config**: `traccar/conf/traccar.xml`
-- **Nginx Config**: `nginx/nginx.conf`
-- **Database**: Port 5432 (Internal to Docker)
+2. **Configure Environment**
+   Edit the `.env` file with your production credentials:
+   ```bash
+   cp .env .env.prod
+   nano .env
+   ```
 
-## Backup
-The backup script runs via cron:
-```bash
-0 2 * * * /scripts/backup.sh
-```
+3. **Deploy with Docker**
+   Run the startup script:
+   ```bash
+   chmod +x scripts/start/start.sh
+   ./scripts/start/start.sh
+   ```
 
-## Security
-Ports to open in firewall:
-- 80 (HTTP)
-- 443 (HTTPS)
-- 8082 (Traccar Web)
-- 5000-5150 (GPS Protocols)
+4. **SSL Configuration**
+   By default, Nginx is configured for HTTP. To enable HTTPS:
+   - Place your SSL certificates in `infrastructure/ssl/`
+   - Uncomment the SSL section in `infrastructure/nginx/nginx.conf`
+   - Restart Nginx: `docker restart traccar-nginx`
+
+5. **Firewall Setup**
+   Ensure tracking ports are open:
+   ```bash
+   sudo ufw allow 80,443/tcp
+   sudo ufw allow 5000:5150/tcp
+   sudo ufw allow 5150:5150/udp
+   ```
+
+## Maintenance
+- **Backups**: Run `./scripts/backup/backup.sh` regularly.
+- **Health**: Check system status with `./scripts/healthcheck/healthcheck.sh`.
