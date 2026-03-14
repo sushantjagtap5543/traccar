@@ -28,8 +28,15 @@ fi
 
 # 5. Build and Start Containers
 echo "🏗️ Building Infrastructure..."
-docker-compose -f docker/docker-compose.yml up --build -d
+docker-compose up --build -d
+
+# 6. Verify Health
+echo "⏳ Waiting for services to stabilize..."
+sleep 15
+
+echo "🏥 Running Health Checks..."
+./scripts/healthcheck.sh
 
 echo "✅ Deployment Successful!"
-echo "📡 Platform access: https://localhost (SSL)"
-echo "📡 API Documentation: https://localhost/api/docs"
+echo "📡 Platform access: http://localhost"
+echo "📡 API Documentation: http://localhost/api/docs"
