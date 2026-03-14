@@ -2,8 +2,8 @@ import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateCol
 import { User } from '../../users/entities/user.entity';
 import { Client } from '../../clients/entities/client.entity';
 
-@Entity('vehicles')
-export class Vehicle {
+@Entity('devices')
+export class Device {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 

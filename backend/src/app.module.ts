@@ -5,14 +5,15 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
-import { VehiclesModule } from './modules/vehicles/vehicles.module';
+import { DevicesModule } from './modules/devices/devices.module';
 import { TraccarModule } from './modules/traccar/traccar.module';
-import { TelemetryModule } from './modules/telemetry/telemetry.module';
+import { PositionsModule } from './modules/positions/positions.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
 import { CommandsModule } from './modules/commands/commands.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { ClientsModule } from './modules/clients/clients.module';
+import { StatsModule } from './modules/stats/stats.module';
 
 @Module({
   imports: [
@@ -31,14 +32,15 @@ import { ClientsModule } from './modules/clients/clients.module';
     }),
     AuthModule,
     UsersModule,
-    VehiclesModule,
+    DevicesModule,
     TraccarModule,
-    TelemetryModule,
+    PositionsModule,
     AlertsModule,
     CommandsModule,
     SubscriptionsModule,
     BillingModule,
     ClientsModule,
+    StatsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

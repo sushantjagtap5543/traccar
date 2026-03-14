@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useTelemetryStore } from '@/store/useTelemetryStore';
+import { usePositionsStore } from '@/store/usePositionsStore';
 
 interface MapViewProps {
   center?: [number, number];
@@ -13,7 +13,7 @@ interface MapViewProps {
 export function MapView({ center = [78.9629, 20.5937], zoom = 5 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
-  const { positions } = useTelemetryStore();
+  const { positions } = usePositionsStore();
   const [activeMarkers, setActiveMarkers] = useState<Record<string, maplibregl.Marker>>({});
 
   useEffect(() => {
@@ -32,7 +32,6 @@ export function MapView({ center = [78.9629, 20.5937], zoom = 5 }: MapViewProps)
     map.current.on('load', () => {
       if (!map.current) return;
 
-      // Add clustering source
       map.current.addSource('vehicles', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
@@ -41,7 +40,6 @@ export function MapView({ center = [78.9629, 20.5937], zoom = 5 }: MapViewProps)
         clusterRadius: 50
       });
 
-      // Cluster Circles
       map.current.addLayer({
         id: 'clusters',
         type: 'circle',
@@ -53,7 +51,6 @@ export function MapView({ center = [78.9629, 20.5937], zoom = 5 }: MapViewProps)
         }
       });
 
-      // Cluster Count Text
       map.current.addLayer({
         id: 'cluster-count',
         type: 'symbol',
@@ -89,9 +86,9 @@ export function MapView({ center = [78.9629, 20.5937], zoom = 5 }: MapViewProps)
     const newMarkers = { ...activeMarkers };
 
     Object.values(positions).forEach((pos) => {
-      if (newMarkers[pos.vehicleId]) {
-        newMarkers[pos.vehicleId].setLngLat([pos.longitude, pos.latitude]);
-        const el = newMarkers[pos.vehicleId].getElement();
+      if (newMarkers[pos.deviceId]) {
+        newMarkers[pos.deviceId].setLngLat([pos.longitude, pos.latitude]);
+        const el = newMarkers[pos.deviceId].getElement();
         const icon = el.querySelector('.vehicle-icon') as HTMLElement;
         if (icon) icon.style.transform = `rotate(${pos.course}deg)`;
       } else {
@@ -99,7 +96,7 @@ export function MapView({ center = [78.9629, 20.5937], zoom = 5 }: MapViewProps)
         el.className = 'vehicle-marker';
         const color = pos.status === 'moving' ? '#10b981' : pos.status === 'idle' ? '#f59e0b' : '#ef4444';
         
-        let path = "M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z"; // Default arrow
+        let path = "M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z"; 
         if (pos.attributes?.type === 'truck') {
           path = "M20,8H17V4H3C1.89,4 1,4.89 1,6V17H3A3,3 0 0,0 6,20A3,3 0 0,0 9,17H15A3,3 0 0,0 18,20A3,3 0 0,0 21,17H23V12L20,8M6,18.5A1.5,1.5 0 0,1 4.5,17A1.5,1.5 0 0,1 6,15.5A1.5,1.5 0 0,1 7.5,17A1.5,1.5 0 0,1 6,18.5M17,12V9.5H19.5L21.47,12H17M18,18.5A1.5,1.5 0 0,1 16.5,17A1.5,1.5 0 0,1 18,15.5A1.5,1.5 0 0,1 19.5,17A1.5,1.5 0 0,1 18,18.5Z";
         } else if (pos.attributes?.type === 'bike') {
@@ -117,7 +114,7 @@ export function MapView({ center = [78.9629, 20.5937], zoom = 5 }: MapViewProps)
         const marker = new maplibregl.Marker({ element: el })
           .setLngLat([pos.longitude, pos.latitude])
           .addTo(map.current!);
-        newMarkers[pos.vehicleId] = marker;
+        newMarkers[pos.deviceId] = marker;
       }
     });
 
@@ -126,7 +123,7 @@ export function MapView({ center = [78.9629, 20.5937], zoom = 5 }: MapViewProps)
 
   return (
     <div className="w-full h-full relative">
-      <div ref={mapContainer} className="map-container" />
+      <div ref={mapContainer} className="map-container w-full h-full" />
       <div className="absolute top-4 left-4 glass p-4 rounded-xl z-10 shadow-premium border border-border">
         <h3 className="text-sm font-bold mb-2 uppercase tracking-tighter italic">Live Fleet</h3>
         <div className="space-y-2">

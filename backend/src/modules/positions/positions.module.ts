@@ -1,15 +1,15 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TelemetryGateway } from './telemetry.gateway';
-import { TelemetryService } from './telemetry.service';
+import { PositionsGateway } from './positions.gateway';
+import { PositionsService } from './positions.service';
 import { TraccarModule } from '../traccar/traccar.module';
-import { VehiclesModule } from '../vehicles/vehicles.module';
+import { DevicesModule } from '../devices/devices.module';
 
 @Module({
   imports: [
     TraccarModule,
-    VehiclesModule,
+    DevicesModule,
     ConfigModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -20,7 +20,7 @@ import { VehiclesModule } from '../vehicles/vehicles.module';
       inject: [ConfigService],
     }),
   ],
-  providers: [TelemetryGateway, TelemetryService],
-  exports: [TelemetryGateway, TelemetryService],
+  providers: [PositionsGateway, PositionsService],
+  exports: [PositionsGateway, PositionsService],
 })
-export class TelemetryModule {}
+export class PositionsModule {}

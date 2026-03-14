@@ -13,9 +13,9 @@ import { JwtService } from '@nestjs/jwt';
   cors: {
     origin: '*',
   },
-  namespace: 'telemetry',
+  namespace: 'positions',
 })
-export class TelemetryGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class PositionsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 

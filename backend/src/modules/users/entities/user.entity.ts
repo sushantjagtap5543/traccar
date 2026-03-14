@@ -2,8 +2,8 @@ import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateCol
 import { Client } from '../../clients/entities/client.entity';
 
 export enum UserRole {
-  ADMIN = 'admin',
-  CLIENT = 'client',
+  ADMIN = 'ADMIN',
+  CLIENT = 'CLIENT',
 }
 
 @Entity('users')
@@ -48,7 +48,7 @@ export class User {
   @Column({
     type: 'enum',
     enum: UserRole,
-    default: UserRole.USER,
+    default: UserRole.CLIENT,
   })
   role: UserRole;
 

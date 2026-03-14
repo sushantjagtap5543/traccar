@@ -1,5 +1,5 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, ManyToOne } from 'typeorm';
-import { Vehicle } from '../../vehicles/entities/vehicle.entity';
+import { Device } from '../../devices/entities/device.entity';
 
 @Entity('alerts')
 export class Alert {
@@ -21,11 +21,11 @@ export class Alert {
   @Column({ type: 'jsonb', nullable: true })
   attributes: any;
 
-  @ManyToOne(() => Vehicle, { onDelete: 'CASCADE' })
-  vehicle: Vehicle;
+  @ManyToOne(() => Device, { onDelete: 'CASCADE' })
+  device: Device;
 
   @Column()
-  vehicleId: string;
+  deviceId: string;
 
   @Column({ default: false })
   isRead: boolean;
