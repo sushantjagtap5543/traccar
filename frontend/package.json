@@ -16,6 +16,10 @@
     "axios": "latest",
     "zustand": "latest",
     "maplibre-gl": "latest",
+    "recharts": "latest",
+    "clsx": "latest",
+    "tailwind-merge": "latest",
+    "date-fns": "latest",
     "socket.io-client": "latest",
     "react-toastify": "latest"
   }

@@ -9,6 +9,7 @@ import { GeofencesService } from '../geofences/geofences.service';
 export class AlertsService {
   private lastIgnitionState = new Map<string, boolean>();
   private lastGeofenceState = new Map<string, Record<string, boolean>>();
+  private lastAlertTimes = new Map<string, number>();
 
   constructor(
     @InjectRepository(Alert)
@@ -18,37 +19,54 @@ export class AlertsService {
     private geofencesService: GeofencesService,
   ) {}
 
+  private isCooldownActive(deviceId: string, type: string): boolean {
+    const key = `${deviceId}:${type}`;
+    const lastTime = this.lastAlertTimes.get(key) || 0;
+    const now = Date.now();
+    const cooldownMs = 15 * 60 * 1000; // 15 minutes
+    
+    if (now - lastTime < cooldownMs) return true;
+    this.lastAlertTimes.set(key, now);
+    return false;
+  }
+
   async processTelemetry(deviceId: string, telemetry: any, userId: string, clientId?: string) {
     const alertsToCreate: Partial<Alert>[] = [];
+    const attributes = telemetry.attributes || {};
+    const alarm = attributes.alarm;
     
     // 1. Overspeed
     if (telemetry.speed > (telemetry.speedLimit || 80)) {
-       // Logic to avoid spamming speed alerts (e.g., once every 5 minutes)
-       alertsToCreate.push({ type: 'overspeed', message: `Vehicle exceeded speed limit: ${Math.round(telemetry.speed)} km/h`, deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
+       if (!this.isCooldownActive(deviceId, 'overspeed')) {
+         alertsToCreate.push({ type: 'overspeed', message: `Vehicle exceeded speed limit: ${Math.round(telemetry.speed)} km/h`, deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
+       }
     }
 
-    // 2. Power Cut
-    if (telemetry.attributes?.alarm === 'powerCut') {
-      alertsToCreate.push({ type: 'power_cut', message: 'Main power supply disconnected', deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
-    }
+    // 2. Power Cut / Vibration / Tow / SOS / Signal Lost / Harsh Braking
+    const commonAlarms = [
+      { key: 'powerCut', type: 'power_cut', msg: 'Main power supply disconnected' },
+      { key: 'vibration', type: 'vibration', msg: 'Vibration detected while parked' },
+      { key: 'tow', type: 'tow', msg: 'Vehicle is being towed' },
+      { key: 'sos', type: 'sos', msg: 'SOS Panic Button pressed!' },
+      { key: 'jamming', type: 'jamming', msg: 'Signal jamming detected' },
+      { key: 'hardBraking', type: 'harsh_braking', msg: 'Harsh braking detected' },
+      { key: 'hardAcceleration', type: 'harsh_acceleration', msg: 'Harsh acceleration detected' },
+      { key: 'hardCornering', type: 'harsh_cornering', msg: 'Harsh cornering detected' }
+    ];
 
-    // 3. Vibration
-    if (telemetry.attributes?.alarm === 'vibration') {
-      alertsToCreate.push({ type: 'vibration', message: 'Vibration detected while parked', deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
-    }
-
-    // 4. Tow
-    if (telemetry.attributes?.alarm === 'tow') {
-      alertsToCreate.push({ type: 'tow', message: 'Vehicle is being towed', deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
-    }
+    commonAlarms.forEach(a => {
+      if (alarm === a.key && !this.isCooldownActive(deviceId, a.type)) {
+        alertsToCreate.push({ type: a.type, message: a.msg, deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
+      }
+    });
 
     // 5. Low Battery
-    if (telemetry.attributes?.batteryLevel < 20) {
-      alertsToCreate.push({ type: 'low_battery', message: `Device battery is low (${telemetry.attributes.batteryLevel}%)`, deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
+    if (attributes.batteryLevel < 20 && !this.isCooldownActive(deviceId, 'low_battery')) {
+      alertsToCreate.push({ type: 'low_battery', message: `Device battery is low (${attributes.batteryLevel}%)`, deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
     }
 
-    // 6. Ignition Change (State aware)
-    const currentIgnition = telemetry.attributes?.ignition;
+    // 6. Ignition Change (State aware, usually no cooldown wanted but we can add one if user insists)
+    const currentIgnition = attributes.ignition;
     if (currentIgnition !== undefined) {
       const lastState = this.lastIgnitionState.get(deviceId);
       if (lastState !== undefined && lastState !== currentIgnition) {
@@ -71,28 +89,34 @@ export class AlertsService {
         const wasInside = this.lastGeofenceState.get(deviceId)?.[gfId];
         if (wasInside !== undefined && wasInside !== check.isInside) {
           const type = check.isInside ? 'geofence_enter' : 'geofence_exit';
-          alertsToCreate.push({
-            type,
-            message: `${check.isInside ? 'Entered' : 'Exited'} geofence: ${check.geofence.name}`,
-            deviceId,
-            latitude: telemetry.latitude,
-            longitude: telemetry.longitude,
-          });
+          if (!this.isCooldownActive(deviceId, `${type}:${gfId}`)) {
+            alertsToCreate.push({
+              type,
+              message: `${check.isInside ? 'Entered' : 'Exited'} geofence: ${check.geofence.name}`,
+              deviceId,
+              latitude: telemetry.latitude,
+              longitude: telemetry.longitude,
+            });
+          }
         }
-        // Update state
         const state = this.lastGeofenceState.get(deviceId) || {};
         state[gfId] = check.isInside;
         this.lastGeofenceState.set(deviceId, state);
       }
     }
 
-    // 8. SOS
-    if (telemetry.attributes?.alarm === 'sos') {
-      alertsToCreate.push({ type: 'sos', message: 'SOS Panic Button pressed!', deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
+    // 10. GPS Signal
+    if (attributes.gps === 'lost' && !this.isCooldownActive(deviceId, 'gps_lost')) {
+       alertsToCreate.push({ type: 'gps_lost', message: 'GPS satellite signal lost', deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
+    }
+
+    // 16. Door
+    if (attributes.door === true && !this.isCooldownActive(deviceId, 'door_open')) {
+       alertsToCreate.push({ type: 'door_open', message: 'Unauthorized door access detected', deviceId, latitude: telemetry.latitude, longitude: telemetry.longitude });
     }
 
     for (const alertData of alertsToCreate) {
-      const alert = await this.alertRepository.save(this.alertRepository.create({ ...alertData, deviceId, attributes: telemetry.attributes }));
+      const alert = await this.alertRepository.save(this.alertRepository.create({ ...alertData, deviceId, attributes }));
       
       if (clientId) {
         this.positionsGateway.broadcastToClient(clientId, 'new_alert', alert);
@@ -104,6 +128,8 @@ export class AlertsService {
   }
 
   async createOfflineAlert(deviceId: string, userId: string, clientId?: string) {
+    if (this.isCooldownActive(deviceId, 'offline')) return;
+
     const alert = await this.alertRepository.save(this.alertRepository.create({
       type: 'offline',
       message: 'Device has gone offline',
@@ -118,7 +144,7 @@ export class AlertsService {
   }
 
   private async sendEmail(userId: string, alert: any) {
-    // Email alert logic
+    // Email alert logic - Integration with SendGrid or SMTP could be added here
   }
 
   async findByClient(clientId: string): Promise<Alert[]> {
@@ -138,7 +164,6 @@ export class AlertsService {
       take: 50,
     });
   }
-
 
   async markAsRead(id: string): Promise<void> {
     await this.alertRepository.update(id, { isRead: true });

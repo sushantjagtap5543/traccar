@@ -6,27 +6,30 @@ import { Map as MapIcon, Plus, Trash2, Globe, Shield, Bell } from 'lucide-react'
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
+import { GeofencePicker } from '@/components/GeofencePicker';
+import { useAuthStore } from '@/store/useAuthStore';
+
 export default function GeofencesPage() {
   const [geofences, setGeofences] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const { token } = useAuthStore();
   
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    lat: '',
-    lng: '',
+    lat: '20.5937',
+    lng: '78.9629',
     radius: '500',
     alertType: 'both'
   });
 
   useEffect(() => {
-    fetchGeofences();
-  }, []);
+    if (token) fetchGeofences();
+  }, [token]);
 
   const fetchGeofences = async () => {
     try {
-      const token = localStorage.getItem('token');
       const res = await axios.get('/api/geofences', {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -39,7 +42,6 @@ export default function GeofencesPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
       await axios.post('/api/geofences', {
         name: formData.name,
         description: formData.description,
@@ -63,7 +65,6 @@ export default function GeofencesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure?')) return;
     try {
-      const token = localStorage.getItem('token');
       await axios.delete(`/api/geofences/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -75,9 +76,9 @@ export default function GeofencesPage() {
   };
 
   return (
-    <main className="flex min-h-screen bg-background overflow-hidden">
+    <main className="flex min-h-screen bg-background overflow-hidden font-sans">
       <Sidebar />
-      <div className="flex-1 flex flex-col relative overflow-y-auto font-sans">
+      <div className="flex-1 flex flex-col relative overflow-y-auto">
         <header className="h-16 px-8 flex items-center justify-between border-b border-border glass sticky top-0 z-20">
           <div className="flex items-center gap-3">
             <Globe className="w-5 h-5 text-primary" />
@@ -85,10 +86,10 @@ export default function GeofencesPage() {
           </div>
           <button 
             onClick={() => setShowForm(!showForm)}
-            className="bg-primary text-white text-[10px] font-bold px-4 py-2 rounded-lg flex items-center gap-2 hover:shadow-primary/20 hover:shadow-lg transition-all"
+            className="bg-primary text-white text-[10px] font-bold px-4 py-2 rounded-lg flex items-center gap-2 hover:shadow-primary/20 hover:shadow-lg transition-all uppercase tracking-widest"
           >
             <Plus className="w-4 h-4" />
-            Define New Zone
+            {showForm ? 'Close Editor' : 'Define New Zone'}
           </button>
         </header>
 
@@ -102,7 +103,7 @@ export default function GeofencesPage() {
               </div>
             )}
             
-            {geofences.map(gf => (
+            {geofences.map((gf: any) => (
               <div key={gf.id} className="glass p-6 rounded-2xl border border-border flex items-center justify-between hover:border-primary/50 transition-all group">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
@@ -112,7 +113,7 @@ export default function GeofencesPage() {
                     <h3 className="font-bold text-sm uppercase">{gf.name}</h3>
                     <p className="text-[10px] text-muted">{gf.description || 'Virtual security perimeter'}</p>
                     <div className="flex gap-4 mt-1">
-                       <span className="text-[9px] font-bold text-emerald-400 uppercase">Radius: {gf.area.radius}m</span>
+                       <span className="text-[9px] font-bold text-emerald-400 uppercase">Radius: {gf.area?.radius}m</span>
                        <span className="text-[9px] font-bold text-blue-400 uppercase flex items-center gap-1">
                          <Bell className="w-2.5 h-2.5" /> {gf.alertType}
                        </span>
@@ -130,7 +131,7 @@ export default function GeofencesPage() {
           </div>
 
           {/* Form Side panel */}
-          <div className={showForm ? "block" : "hidden lg:block opacity-40 grayscale pointer-events-none"}>
+          <div className={showForm ? "block transition-all" : "hidden lg:block opacity-40 grayscale pointer-events-none"}>
             <div className="glass p-8 rounded-2xl border border-border sticky top-24">
               <h3 className="text-xs font-bold uppercase mb-6 tracking-widest text-primary">Zone Configuration</h3>
               <form onSubmit={handleCreate} className="space-y-4">
@@ -142,45 +143,49 @@ export default function GeofencesPage() {
                     value={formData.name}
                     onChange={e => setFormData({...formData, name: e.target.value})}
                     placeholder="e.g. Warehouse A"
-                    className="w-full bg-white/5 border border-border rounded-lg px-4 py-2 text-xs text-white outline-none focus:border-primary"
+                    className="w-full bg-white/5 border border-border rounded-lg px-4 py-3 text-xs text-white outline-none focus:border-primary transition-all"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted uppercase">Latitude</label>
-                    <input 
-                      type="number" 
-                      step="any"
-                      required
-                      value={formData.lat}
-                      onChange={e => setFormData({...formData, lat: e.target.value})}
-                      className="w-full bg-white/5 border border-border rounded-lg px-4 py-2 text-xs text-white outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted uppercase">Longitude</label>
-                    <input 
-                      type="number" 
-                      step="any"
-                      required
-                      value={formData.lng}
-                      onChange={e => setFormData({...formData, lng: e.target.value})}
-                      className="w-full bg-white/5 border border-border rounded-lg px-4 py-2 text-xs text-white outline-none"
-                    />
-                  </div>
-                </div>
+
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted uppercase">Radius (meters)</label>
+                  <label className="text-[10px] font-bold text-muted uppercase">Geographic Location</label>
+                  <GeofencePicker 
+                     lat={parseFloat(formData.lat)} 
+                     lng={parseFloat(formData.lng)} 
+                     radius={parseInt(formData.radius)}
+                     onChange={(lat, lng) => setFormData({...formData, lat: lat.toString(), lng: lng.toString()})}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted uppercase">Radius (meters): {formData.radius}m</label>
                   <input 
-                    type="number" 
+                    type="range" 
+                    min="100"
+                    max="5000"
+                    step="100"
                     required
                     value={formData.radius}
                     onChange={e => setFormData({...formData, radius: e.target.value})}
-                    className="w-full bg-white/5 border border-border rounded-lg px-4 py-2 text-xs text-white outline-none"
+                    className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
                   />
                 </div>
-                <button className="w-full bg-primary text-white text-xs font-bold py-3 rounded-xl mt-4 hover:shadow-primary/30 hover:shadow-xl transition-all uppercase tracking-widest">
-                  Activate Zone
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted uppercase">Alert On</label>
+                  <select 
+                    value={formData.alertType}
+                    onChange={e => setFormData({...formData, alertType: e.target.value})}
+                    className="w-full bg-white/5 border border-border rounded-lg px-4 py-3 text-xs text-white outline-none focus:border-primary"
+                  >
+                    <option value="both" className="bg-slate-900">Both (Enter & Exit)</option>
+                    <option value="enter" className="bg-slate-900">Entrance Only</option>
+                    <option value="exit" className="bg-slate-900">Exit Only</option>
+                  </select>
+                </div>
+
+                <button className="w-full bg-primary text-white text-[10px] font-black py-4 rounded-xl mt-4 hover:shadow-primary/30 hover:shadow-xl transition-all uppercase tracking-[0.2em]">
+                  Deploy Security Zone
                 </button>
               </form>
             </div>

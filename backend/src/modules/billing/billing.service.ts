@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Payment } from './entities/payment.entity';
 import { ConfigService } from '@nestjs/config';
+const Razorpay = require('razorpay');
+import * as crypto from 'crypto';
 
 @Injectable()
 export class BillingService {
@@ -13,32 +15,62 @@ export class BillingService {
     private paymentRepository: Repository<Payment>,
     private configService: ConfigService,
   ) {
-    // Razorpay would be initialized here with keys from ConfigService
-    // this.razorpay = new Razorpay({ ... });
+    this.razorpay = new Razorpay({
+      key_id: this.configService.get('RAZORPAY_KEY_ID') || 'rzp_test_placeholder',
+      key_secret: this.configService.get('RAZORPAY_SECRET') || 'secret_placeholder',
+    });
   }
 
-  async createOrder(userId: string, amount: number) {
-    // In a real implementation, you'd call Razorpay API to create an order
-    const orderId = `order_${Math.random().toString(36).substr(2, 9)}`;
-    
-    const payment = this.paymentRepository.create({
-      userId,
+  async createOrder(userId: string, planId: string) {
+    let baseAmount = 0;
+    if (planId === '1month') baseAmount = 200;
+    else if (planId === '6month') baseAmount = 950;
+    else if (planId === '12month') baseAmount = 1500;
+    else throw new BadRequestException('Invalid plan selected');
+
+    const amount = Math.round(baseAmount * 100 * 1.18); // Paisa + 18% GST
+
+    const options = {
       amount,
       currency: 'INR',
-      orderId,
+      receipt: `geosure_${Date.now()}`,
+    };
+
+    const order = await this.razorpay.orders.create(options);
+
+    const payment = this.paymentRepository.create({
+      userId,
+      amount: amount / 100,
+      currency: 'INR',
+      orderId: order.id,
       status: 'pending',
+      attributes: { planId }
     });
 
-    return this.paymentRepository.save(payment);
+    await this.paymentRepository.save(payment);
+    return order;
   }
 
-  async capturePayment(userId: string, orderId: string, paymentId: string) {
+  async verifyPayment(userId: string, orderId: string, paymentId: string, signature: string) {
+    const text = orderId + '|' + paymentId;
+    const secret = this.configService.get('RAZORPAY_SECRET') || 'secret_placeholder';
+    const generated_signature = crypto
+      .createHmac('sha256', secret)
+      .update(text)
+      .digest('hex');
+
+    if (generated_signature !== signature) {
+      throw new BadRequestException('Invalid payment signature');
+    }
+
     const payment = await this.paymentRepository.findOne({ where: { orderId, userId } });
-    if (!payment) throw new Error('Payment order not found');
+    if (!payment) throw new BadRequestException('Payment record not found');
 
     payment.paymentId = paymentId;
     payment.status = 'captured';
-    return this.paymentRepository.save(payment);
+    await this.paymentRepository.save(payment);
+
+    return { success: true };
   }
 
   async getHistory(userId: string) {

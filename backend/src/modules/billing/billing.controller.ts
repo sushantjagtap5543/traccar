@@ -12,14 +12,14 @@ export class BillingController {
 
   @Post('order')
   @ApiOperation({ summary: 'Create a new payment order' })
-  async createOrder(@Req() req, @Body() body: { amount: number }) {
-    return this.billingService.createOrder(req.user.id, body.amount);
+  async createOrder(@Req() req, @Body() body: { planId: string }) {
+    return this.billingService.createOrder(req.user.id, body.planId);
   }
 
-  @Post('capture')
-  @ApiOperation({ summary: 'Capture a successful payment' })
-  async capturePayment(@Req() req, @Body() body: { orderId: string, paymentId: string }) {
-    return this.billingService.capturePayment(req.user.id, body.orderId, body.paymentId);
+  @Post('verify')
+  @ApiOperation({ summary: 'Verify and capture a successful payment' })
+  async verifyPayment(@Req() req, @Body() body: { razorpay_order_id: string, razorpay_payment_id: string, razorpay_signature: string }) {
+    return this.billingService.verifyPayment(req.user.id, body.razorpay_order_id, body.razorpay_payment_id, body.razorpay_signature);
   }
 
   @Get('history')

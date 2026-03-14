@@ -124,15 +124,34 @@ export function MapView({ center = [78.9629, 20.5937], zoom = 5 }: MapViewProps)
   return (
     <div className="w-full h-full relative">
       <div ref={mapContainer} className="map-container w-full h-full" />
+      
+      {/* Search Bar */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 w-full max-w-md px-4">
+        <div className="glass flex items-center p-2 rounded-2xl border border-border gap-2">
+            <input 
+                type="text" 
+                placeholder="Search vehicle name or imei..." 
+                className="flex-1 bg-transparent border-none outline-none text-xs px-4 text-white"
+                onChange={(e) => {
+                    const term = e.target.value.toLowerCase();
+                    const found = Object.values(positions).find(p => p.name?.toLowerCase().includes(term) || p.imei?.includes(term));
+                    if (found && map.current) {
+                        map.current.flyTo({ center: [found.longitude, found.latitude], zoom: 16 });
+                    }
+                }}
+            />
+        </div>
+      </div>
+
       <div className="absolute top-4 left-4 glass p-4 rounded-xl z-10 shadow-premium border border-border">
-        <h3 className="text-sm font-bold mb-2 uppercase tracking-tighter italic">Live Fleet</h3>
+        <h3 className="text-sm font-bold mb-2 uppercase tracking-tighter italic">Fleet Pulse</h3>
         <div className="space-y-2">
           <div className="flex items-center gap-3">
-            <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_#10b981]" />
             <span className="text-[10px] font-bold uppercase">Moving: {Object.values(positions).filter(p => p.status === 'moving').length}</span>
           </div>
           <div className="flex items-center gap-3">
-            <span className="w-3 h-3 rounded-full bg-amber-500" />
+            <span className="w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_10px_#f59e0b]" />
             <span className="text-[10px] font-bold uppercase text-muted">Idle: {Object.values(positions).filter(p => p.status === 'idle').length}</span>
           </div>
         </div>
