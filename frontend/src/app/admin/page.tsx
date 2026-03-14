@@ -3,6 +3,7 @@
 import React from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { Users, Smartphone, CreditCard, Activity, Search, Plus, Filter } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function AdminDashboardPage() {
   return (
@@ -73,11 +74,8 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          </div>
-
           {/* Client Management & Tables Section */}
           <div className="grid grid-cols-1 lg:grid-cols-1 gap-8">
-             {/* Client Management */}
              <div className="glass rounded-2xl border border-border overflow-hidden">
                <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-white/5">
                  <h3 className="text-sm font-semibold uppercase tracking-widest">Client Portal Management</h3>
@@ -100,7 +98,7 @@ export default function AdminDashboardPage() {
                        { name: 'Elite Logistics', user: 'admin@elitelog.com', fleet: 150, plan: 'Enterprise', status: 'Active' },
                        { name: 'SafeWay Couriers', user: 'jason@safeway.com', fleet: 45, plan: 'Premium', status: 'Active' },
                        { name: 'FastTrack Rentals', user: 'mira@fasttrack.in', fleet: 12, plan: 'Free', status: 'Suspended' },
-                     ].map((client, i) => (
+                     ].map((client) => (
                        <tr key={client.name} className="hover:bg-white/5 transition-colors">
                          <td className="px-6 py-4 font-bold text-white">{client.name}</td>
                          <td className="px-6 py-4 text-muted">{client.user}</td>
@@ -124,62 +122,7 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Recent Registrations */}
-            <div className="glass rounded-2xl border border-border overflow-hidden">
-              <div className="px-6 py-4 border-b border-border flex justify-between items-center">
-                <h3 className="text-sm font-semibold italic">Recent Device Registrations</h3>
-                <Filter className="w-4 h-4 text-muted cursor-pointer" />
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-white/5 text-muted uppercase tracking-wider">
-                    <tr>
-                      <th className="px-6 py-3 font-semibold">IMEI</th>
-                      <th className="px-6 py-3 font-semibold">Model</th>
-                      <th className="px-6 py-3 font-semibold">User</th>
-                      <th className="px-6 py-3 font-semibold">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <tr key={i} className="hover:bg-white/5 transition-colors">
-                        <td className="px-6 py-4 font-mono">8645220451{i}982</td>
-                        <td className="px-6 py-4">TK-103 Premium</td>
-                        <td className="px-6 py-4">user_{i}@example.com</td>
-                        <td className="px-6 py-4">
-                          <span className="bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded-full font-bold">Active</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Subscription Expiry Alert */}
-            <div className="glass rounded-2xl border border-border overflow-hidden">
-              <div className="px-6 py-4 border-b border-border flex justify-between items-center">
-                <h3 className="text-sm font-semibold italic">Subscription Monitoring</h3>
-              </div>
-              <div className="p-6">
-                <div className="space-y-4">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-border">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                          <CreditCard className="w-5 h-5 text-orange-500" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">IMEI: ...8829{i}</p>
-                          <p className="text-[10px] text-muted text-orange-400">Expiring in {i * 10} days</p>
-                        </div>
-                      </div>
-                      <button className="text-[10px] font-bold px-3 py-1.5 rounded-lg border border-border hover:bg-white/10">Extend Plan</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            {/* Recent Registrations can go here */}
           </div>
 
           {/* System Logs */}
@@ -189,7 +132,6 @@ export default function AdminDashboardPage() {
             <p className="text-blue-500/70">[10:44:55] INFO: Ignition ON command sent to Device ID 442</p>
             <p className="text-amber-500/70">[10:44:30] WARN: Low battery alert triggered for User ID 8221</p>
             <p className="text-red-500/70">[10:44:10] ERROR: Traccar connection timeout for cluster-asia-1</p>
-            <p className="text-muted/50">[10:43:55] DEBUG: Queue cleanup task completed in 120ms</p>
           </div>
         </div>
       </div>
