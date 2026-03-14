@@ -6,6 +6,8 @@ import { ConfigService } from '@nestjs/config';
 const Razorpay = require('razorpay');
 import * as crypto from 'crypto';
 
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+
 @Injectable()
 export class BillingService {
   private razorpay: any;
@@ -14,6 +16,7 @@ export class BillingService {
     @InjectRepository(Payment)
     private paymentRepository: Repository<Payment>,
     private configService: ConfigService,
+    private subscriptionsService: SubscriptionsService,
   ) {
     this.razorpay = new Razorpay({
       key_id: this.configService.get('RAZORPAY_KEY_ID') || 'rzp_test_placeholder',
@@ -51,7 +54,7 @@ export class BillingService {
     return order;
   }
 
-  async verifyPayment(userId: string, orderId: string, paymentId: string, signature: string) {
+  async verifyPayment(userId: string, orderId: string, paymentId: string, signature: string, imei: string) {
     const text = orderId + '|' + paymentId;
     const secret = this.configService.get('RAZORPAY_SECRET') || 'secret_placeholder';
     const generated_signature = crypto
@@ -69,6 +72,10 @@ export class BillingService {
     payment.paymentId = paymentId;
     payment.status = 'captured';
     await this.paymentRepository.save(payment);
+
+    // Extend subscription
+    const planId = (payment.attributes as any).planId;
+    await this.subscriptionsService.extendSubscription(imei, planId);
 
     return { success: true };
   }

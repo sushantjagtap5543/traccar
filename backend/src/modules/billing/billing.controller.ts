@@ -18,8 +18,8 @@ export class BillingController {
 
   @Post('verify')
   @ApiOperation({ summary: 'Verify and capture a successful payment' })
-  async verifyPayment(@Req() req, @Body() body: { razorpay_order_id: string, razorpay_payment_id: string, razorpay_signature: string }) {
-    return this.billingService.verifyPayment(req.user.id, body.razorpay_order_id, body.razorpay_payment_id, body.razorpay_signature);
+  async verifyPayment(@Req() req, @Body() body: { razorpay_order_id: string, razorpay_payment_id: string, razorpay_signature: string, imei: string }) {
+    return this.billingService.verifyPayment(req.user.id, body.razorpay_order_id, body.razorpay_payment_id, body.razorpay_signature, body.imei);
   }
 
   @Get('history')

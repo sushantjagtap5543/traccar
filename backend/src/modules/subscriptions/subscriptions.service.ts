@@ -29,6 +29,22 @@ export class SubscriptionsService {
     return this.subscriptionRepository.findOne({ where: { imei } });
   }
 
+  async extendSubscription(imei: string, planId: string): Promise<Subscription> {
+    const subscription = await this.getSubscription(imei);
+    if (!subscription) throw new Error('Subscription not found');
+
+    const months = planId === '1month' ? 1 : (planId === '6month' ? 6 : 12);
+    const newEndDate = new Date(subscription.endDate);
+    if (newEndDate < new Date()) {
+      newEndDate.setTime(Date.now());
+    }
+    newEndDate.setMonth(newEndDate.getMonth() + months);
+
+    subscription.endDate = newEndDate;
+    subscription.status = 'active';
+    return this.subscriptionRepository.save(subscription);
+  }
+
   async findAll(): Promise<Subscription[]> {
     return this.subscriptionRepository.find({ order: { endDate: 'DESC' } });
   }

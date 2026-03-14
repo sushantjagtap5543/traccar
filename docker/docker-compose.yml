@@ -44,10 +44,19 @@ services:
     container_name: geosurepath-backend
     restart: always
     environment:
-      DATABASE_URL: postgres://traccar:securepass@postgres:5432/traccar
-      REDIS_URL: redis://redis:6379
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: traccar
+      DB_PASSWORD: securepass
+      DB_NAME: traccar
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET:-supersecretkey}
-      TRACCAR_INTERNAL_URL: http://traccar:8082
+      TRACCAR_URL: http://traccar:8082/api
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-rzp_test_placeholder}
+      RAZORPAY_SECRET: ${RAZORPAY_SECRET:-secret_placeholder}
+      OFFLINE_THRESHOLD: 300000
+      POLLING_INTERVAL: 10000
     depends_on:
       - postgres
       - redis

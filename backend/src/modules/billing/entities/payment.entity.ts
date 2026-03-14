@@ -21,9 +21,15 @@ export class Payment {
   @Column({ default: 'pending' })
   status: string; // pending, captured, failed
 
+  @Column()
+  userId: string;
+
   @ManyToOne(() => User)
   @JoinColumn({ name: 'userId' })
-  userId: string;
+  user: User;
+
+  @Column({ type: 'jsonb', nullable: true })
+  attributes: object;
 
   @CreateDateColumn()
   createdAt: Date;
