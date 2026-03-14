@@ -1,0 +1,31 @@
+# Traccar Core Patches (Manual Application Required)
+
+## 1. Fix Packet Parsing Crash
+File: org.traccar.BaseProtocolDecoder
+Issue: Unhandled exceptions during packet decoding crash the protocol server.
+
+--- a/org/traccar/BaseProtocolDecoder.java
++++ b/org/traccar/BaseProtocolDecoder.java
+@@ -50,7 +50,11 @@ protected void onMessage(Channel channel, SocketAddress remoteAddress, Object ms
+     if (msg instanceof ByteBuf) {
+-        decode(channel, remoteAddress, msg);
++        try {
++            decode(channel, remoteAddress, msg);
++        } catch (Exception e) {
++            Log.warning("Invalid GPS packet from " + remoteAddress, e);
++        }
+     }
+ }
+
+## 2. Fix Device Session Leak
+File: org.traccar.BasePipelineFactory
+Issue: Channels remain open in the session manager after device disconnect.
+
+--- a/org/traccar/TrackerServer.java
++++ b/org/traccar/TrackerServer.java
+@@ -80,6 +80,9 @@ public void channelActive(ChannelHandlerContext ctx) {
+ 
++public void channelInactive(ChannelHandlerContext ctx) {
++    sessionManager.remove(ctx.channel());
++    ctx.fireChannelInactive();
++}
