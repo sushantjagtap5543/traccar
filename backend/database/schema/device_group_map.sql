@@ -1,0 +1,6 @@
+CREATE TABLE device_group_map (
+    id SERIAL PRIMARY KEY,
+    device_id BIGINT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+    group_id INT NOT NULL REFERENCES device_groups(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

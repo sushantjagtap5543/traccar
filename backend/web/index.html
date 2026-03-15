@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GPS Platform</title>
+    <script>
+        if(localStorage.getItem("session") === "active"){
+            window.location = "dashboard.html";
+        } else {
+            window.location = "login.html";
+        }
+    </script>
+</head>
+<body>
+    Redirecting...
+</body>
+</html>

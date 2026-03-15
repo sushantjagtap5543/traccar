@@ -1,0 +1,13 @@
+[Unit]
+Description=Traccar Platform
+After=docker.service
+Requires=docker.service
+
+[Service]
+Restart=always
+ExecStart=/usr/local/bin/docker-compose -f /opt/traccar-platform/docker-compose.yml up
+ExecStop=/usr/local/bin/docker-compose -f /opt/traccar-platform/docker-compose.yml down
+WorkingDirectory=/opt/traccar-platform
+
+[Install]
+WantedBy=multi-user.target

@@ -27,10 +27,33 @@ traccar-product
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Deployment (Docker)
+The platform is fully dockerized and ready for production.
+
+### 1. Configure Environment
+Update the `.env` file with your production credentials:
 ```bash
-cd traccar-product/scripts
-./start.sh
+# Backend
+TRACCAR_ADMIN_USER=admin
+TRACCAR_ADMIN_PASS=Admin123
+
+# Database
+POSTGRES_DB=traccar
+POSTGRES_USER=traccar
+POSTGRES_PASSWORD=Traccar@123
+```
+
+### 2. Launch with Docker Compose
+```bash
+docker-compose up --build -d
+```
+
+### 3. Linux Auto-start (Optional)
+To enable auto-start on Linux boot:
+```bash
+sudo cp traccar.service /etc/systemd/system/
+sudo systemctl enable traccar
+sudo systemctl start traccar
 ```
 
 ---

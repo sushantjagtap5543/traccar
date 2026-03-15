@@ -1,51 +1,48 @@
-version: "3.8"
+version: "3.9"
 
 services:
 
-  database:
-    image: postgres:15
-    container_name: traccar_db
+  postgres:
+    image: postgres:15-alpine
+    container_name: traccar-postgres
     restart: always
     environment:
-      POSTGRES_USER: traccar
-      POSTGRES_PASSWORD: traccar
-      POSTGRES_DB: traccar
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - db_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+      - ./data/postgres:/var/lib/postgresql/data
 
-  traccar:
-    build: .
-    container_name: traccar_server
+  backend:
+    build: ./backend
+    container_name: traccar-backend
     restart: always
-    depends_on:
-      - database
-    ports:
-      - "8082:8082"
-      - "5000-5150:5000-5150"
-    env_file:
-      - .env
     environment:
-      DATABASE_URL: jdbc:postgresql://database:5432/traccar
-      DATABASE_USER: traccar
-      DATABASE_PASSWORD: traccar
-    healthcheck:
-      test: ["CMD","curl","-f","http://localhost:8082"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
+      TRACCAR_ADMIN_USER: ${TRACCAR_ADMIN_USER}
+      TRACCAR_ADMIN_PASS: ${TRACCAR_ADMIN_PASS}
+      SERVER_PORT: ${SERVER_PORT}
+    depends_on:
+      - postgres
+    ports:
+      - "${SERVER_PORT}:8082"
+
+  frontend:
+    build: ./frontend
+    container_name: traccar-frontend
+    restart: always
+    ports:
+      - "3000:80"
 
   nginx:
     image: nginx:latest
-    container_name: traccar_proxy
+    container_name: traccar-nginx
     restart: always
     ports:
       - "80:80"
+      - "443:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
-      - traccar
-
-volumes:
-  db_data:
+      - backend
+      - frontend
