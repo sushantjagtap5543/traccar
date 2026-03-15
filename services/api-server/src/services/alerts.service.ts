@@ -2,7 +2,7 @@ import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Event } from '../database/entities/event.entity';
-import { PositionsGateway } from '../server/modules/positions.gateway';
+import { PositionsGateway } from '../modules/positions.gateway';
 import { GeofencesService } from './geofences.service';
 import { DevicesService } from './devices.service';
 

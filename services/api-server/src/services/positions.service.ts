@@ -1,9 +1,8 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Inject, forwardRef } from '@nestjs/common';
-import { PositionsGateway } from '../server/modules/positions.gateway';
+import { PositionsGateway } from '../modules/positions.gateway';
 import { TraccarService } from './traccar.service';
 import { DevicesService } from './devices.service';
 import { AlertsService } from './alerts.service';
-import { PermissionsService } from './permissions.service'; // Assuming we need this or access repo directly
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
