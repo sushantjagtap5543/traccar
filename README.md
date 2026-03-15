@@ -9,20 +9,21 @@ Traccar-Product is a complete, modular GPS tracking system designed for self-hos
 ```
 traccar-product
 ├ backend
-│ ├ tracking-server  (NestJS Core & Monitoring)
-│ ├ auth             (JWT, RBAC, Encryption)
-│ ├ billing          (Plans, Subs, Invoices, Payments)
+│ └ tracking-server   (Traccar Core & Protocol Handling)
+│
+├ services
+│ └ api-server        (NestJS: Auth, Billing, Reports)
 │
 ├ frontend
-│ ├ admin            (Fleet & Revenue Control)
-│ └ client           (Live Tracking & History)
+│ ├ client-dashboard  (Primary Tracking UI)
+│ └ admin-dashboard   (Administrative Control)
 │
 ├ infrastructure
-│ ├ docker           (Orchestration & Env)
-│ └ nginx            (Reverse Proxy)
+│ ├ docker            (Production Dockerfiles)
+│ └ nginx             (Reverse Proxy & SSL)
 │
-├ scripts            (Start, Backup, Health)
-└ .env               (Production Config)
+├ scripts             (Maintenance & Backups)
+└ .env                (Unified Environment Config)
 ```
 
 ---

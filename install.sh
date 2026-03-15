@@ -43,21 +43,37 @@ fi
 # -- REMOTE EXECUTION START --
 echo "☁️ Node: Remote Server ($REMOTE_IP)"
 
-# 1. Update Repository
-echo "📡 Remote: Updating repository..."
+# 1. Prerequisites Installation
+echo "🛠️ Remote: Checking and installing prerequisites..."
+if [[ -f /usr/bin/apt-get ]]; then
+    sudo apt-get update -y
+    sudo apt-get install -y git curl openssl docker.io docker-compose
+    sudo usermod -aG docker $USER || true
+else
+    echo "⚠️ Non-Debian system detected. Please ensure git, curl, openssl, docker, and docker-compose are installed."
+fi
+
+# 2. Update Repository
+echo "📡 Remote: Updating repository from $REPO_URL..."
+# Ensure we are in the right directory
+cd /home/ubuntu/traccar || exit
 git fetch origin
 git reset --hard origin/main
+git pull $REPO_URL main
 
-# 2. Environment Clean
+# 3. Comprehensive System Cleanup
 echo "🧹 Remote: Cleaning up existing environment..."
+# Stop and remove all containers, volumes, and orphans
 docker-compose down --volumes --remove-orphans || true
-docker system prune -f
+# Clean up all docker resources (containers, images, volumes, networks)
+docker system prune -a -f --volumes
 
-# 3. Directories & Env
+# 4. Directories & Env
 echo "📁 Remote: Preparing directories..."
 mkdir -p traccar/logs traccar/data database/data nginx/ssl
+chmod -R 777 traccar/logs traccar/data database/data || true
 
-# 4. Deployment
+# 5. Deployment
 echo "🏗️ Remote: Building and launching services..."
 chmod +x scripts/*.sh
 ./scripts/deploy.sh
@@ -73,7 +89,7 @@ REGISTER_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhos
     -H "Content-Type: application/json" \
     -d '{"name":"Automation Test","email":"test_'"$(date +%s)"'@test.com","password":"password123"}')
 
-if [ "$REGISTER_STATUS" == "200" ] || [ "$REGISTER_STATUS" == "204" ]; then
+if [ "$REGISTER_STATUS" == "200" ] || [ "$REGISTER_STATUS" == "204" ] || [ "$REGISTER_STATUS" == "201" ]; then
     echo "✅ Registration API: Success ($REGISTER_STATUS)"
 else
     echo "❌ Registration API: Failed ($REGISTER_STATUS)"

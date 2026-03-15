@@ -39,7 +39,7 @@ services:
       - "3001:3001"
 
   frontend:
-    build: ./frontend
+    build: ./frontend/client-dashboard
     container_name: traccar-frontend
     restart: always
     ports:

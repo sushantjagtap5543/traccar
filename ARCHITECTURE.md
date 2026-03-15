@@ -4,22 +4,24 @@ This document describes the production-grade architecture for the GPS tracking p
 
 ## System Components
 
-### 1. Frontend (apps/web-dashboard)
-- **Technology**: React + Material UI + OpenLayers.
-- **Role**: Primary interface for tracking, reports, alerts, and administration.
+### 1. Frontend (frontend/client-dashboard)
+- **Technology**: React + Vite + Leaflet.
+- **Role**: Primary client interface for live tracking and history.
 - **Pages**:
-    - Dashboard: Real-time map tracking.
-    - Alerts: Recent device events.
+    - Dashboard: Real-time map tracking with marker clustering.
     - Reports: Historical summaries.
-    - User Management: Administrative user control.
 
-### 2. Backend (services/tracking-engine)
+### 2. Admin Dashboard (frontend/admin-dashboard)
+- **Technology**: React + Material UI + OpenLayers.
+- **Role**: Fleet control, user management, and revenue analytics.
+
+### 3. Backend (backend/tracking-server)
 - **Technology**: Java (Traccar Core).
-- **Role**: High-performance protocol handling.
+- **Role**: High-performance protocol handling and data ingestion.
 
-### 3. API Server (services/api-server)
+### 4. API Server (services/api-server)
 - **Technology**: NestJS.
-- **Role**: Main REST API for advanced features.
+- **Role**: Main REST API for advanced features, authentication (JWT/RBAC), and billing.
 
 ### 3. Database
 - **Primary**: PostgreSQL (Selected for its reliability and spatial support with PostGIS).
