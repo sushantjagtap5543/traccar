@@ -7,7 +7,7 @@
 <entry key='database.driver'>org.postgresql.Driver</entry>
 
 <entry key='database.url'>
-jdbc:postgresql://database:5432/traccar
+jdbc:postgresql://postgres:5432/traccar
 </entry>
 
 <entry key='database.user'>traccar</entry>
