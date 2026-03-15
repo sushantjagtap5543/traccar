@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import MapView from "../components/MapView";
 import { getPositions } from "../services/deviceService";
-import { Map as MapIcon, Activity, ShieldCircle, Clock } from "lucide-react";
+import { Map as MapIcon, Activity, ShieldCheck, Clock } from "lucide-react";
 import socketService from "../services/socketService";
 import StatusBadge from "../components/StatusBadge";
 
@@ -56,7 +56,7 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="stat-card glass">
-          <div className="stat-icon alerts"><ShieldCircle size={24} /></div>
+          <div className="stat-icon alerts"><ShieldCheck size={24} /></div>
           <div className="stat-info">
             <span className="stat-label">Security Alerts</span>
             <span className="stat-value">{stats.alerts}</span>
