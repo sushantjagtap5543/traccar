@@ -10,7 +10,7 @@ import { DevicesModule } from './devices.module';
   imports: [
     TypeOrmModule.forFeature([CommandLog]),
     TraccarModule,
-    VehiclesModule,
+    DevicesModule,
   ],
   providers: [CommandsService],
   controllers: [CommandsController],

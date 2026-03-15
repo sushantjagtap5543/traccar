@@ -138,8 +138,8 @@ export class AlertsService {
   async findAllByUser(userId: string): Promise<Event[]> {
     // This requires a join with permissions
     return this.eventRepository.createQueryBuilder('event')
-      .innerJoin('permissions', 'p', 'p.deviceid = event.deviceid')
-      .where('p.userid = :userId', { userId })
+      .innerJoin('permissions', 'p', 'p.device_id = event.deviceid')
+      .where('p.user_id = :userId', { userId })
       .orderBy('event.eventtime', 'DESC')
       .take(50)
       .getMany();
