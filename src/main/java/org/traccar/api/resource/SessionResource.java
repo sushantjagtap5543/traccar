@@ -22,11 +22,10 @@ import java.util.Map;
 public class SessionResource {
 
     private final Storage storage;
-    private final TokenManager tokenManager;
+    // Removed TokenManager instance as its methods are static
 
     public SessionResource(Storage storage) {
         this.storage = storage;
-        this.tokenManager = new TokenManager();
     }
 
     @POST
@@ -45,7 +44,7 @@ public class SessionResource {
             throw new WebApplicationException("Invalid password", 401);
         }
 
-        String token = tokenManager.createToken(user.getId());
+        String token = TokenManager.generate(user.getId());
 
         user.setPassword(null); // Safety: clear password before sending back
 

@@ -1,5 +1,8 @@
 package org.traccar.api.controllers;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
