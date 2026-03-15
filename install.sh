@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# GeoSurePath Unified Installation, Push & Deployment Script
-# This script performs a local push to GitHub and initiates remote deployment.
+# GeoSurePath Unified Automation Script
+# Detects environment and performs either local-to-remote deployment or direct server installation.
 
-set -e # Exit on error
+set -e
 
 # Configuration
 REMOTE_IP="3.108.114.12"
@@ -11,50 +11,61 @@ REMOTE_USER="ubuntu"
 PEM_FILE="11111.pem"
 REPO_URL="https://github.com/sushantjagtap5543/traccar.git"
 
-echo "🚀 Starting GeoSurePath Unified Automation..."
-
-# 1. Local Code Push
-if [ -d .git ]; then
-    echo "📤 Pushing code changes to GitHub..."
-    git add .
-    git commit -m "Automated deployment update: $(date)" || echo "No changes to commit"
-    git push origin main || echo "Push failed, continuing with deployment..."
+# Detection
+IS_REMOTE=false
+if [[ "$(hostname)" == *"ip-"* ]] || [[ -f "/home/ubuntu/traccar/install.sh" ]]; then
+    IS_REMOTE=true
 fi
 
-# 2. Remote Deployment
-echo "🌐 Initiating Remote Deployment on $REMOTE_IP..."
-
-ssh -o StrictHostKeyChecking=no -i $PEM_FILE $REMOTE_USER@$REMOTE_IP << 'EOF'
-    set -e
-    echo "📡 Remote: Updating repository..."
-    if [ ! -d "traccar" ]; then
-        git clone https://github.com/sushantjagtap5543/traccar.git
+if [ "$IS_REMOTE" = false ]; then
+    echo "🏠 Node: Local Development Machine"
+    
+    # 1. Local Code Push
+    if [ -d .git ]; then
+        echo "📤 Pushing code changes to GitHub..."
+        git add .
+        git commit -m "Automated deployment update: $(date)" || echo "No changes to commit"
+        git push origin main || echo "Push failed, continuing with deployment..."
     fi
-    cd traccar
-    git fetch origin
-    git reset --hard origin/main
 
-    echo "🧹 Remote: Cleaning up existing environment..."
-    docker-compose down --volumes --remove-orphans || true
-    docker system prune -f
+    # 2. Trigger Remote Deployment
+    echo "🌐 Initiating Remote Deployment on $REMOTE_IP..."
+    ssh -o StrictHostKeyChecking=no -i $PEM_FILE $REMOTE_USER@$REMOTE_IP "cd traccar && ./install.sh"
+    
+    echo "✨ Local Process Complete!"
+    exit 0
+fi
 
-    echo "🏗️ Remote: Building and launching services..."
-    # Ensure deployment script is executable
-    chmod +x scripts/*.sh
-    ./scripts/deploy.sh
-EOF
+# -- REMOTE EXECUTION START --
+echo "☁️ Node: Remote Server ($REMOTE_IP)"
 
-# 3. Final Verification (Local Test)
-echo "🧪 Running Final Verification Tests..."
+# 1. Update Repository
+echo "📡 Remote: Updating repository..."
+git fetch origin
+git reset --hard origin/main
+
+# 2. Environment Clean
+echo "🧹 Remote: Cleaning up existing environment..."
+docker-compose down --volumes --remove-orphans || true
+docker system prune -f
+
+# 3. Directories & Env
+echo "📁 Remote: Preparing directories..."
+mkdir -p traccar/logs traccar/data database/data nginx/ssl
+
+# 4. Deployment
+echo "🏗️ Remote: Building and launching services..."
+chmod +x scripts/*.sh
+./scripts/deploy.sh
+
+# 5. Verification
+echo "🧪 Remote: Running Verification Tests..."
 echo "------------------------------------------------"
+echo "⏳ Waiting for stability (15s)..."
+sleep 15
 
-# Wait for services to be reachable via public IP
-echo "⏳ Waiting for remote services to settle (30s)..."
-sleep 30
-
-# Test Registration API
 echo "📝 Testing Registration API..."
-REGISTER_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://$REMOTE_IP:8082/api/register \
+REGISTER_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8082/api/register \
     -H "Content-Type: application/json" \
     -d '{"name":"Automation Test","email":"test_'"$(date +%s)"'@test.com","password":"password123"}')
 
@@ -62,12 +73,10 @@ if [ "$REGISTER_STATUS" == "200" ] || [ "$REGISTER_STATUS" == "204" ]; then
     echo "✅ Registration API: Success ($REGISTER_STATUS)"
 else
     echo "❌ Registration API: Failed ($REGISTER_STATUS)"
-    echo "   Note: If 404, the Traccar Core might need a custom build to include the new endpoint."
 fi
 
-# Test Login API
 echo "🔑 Testing Login API..."
-LOGIN_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://$REMOTE_IP:8082/api/session/login \
+LOGIN_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8082/api/session/login \
     -H "Content-Type: application/json" \
     -d '{"email":"admin@admin.com","password":"admin"}')
 
@@ -78,5 +87,4 @@ else
 fi
 
 echo "------------------------------------------------"
-echo "✨ All Processes Complete!"
-echo "📡 Remote Access: http://$REMOTE_IP"
+echo "✅ Remote Deployment & Verification Complete!"
