@@ -11,6 +11,9 @@ services:
     volumes:
       - ./traccar/data:/opt/traccar/data
       - ./traccar/traccar.xml:/opt/traccar/conf/traccar.xml:ro
+    environment:
+      - TRACCAR_WEB_ORIGIN=*
+      - TRACCAR_WEB_CORS=true
     deploy:
       resources:
         limits:

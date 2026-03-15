@@ -26,6 +26,8 @@
     <!-- Web Interface (Internal for backend proxy) -->
     <entry key='web.port'>8082</entry>
     <entry key='web.path'>./web</entry>
+    <entry key='web.origin'>*</entry>
+    <entry key='web.cors'>true</entry>
 
     <!-- Logging -->
     <entry key='logger.file'>/opt/traccar/logs/tracker-server.log</entry>
