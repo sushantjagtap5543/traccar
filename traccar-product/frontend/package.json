@@ -9,9 +9,9 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
+    "next": "15.1.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
     "lucide-react": "latest",
     "axios": "latest",
     "zustand": "latest",
@@ -21,6 +21,9 @@
     "tailwind-merge": "latest",
     "date-fns": "latest",
     "socket.io-client": "latest",
-    "react-toastify": "latest"
+    "react-toastify": "latest",
+    "postcss": "latest",
+    "autoprefixer": "latest",
+    "tailwindcss": "latest"
   }
 }
