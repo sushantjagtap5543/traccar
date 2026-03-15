@@ -48,12 +48,23 @@ echo "🛠️ Remote: Checking and installing prerequisites..."
 if [[ -f /usr/bin/apt-get ]]; then
     sudo apt-get update -y
     sudo apt-get install -y git curl openssl || true
-    # Attempt to install docker and docker-compose, handling potential conflicts
-    sudo apt-get install -y docker.io docker-compose || {
-        echo "⚠️ Package conflict detected, attempting to fix..."
-        sudo apt-get remove -y containerd runc
-        sudo apt-get install -y docker.io docker-compose
-    }
+    
+    # Check if docker is already installed
+    if ! command -v docker &> /dev/null; then
+        echo "Installing docker..."
+        sudo apt-get install -y docker.io || echo "⚠️ Docker installation failed"
+    else
+        echo "✅ Docker already installed: $(docker --version)"
+    fi
+
+    # Check if docker-compose is already installed
+    if ! command -v docker-compose &> /dev/null; then
+        echo "Installing docker-compose..."
+        sudo apt-get install -y docker-compose || echo "⚠️ Docker Compose installation failed"
+    else
+        echo "✅ Docker Compose already installed: $(docker-compose --version)"
+    fi
+    
     sudo usermod -aG docker $USER || true
 
     # Firewall Configuration (UFW)
