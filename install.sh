@@ -47,8 +47,26 @@ echo "☁️ Node: Remote Server ($REMOTE_IP)"
 echo "🛠️ Remote: Checking and installing prerequisites..."
 if [[ -f /usr/bin/apt-get ]]; then
     sudo apt-get update -y
-    sudo apt-get install -y git curl openssl docker.io docker-compose
+    sudo apt-get install -y git curl openssl || true
+    # Attempt to install docker and docker-compose, handling potential conflicts
+    sudo apt-get install -y docker.io docker-compose || {
+        echo "⚠️ Package conflict detected, attempting to fix..."
+        sudo apt-get remove -y containerd runc
+        sudo apt-get install -y docker.io docker-compose
+    }
     sudo usermod -aG docker $USER || true
+
+    # Firewall Configuration (UFW)
+    echo "🛡️ Remote: Configuring firewall (UFW)..."
+    sudo ufw allow 22/tcp
+    sudo ufw allow 80/tcp
+    sudo ufw allow 443/tcp
+    sudo ufw allow 3000/tcp
+    sudo ufw allow 3001/tcp
+    sudo ufw allow 8082/tcp
+    sudo ufw allow 5000:5150/tcp
+    sudo ufw allow 5000:5150/udp
+    echo "y" | sudo ufw enable
 else
     echo "⚠️ Non-Debian system detected. Please ensure git, curl, openssl, docker, and docker-compose are installed."
 fi
