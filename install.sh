@@ -46,8 +46,22 @@ echo "☁️ Node: Remote Server ($REMOTE_IP)"
 # 1. Prerequisites Installation
 echo "🛠️ Remote: Checking and installing prerequisites..."
 if [[ -f /usr/bin/apt-get ]]; then
-    sudo apt-get update -y
-    sudo apt-get install -y git curl openssl || true
+    # Skip update if done in the last 24 hours
+    LAST_UPDATE=$(stat -c %Y /var/lib/apt/periodic/update-success-stamp 2>/dev/null || echo 0)
+    NOW=$(date +%s)
+    if [ $((NOW - LAST_UPDATE)) -gt 86400 ]; then
+        sudo apt-get update -y
+    else
+        echo "✅ Apt cache is fresh, skipping update."
+    fi
+
+    # Check for core tools
+    for tool in git curl openssl; do
+        if ! command -v $tool &> /dev/null; then
+            echo "Installing $tool..."
+            sudo apt-get install -y $tool || true
+        fi
+    done
     
     # Check if docker is already installed
     if ! command -v docker &> /dev/null; then
@@ -68,27 +82,39 @@ if [[ -f /usr/bin/apt-get ]]; then
     sudo usermod -aG docker $USER || true
 
     # Firewall Configuration (UFW)
-    echo "🛡️ Remote: Configuring firewall (UFW)..."
-    sudo ufw allow 22/tcp
-    sudo ufw allow 80/tcp
-    sudo ufw allow 443/tcp
-    sudo ufw allow 3000/tcp
-    sudo ufw allow 3001/tcp
-    sudo ufw allow 8082/tcp
-    sudo ufw allow 5000:5150/tcp
-    sudo ufw allow 5000:5150/udp
-    echo "y" | sudo ufw enable
+    if ! sudo ufw status | grep -q "Status: active"; then
+        echo "🛡️ Remote: Configuring firewall (UFW)..."
+        sudo ufw allow 22/tcp
+        sudo ufw allow 80/tcp
+        sudo ufw allow 443/tcp
+        sudo ufw allow 3000/tcp
+        sudo ufw allow 3001/tcp
+        sudo ufw allow 8082/tcp
+        sudo ufw allow 5000:5150/tcp
+        sudo ufw allow 5000:5150/udp
+        echo "y" | sudo ufw enable
+    else
+        echo "✅ Firewall already active, skipping re-config."
+    fi
 else
     echo "⚠️ Non-Debian system detected. Please ensure git, curl, openssl, docker, and docker-compose are installed."
 fi
 
 # 2. Update Repository
-echo "📡 Remote: Updating repository from $REPO_URL..."
-# Ensure we are in the right directory
+echo "📡 Remote: Syncing repository..."
 cd /home/ubuntu/traccar || exit
-git fetch origin
-git reset --hard origin/main
-git pull $REPO_URL main
+git fetch origin main
+
+LOCAL_HASH=$(git rev-parse HEAD)
+REMOTE_HASH=$(git rev-parse origin/main)
+
+if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
+    echo "🔄 Updates found, pulling changes..."
+    git reset --hard origin/main
+    git pull origin main
+else
+    echo "✅ Already up-to-date."
+fi
 
 # 3. Incremental Deployment Update
 echo "🧹 Remote: Preparing for incremental update..."
@@ -108,8 +134,19 @@ chmod +x scripts/*.sh
 # 5. Verification
 echo "🧪 Remote: Running Verification Tests..."
 echo "------------------------------------------------"
-echo "⏳ Waiting for stability (15s)..."
-sleep 15
+echo "⏳ Waiting for API to become healthy..."
+
+MAX_RETRIES=12
+COUNT=0
+until $(curl -sSf http://localhost:8082/api/server > /dev/null 2>&1); do
+    if [ $COUNT -eq $MAX_RETRIES ]; then
+        echo "❌ Timeout waiting for API. Proceeding with tests anyway..."
+        break
+    fi
+    echo "   ...waiting ($((COUNT+1))/$MAX_RETRIES)"
+    sleep 5
+    COUNT=$((COUNT+1))
+done
 
 echo "📝 Testing Registration API..."
 REGISTER_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8082/api/register \
