@@ -2,7 +2,7 @@ import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
 import { join } from 'path';
 
-config({ path: join(__dirname, '../../.env') });
+config({ path: join(__dirname, '..', '..', '.env') });
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -13,7 +13,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'traccar_db',
   synchronize: false,
   logging: true,
-  entities: [join(__dirname, '/entities/*.entity{.ts,.js}')],
-  migrations: [join(__dirname, '/migrations/*{.ts,.js}')],
+  entities: [join(__dirname, 'entities', '*.entity{.ts,.js}')],
+  migrations: [join(__dirname, 'migrations', '*{.ts,.js}')],
   subscribers: [],
 });

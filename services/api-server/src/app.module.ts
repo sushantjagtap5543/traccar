@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { AuthModule } from '../auth/auth.module';
+import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './modules/users.module';
 import { DevicesModule } from './modules/devices.module';
 import { TraccarModule } from './modules/traccar.module';
@@ -29,8 +29,8 @@ import { RedisModule } from './modules/redis.module';
       username: process.env.DB_USER || 'traccar',
       password: process.env.DB_PASSWORD || 'traccar',
       database: process.env.DB_NAME || 'traccar_db',
-      entities: [__dirname + '/../database/entities/*.entity{.ts,.js}'],
-      migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
+      entities: [require('path').join(__dirname, 'database', 'entities', '*.entity{.ts,.js}')],
+      migrations: [require('path').join(__dirname, 'database', 'migrations', '*{.ts,.js}')],
       migrationsRun: true,
       synchronize: false,
     }),

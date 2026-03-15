@@ -31,12 +31,23 @@ services:
     container_name: traccar-api
     restart: always
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET:-super-secret-key}
+      REDIS_HOST: redis
     depends_on:
       - postgres
+      - redis
     ports:
       - "3001:3001"
+
+  redis:
+    image: redis:alpine
+    container_name: traccar-redis
+    restart: always
 
   frontend:
     build: ./frontend/client-dashboard
@@ -44,6 +55,13 @@ services:
     restart: always
     ports:
       - "3000:80"
+
+  admin-frontend:
+    build: ./frontend/admin-dashboard
+    container_name: traccar-admin-frontend
+    restart: always
+    ports:
+      - "3002:80"
 
   nginx:
     image: nginx:latest
