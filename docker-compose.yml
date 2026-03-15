@@ -1,117 +1,51 @@
 version: "3.8"
 
 services:
-  traccar:
-    build:
-      context: .
-      dockerfile: infrastructure/docker/traccar.Dockerfile
-    container_name: traccar-core
+
+  database:
+    image: postgres:15
+    container_name: traccar_db
     restart: always
+    environment:
+      POSTGRES_USER: traccar
+      POSTGRES_PASSWORD: traccar
+      POSTGRES_DB: traccar
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  traccar:
+    build: .
+    container_name: traccar_server
+    restart: always
+    depends_on:
+      - database
     ports:
       - "8082:8082"
       - "5000-5150:5000-5150"
-    volumes:
-      - ./services/tracking-engine/data:/opt/traccar/data
-      - ./services/tracking-engine/traccar.xml:/opt/traccar/conf/traccar.xml:ro
+    env_file:
+      - .env
     environment:
-      - TRACCAR_WEB_ORIGIN=*
-      - TRACCAR_WEB_CORS=true
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-    networks:
-      - traccar-network
-
-  nginx:
-    image: nginx:latest
-    container_name: nginx
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-    depends_on:
-      frontend:
-        condition: service_started
-      backend:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    networks:
-      - traccar-network
-
-  redis:
-    image: redis:alpine
-    container_name: redis
-    restart: always
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-    networks:
-      - traccar-network
-
-  postgres:
-    image: postgres:15
-    container_name: postgres
-    restart: always
-    environment:
-      POSTGRES_DB: ${DB_NAME:-traccar}
-      POSTGRES_USER: ${DB_USER:-traccar}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-traccar}
-    ports:
-      - "5432:5432"
-    volumes:
-      - ./database/data:/var/lib/postgresql/data
-      - ./database/schema:/docker-entrypoint-initdb.d
+      DATABASE_URL: jdbc:postgresql://database:5432/traccar
+      DATABASE_USER: traccar
+      DATABASE_PASSWORD: traccar
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-    networks:
-      - traccar-network
-
-  backend:
-    build:
-      context: ./services/api-server
-      dockerfile: ../../infrastructure/docker/backend.Dockerfile
-    container_name: backend
-    environment:
-      DB_HOST: postgres
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET}
-      PORT: 8083
-      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-replace_with_actual_key}
-      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-replace_with_actual_secret}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/api/health"]
+      test: ["CMD","curl","-f","http://localhost:8082"]
       interval: 30s
       timeout: 10s
       retries: 5
-    networks:
-      - traccar-network
- 
-  frontend:
-    build:
-      context: ./apps/web-dashboard
-      dockerfile: ../../infrastructure/docker/frontend.Dockerfile
-    container_name: frontend
-    networks:
-      - traccar-network
 
-networks:
-  traccar-network:
-    driver: bridge
+  nginx:
+    image: nginx:latest
+    container_name: traccar_proxy
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - traccar
+
+volumes:
+  db_data:
