@@ -1,6 +1,6 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
-import { TraccarService } from '../traccar/traccar.service';
-import { DevicesService } from '../devices/devices.service';
+import { TraccarService } from './traccar.service';
+import { DevicesService } from './devices.service';
 
 @Injectable()
 export class ReportsService {

@@ -10,7 +10,7 @@ import { toast } from 'react-toastify';
 import { useAuthStore } from '@/store/useAuthStore';
 
 export default function AlertsPage() {
-  const [alerts, setAlerts] = useState([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { token } = useAuthStore();
   const apiBase = process.env.NEXT_PUBLIC_API_URL || '';

@@ -8,11 +8,11 @@ import { format } from 'date-fns';
 import { toast } from 'react-toastify';
 
 export default function ReportsPage() {
-  const [devices, setDevices] = useState([]);
+  const [devices, setDevices] = useState<any[]>([]);
   const [selectedDevice, setSelectedDevice] = useState('');
   const [fromDate, setFromDate] = useState(format(new Date(Date.now() - 86400000), "yyyy-MM-dd'T'HH:mm"));
   const [toDate, setToDate] = useState(format(new Date(), "yyyy-MM-dd'T'HH:mm"));
-  const [reportData, setReportData] = useState([]);
+  const [reportData, setReportData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [type, setType] = useState('trips'); // trips, stops, summary
 

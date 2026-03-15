@@ -6,19 +6,25 @@ export class Payment {
   id: number;
 
   @Column()
-  invoiceId: number;
+  userId: string;
 
   @Column({ nullable: true })
-  transactionId: string;
+  orderId: string;
+
+  @Column({ nullable: true })
+  paymentId: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   amount: number;
 
-  @Column()
-  method: string; // razorpay, paypal, bank_transfer
+  @Column({ default: 'INR' })
+  currency: string;
 
   @Column({ default: 'pending' })
-  status: string; // pending, success, failed
+  status: string; // pending, captured, failed
+
+  @Column({ type: 'json', nullable: true })
+  attributes: any;
 
   @CreateDateColumn()
   createdAt: Date;

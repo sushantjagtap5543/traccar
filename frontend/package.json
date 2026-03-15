@@ -9,18 +9,23 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "axios": "latest",
+    "clsx": "latest",
+    "date-fns": "latest",
+    "lucide-react": "latest",
+    "maplibre-gl": "latest",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "lucide-react": "latest",
-    "axios": "latest",
-    "zustand": "latest",
-    "maplibre-gl": "latest",
+    "react-toastify": "latest",
     "recharts": "latest",
-    "clsx": "latest",
-    "tailwind-merge": "latest",
-    "date-fns": "latest",
     "socket.io-client": "latest",
-    "react-toastify": "latest"
+    "tailwind-merge": "latest",
+    "zustand": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "25.5.0",
+    "@types/react": "19.2.14",
+    "typescript": "5.9.3"
   }
 }

@@ -11,7 +11,7 @@ import axios from 'axios';
 export default function AdminDashboardPage() {
   const { adminStats, fetchAdminStats } = useStatsStore();
   const { token } = useAuthStore();
-  const [clients, setClients] = useState([]);
+  const [clients, setClients] = useState<any[]>([]);
 
   useEffect(() => {
     if (token) {
@@ -92,7 +92,7 @@ export default function AdminDashboardPage() {
             <div className="glass p-4 rounded-xl border border-border">
               <p className="text-[9px] font-bold text-blue-400 mb-1 uppercase tracking-widest">Efficiency</p>
               <p className="text-xl font-black">
-                {adminStats?.totalVehicles > 0 
+                {adminStats && adminStats.totalVehicles > 0 
                   ? `${Math.round((adminStats.onlineVehicles / adminStats.totalVehicles) * 100)}%`
                   : '100%'}
               </p>

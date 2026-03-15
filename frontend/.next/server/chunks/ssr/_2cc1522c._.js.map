@@ -1,0 +1,1 @@
+{"version":3,"sources":["../../../../src/app/dashboard/trip-report/page.jsx"],"sourcesContent":["export default function Page() { return <div className='p-8'><h1>trip-report.jsx</h1></div>; }\r\n"],"names":[],"mappings":"8LAAe,SAAS,IAAS,MAAO,CAAA,EAAA,EAAA,GAAA,EAAC,MAAA,CAAI,UAAU,eAAM,CAAA,EAAA,EAAA,GAAA,EAAC,KAAA,UAAG,qBAA4B"}

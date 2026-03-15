@@ -6,10 +6,13 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
+  // Set global prefix
+  app.setGlobalPrefix('api');
+
   // Enforce validation globally
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
-    forgetUnknownValues: true,
+    forbidUnknownValues: true,
     transform: true,
   }));
 
@@ -26,7 +29,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
-  const port = process.env.PORT || 8083;
+  const port = process.env.PORT || process.env.SERVER_PORT || 8083;
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}`);
   console.log(`Swagger documentation: http://localhost:${port}/api/docs`);

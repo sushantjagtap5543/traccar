@@ -1,5 +1,5 @@
 import { Controller, Get, Param, UseGuards, Req } from '@nestjs/common';
-import { SubscriptionsService } from './subscriptions.service';
+import { SubscriptionsService } from '../services/subscriptions.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 

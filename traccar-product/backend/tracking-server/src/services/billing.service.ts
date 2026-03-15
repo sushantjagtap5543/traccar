@@ -1,12 +1,13 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Payment } from './entities/payment.entity';
+import { Payment } from '../database/entities/payment.entity';
+import { Plan } from '../database/entities/plan.entity';
 import { ConfigService } from '@nestjs/config';
 const Razorpay = require('razorpay');
 import * as crypto from 'crypto';
 
-import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { SubscriptionsService } from './subscriptions.service';
 
 @Injectable()
 export class BillingService {
@@ -15,6 +16,8 @@ export class BillingService {
   constructor(
     @InjectRepository(Payment)
     private paymentRepository: Repository<Payment>,
+    @InjectRepository(Plan)
+    private planRepository: Repository<Plan>,
     private configService: ConfigService,
     private subscriptionsService: SubscriptionsService,
   ) {
@@ -22,6 +25,15 @@ export class BillingService {
       key_id: this.configService.get('RAZORPAY_KEY_ID') || 'rzp_test_placeholder',
       key_secret: this.configService.get('RAZORPAY_SECRET') || 'secret_placeholder',
     });
+  }
+
+  async getPlans() {
+    return this.planRepository.find();
+  }
+
+  async createPlan(data: any) {
+    const plan = this.planRepository.create(data);
+    return this.planRepository.save(plan);
   }
 
   async createOrder(userId: string, planId: string) {

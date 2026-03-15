@@ -1,0 +1,5 @@
+1:"$Sreact.fragment"
+2:I[97367,["/_next/static/chunks/ff1a16fafef87110.js","/_next/static/chunks/a2dfb6fc5208ab9b.js"],"OutletBoundary"]
+3:"$Sreact.suspense"
+0:{"buildId":"gYGkMSiZgjdi_kUqUOIaX","rsc":["$","$1","c",{"children":[["$","div",null,{"className":"p-8","children":[["$","h1",null,{"className":"text-2xl font-bold mb-6","children":"Billing & Invoices"}],["$","div",null,{"className":"bg-white rounded shadow p-4","children":[["$","div","INV-001",{"className":"flex justify-between border-b py-3","children":[["$","span",null,{"children":["INV-001"," - ","Alpha Logistics"]}],["$","span",null,{"className":"font-bold","children":".00"}],["$","span",null,{"className":"text-green-500","children":"Paid"}]]}],["$","div","INV-002",{"className":"flex justify-between border-b py-3","children":[["$","span",null,{"children":["INV-002"," - ","Beta Trans"]}],["$","span",null,{"className":"font-bold","children":",200.00"}],["$","span",null,{"className":"text-amber-500","children":"Pending"}]]}]]}]]}],null,["$","$L2",null,{"children":["$","$3",null,{"name":"Next.MetadataOutlet","children":"$@4"}]}]]}],"loading":null,"isPartial":false}
+4:null

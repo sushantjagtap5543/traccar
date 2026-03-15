@@ -7,16 +7,19 @@ export class Subscription {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => Client)
+  @Column()
+  imei: string;
+
+  @ManyToOne(() => Client, { nullable: true })
   client: Client;
 
-  @Column()
+  @Column({ nullable: true })
   clientId: number;
 
-  @ManyToOne(() => Plan)
+  @ManyToOne(() => Plan, { nullable: true })
   plan: Plan;
 
-  @Column()
+  @Column({ nullable: true })
   planId: number;
 
   @Column()

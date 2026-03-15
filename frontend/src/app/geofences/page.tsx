@@ -10,7 +10,7 @@ import { GeofencePicker } from '@/components/GeofencePicker';
 import { useAuthStore } from '@/store/useAuthStore';
 
 export default function GeofencesPage() {
-  const [geofences, setGeofences] = useState([]);
+  const [geofences, setGeofences] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const { token } = useAuthStore();
