@@ -26,6 +26,18 @@ services:
     ports:
       - "${SERVER_PORT}:8082"
 
+  api:
+    build: ./services/api-server
+    container_name: traccar-api
+    restart: always
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET:-super-secret-key}
+    depends_on:
+      - postgres
+    ports:
+      - "3001:3001"
+
   frontend:
     build: ./frontend
     container_name: traccar-frontend
