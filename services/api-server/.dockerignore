@@ -5,7 +5,4 @@ npm-debug.log
 .env
 Dockerfile
 docker-compose.yml
-nest-cli.json
-tsconfig.json
-tsconfig.build.json
 README.md
