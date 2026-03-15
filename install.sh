@@ -90,12 +90,10 @@ git fetch origin
 git reset --hard origin/main
 git pull $REPO_URL main
 
-# 3. Comprehensive System Cleanup
-echo "🧹 Remote: Cleaning up existing environment..."
-# Stop and remove all containers, volumes, and orphans
-docker-compose down --volumes --remove-orphans || true
-# Clean up all docker resources (containers, images, volumes, networks)
-docker system prune -a -f --volumes
+# 3. Incremental Deployment Update
+echo "🧹 Remote: Preparing for incremental update..."
+# We skip the full prune and volume removal to save time.
+# docker-compose up --build -d will only rebuild changed services.
 
 # 4. Directories & Env
 echo "📁 Remote: Preparing directories..."
