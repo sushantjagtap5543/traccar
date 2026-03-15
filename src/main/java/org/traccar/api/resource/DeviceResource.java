@@ -7,6 +7,7 @@ import org.traccar.model.User;
 import org.traccar.storage.Storage;
 import org.traccar.storage.query.Columns;
 import org.traccar.storage.query.Condition;
+import org.traccar.storage.query.Condition.Permission;
 import org.traccar.storage.query.Request;
 
 import java.util.Collection;
@@ -26,6 +27,6 @@ public class DeviceResource extends BaseResource {
     public Collection<Device> get() throws Exception {
         return storage.getObjects(Device.class,
             new Request(new Columns.All(),
-            new Condition.Permission(User.class, getUserId(), Device.class)));
+            new Permission(User.class, getUserId(), Device.class)));
     }
 }
