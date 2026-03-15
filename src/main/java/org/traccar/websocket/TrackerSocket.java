@@ -21,7 +21,7 @@ public class TrackerSocket {
         // Simple token check in query param for demo
         if (query == null || !query.contains("token=")) {
             try {
-                session.close(new CloseReason(CloseReason.CloseCodes.VIOLATED_POLICY, "Unauthorized"));
+                session.close(new jakarta.websocket.CloseReason(jakarta.websocket.CloseReason.CloseCodes.VIOLATED_POLICY, "Unauthorized"));
                 return;
             } catch (IOException e) {
                 e.printStackTrace();
