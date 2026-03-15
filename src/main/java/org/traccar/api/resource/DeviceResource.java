@@ -27,6 +27,6 @@ public class DeviceResource extends BaseResource {
     public Collection<Device> get() throws Exception {
         return storage.getObjects(Device.class,
             new Request(new Columns.All(),
-            new Permission(User.class, getUserId(), Device.class)));
+            new org.traccar.storage.query.Condition.Permission(User.class, getUserId(), Device.class)));
     }
 }
