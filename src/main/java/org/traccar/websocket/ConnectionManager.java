@@ -13,18 +13,18 @@ public class ConnectionManager {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ConnectionManager.class);
     private final ObjectMapper json = new ObjectMapper();
-    private final Set<Session> sessions = new CopyOnWriteArraySet<>();
+    private final Set<jakarta.websocket.Session> sessions = new CopyOnWriteArraySet<>();
 
-    public void addSession(Session session) {
+    public void addSession(jakarta.websocket.Session session) {
         sessions.add(session);
     }
 
-    public void removeSession(Session session) {
+    public void removeSession(jakarta.websocket.Session session) {
         sessions.remove(session);
     }
 
     public void broadcast(Position position) {
-        for (Session session : sessions) {
+        for (jakarta.websocket.Session session : sessions) {
             try {
                 session.getBasicRemote().sendText(json.writeValueAsString(position));
             } catch (Exception e) {
