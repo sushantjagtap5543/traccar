@@ -11,8 +11,8 @@ services:
       - "8082:8082"
       - "5000-5150:5000-5150"
     volumes:
-      - ./traccar/data:/opt/traccar/data
-      - ./traccar/traccar.xml:/opt/traccar/conf/traccar.xml:ro
+      - ./services/tracking-engine/data:/opt/traccar/data
+      - ./services/tracking-engine/traccar.xml:/opt/traccar/conf/traccar.xml:ro
     environment:
       - TRACCAR_WEB_ORIGIN=*
       - TRACCAR_WEB_CORS=true
@@ -34,8 +34,12 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
-      - frontend
-      - backend
+      frontend:
+        condition: service_started
+      backend:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     networks:
       - traccar-network
 
@@ -77,8 +81,8 @@ services:
 
   backend:
     build:
-      context: ./traccar-product/backend/tracking-server
-      dockerfile: ../../../infrastructure/docker/backend.Dockerfile
+      context: ./services/api-server
+      dockerfile: ../../infrastructure/docker/backend.Dockerfile
     container_name: backend
     environment:
       DB_HOST: postgres
@@ -90,7 +94,8 @@ services:
       RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-replace_with_actual_key}
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-replace_with_actual_secret}
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8083/api/health"]
       interval: 30s
@@ -101,7 +106,7 @@ services:
  
   frontend:
     build:
-      context: ./traccar-product/frontend
+      context: ./apps/web-dashboard
       dockerfile: ../../infrastructure/docker/frontend.Dockerfile
     container_name: frontend
     networks:

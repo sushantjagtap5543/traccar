@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: traccar-db
+    environment:
+      POSTGRES_DB: traccar
+      POSTGRES_USER: traccar
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-traccar}
+    volumes:
+      - traccar_db_data:/var/lib/postgresql/data
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: traccar-redis
+    restart: always
+
+  backend:
+    image: traccar/traccar:latest
+    container_name: traccar-backend
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8082:8082"
+      - "5000-5150:5000-5150"
+      - "5000-5150:5000-5150/udp"
+    environment:
+      - TRACCAR_DB_URL=jdbc:postgresql://db:5432/traccar
+      - TRACCAR_DB_USER=traccar
+      - TRACCAR_DB_PASSWORD=${DB_PASSWORD:-traccar}
+    volumes:
+      - ./conf/traccar.xml:/opt/traccar/conf/traccar.xml:ro
+    restart: always
+
+  frontend:
+    build:
+      context: ./apps/web-dashboard
+      dockerfile: Dockerfile
+    container_name: traccar-frontend
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    restart: always
+
+volumes:
+  traccar_db_data:

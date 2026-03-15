@@ -1,148 +1,156 @@
--- GeoSurePath Database Schema and Triggers
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- Enable PostGIS if available (for future geospatial enhancements, though MapLibre handles most)
--- CREATE EXTENSION IF NOT EXISTS postgis;
-
--- 1. Clients Table (Multi-tenant)
+-- 0. Clients Table
 CREATE TABLE IF NOT EXISTS clients (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE,
-    status VARCHAR(50) DEFAULT 'active',
+    name VARCHAR(128) NOT NULL,
+    email VARCHAR(128) UNIQUE,
+    status VARCHAR(20) DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Users Table
+-- 1. Users Table (Authentication)
 CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    client_id UUID REFERENCES clients(id) ON DELETE CASCADE,
-    name VARCHAR(255),
-    email VARCHAR(255) UNIQUE,
-    mobile VARCHAR(20) UNIQUE NOT NULL,
-    company VARCHAR(255),
-    address TEXT,
-    password VARCHAR(255),
-    is_otp_verified BOOLEAN DEFAULT FALSE,
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    email VARCHAR(128) UNIQUE NOT NULL,
+    password VARCHAR(256) NOT NULL,
+    phone VARCHAR(32),
+    administrator BOOLEAN DEFAULT FALSE,
+    readonly BOOLEAN DEFAULT FALSE,
+    disabled BOOLEAN DEFAULT FALSE,
+    map VARCHAR(64),
+    latitude DOUBLE PRECISION DEFAULT 0,
+    longitude DOUBLE PRECISION DEFAULT 0,
+    zoom INTEGER DEFAULT 0,
     otp_code VARCHAR(10),
     otp_expires_at TIMESTAMP,
+    is_otp_verified BOOLEAN DEFAULT FALSE,
     role VARCHAR(50) DEFAULT 'CLIENT',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    token VARCHAR(256),
+    client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_client_id ON users(client_id);
+
+-- 2. Groups Table
+CREATE TABLE IF NOT EXISTS groups (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    groupId BIGINT REFERENCES groups(id),
+    attributes JSONB
 );
 
 -- 3. Devices Table
 CREATE TABLE IF NOT EXISTS devices (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    client_id UUID REFERENCES clients(id) ON DELETE CASCADE,
-    name VARCHAR(255) NOT NULL,
-    imei VARCHAR(50) UNIQUE NOT NULL,
-    traccar_device_id INTEGER UNIQUE,
-    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-    model VARCHAR(100) DEFAULT 'unknown',
-    status VARCHAR(50) DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    uniqueId VARCHAR(128) UNIQUE NOT NULL,
+    status VARCHAR(32),
+    lastUpdate TIMESTAMP,
+    positionId BIGINT,
+    groupId BIGINT REFERENCES groups(id),
+    model VARCHAR(128),
+    contact VARCHAR(128),
+    phone VARCHAR(128),
+    category VARCHAR(128),
+    disabled BOOLEAN DEFAULT FALSE,
+    traccar_device_id BIGINT,
+    client_id UUID REFERENCES clients(id) ON DELETE SET NULL
 );
 
--- 3. Approved Devices Table (keeping for registration control)
-CREATE TABLE IF NOT EXISTS approved_devices (
-    imei VARCHAR(50) PRIMARY KEY,
-    model VARCHAR(100),
-    batch VARCHAR(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+CREATE INDEX IF NOT EXISTS idx_devices_client_id ON devices(client_id);
 
--- 4. Positions Table
+CREATE INDEX IF NOT EXISTS idx_devices_uniqueId ON devices(uniqueId);
+
+-- 4. Positions Table (GPS Data)
+-- Note: Partitioning will be handled in a separate script or applied to this table.
 CREATE TABLE IF NOT EXISTS positions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    device_id UUID REFERENCES devices(id) ON DELETE CASCADE,
-    latitude DECIMAL(10, 8),
-    longitude DECIMAL(11, 8),
-    speed DECIMAL(10, 2),
-    course DECIMAL(10, 2),
-    altitude DECIMAL(10, 2),
+    id BIGSERIAL,
+    protocol VARCHAR(128),
+    deviceId BIGINT NOT NULL REFERENCES devices(id),
+    serverTime TIMESTAMP,
+    deviceTime TIMESTAMP,
+    fixTime TIMESTAMP,
+    latitude DOUBLE PRECISION,
+    longitude DOUBLE PRECISION,
+    altitude DOUBLE PRECISION,
+    speed DOUBLE PRECISION,
+    course DOUBLE PRECISION,
+    accuracy DOUBLE PRECISION,
     attributes JSONB,
-    server_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    device_time TIMESTAMP
+    PRIMARY KEY (id, fixTime)
+) PARTITION BY RANGE (fixTime);
+
+CREATE INDEX IF NOT EXISTS idx_positions_deviceId ON positions(deviceId);
+CREATE INDEX IF NOT EXISTS idx_positions_time ON positions(fixTime);
+CREATE INDEX IF NOT EXISTS idx_device_position ON positions(deviceId, fixTime);
+
+-- 5. Permissions Table
+CREATE TABLE IF NOT EXISTS permissions (
+    userId BIGINT NOT NULL REFERENCES users(id),
+    deviceId BIGINT NOT NULL REFERENCES devices(id),
+    PRIMARY KEY (userId, deviceId)
 );
 
-CREATE INDEX idx_device_positions ON positions(device_id, server_time);
-CREATE INDEX idx_positions_device_time ON positions(device_id, device_time);
-
--- 5. Alerts Table
-CREATE TABLE IF NOT EXISTS alerts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    device_id UUID REFERENCES devices(id) ON DELETE CASCADE,
-    type VARCHAR(50) NOT NULL,
-    message TEXT,
-    latitude DECIMAL(10, 8),
-    longitude DECIMAL(11, 8),
-    attributes JSONB,
-    is_read BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 6. Command Logs Table
-CREATE TABLE IF NOT EXISTS command_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    device_id UUID REFERENCES devices(id) ON DELETE CASCADE,
-    type VARCHAR(50) NOT NULL,
-    status VARCHAR(50) DEFAULT 'pending',
-    result JSONB,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 7. Geofences Table
+-- 6. Geofences Table
 CREATE TABLE IF NOT EXISTS geofences (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    client_id UUID REFERENCES clients(id) ON DELETE CASCADE,
-    name VARCHAR(255) NOT NULL,
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(128),
     description TEXT,
-    area JSONB NOT NULL,
-    alert_type VARCHAR(20) DEFAULT 'both',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    area TEXT,
+    attributes JSONB
 );
 
--- 8. Geofence-Device Junction Table
-CREATE TABLE IF NOT EXISTS geofence_devices (
-    geofence_id UUID REFERENCES geofences(id) ON DELETE CASCADE,
-    device_id UUID REFERENCES devices(id) ON DELETE CASCADE,
-    PRIMARY KEY (geofence_id, device_id)
+-- 7. Events Table
+CREATE TABLE IF NOT EXISTS events (
+    id BIGSERIAL PRIMARY KEY,
+    type VARCHAR(128),
+    deviceId BIGINT REFERENCES devices(id),
+    positionId BIGINT,
+    eventTime TIMESTAMP,
+    attributes JSONB
 );
 
--- ... (Subscriptions)
+CREATE INDEX IF NOT EXISTS idx_events_deviceId ON events(deviceId);
+CREATE INDEX IF NOT EXISTS idx_event_time ON events(eventTime);
 
--- --- TRIGGERS ---
+-- 8. Notifications Table
+CREATE TABLE IF NOT EXISTS notifications (
+    id BIGSERIAL PRIMARY KEY,
+    type VARCHAR(128),
+    attributes JSONB,
+    always BOOLEAN DEFAULT FALSE
+);
 
--- Trigger: Automatically generate overspeed alert if position speed > limit
-CREATE OR REPLACE FUNCTION check_overspeed()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF NEW.speed > 80 THEN 
-        INSERT INTO alerts (device_id, type, message, latitude, longitude, attributes)
-        VALUES (NEW.device_id, 'overspeed', 'Vehicle exceeded speed limit: ' || NEW.speed || ' km/h', NEW.latitude, NEW.longitude, NEW.attributes);
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- 9. User Tokens Table
+CREATE TABLE IF NOT EXISTS user_tokens (
+    id BIGSERIAL PRIMARY KEY,
+    userId BIGINT REFERENCES users(id),
+    token VARCHAR(256),
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-CREATE TRIGGER trg_overspeed_check
-AFTER INSERT ON positions
-FOR EACH ROW
-EXECUTE FUNCTION check_overspeed();
+-- 10. Reports Table
+CREATE TABLE IF NOT EXISTS reports (
+    id BIGSERIAL PRIMARY KEY,
+    userId BIGINT REFERENCES users(id),
+    deviceId BIGINT REFERENCES devices(id),
+    reportType VARCHAR(128),
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
--- Trigger: Log device binding on device registration (audit)
-CREATE OR REPLACE FUNCTION log_device_binding()
-RETURNS TRIGGER AS $$
-BEGIN
-    INSERT INTO command_logs (device_id, type, status, result)
-    VALUES (NEW.id, 'device_binding', 'success', jsonb_build_object('imei', NEW.imei, 'traccar_id', NEW.traccar_device_id));
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- 11. Custom Indices and Constraints (Additional from User Request)
+-- Already included in table definitions above via REFERENCES and CREATE INDEX
+CREATE INDEX IF NOT EXISTS idx_positions_deviceId_fixTime ON positions(deviceId, fixTime DESC);
+CREATE INDEX IF NOT EXISTS idx_positions_protocol ON positions(protocol);
 
-CREATE TRIGGER trg_device_binding_log
-AFTER INSERT ON devices
-FOR EACH ROW
-EXECUTE FUNCTION log_device_binding();
+-- 12. Default Admin User
+-- WARNING: Use a secure BCrypt hash here. Default is for demonstration only.
+INSERT INTO users (name, email, password, administrator)
+VALUES ('admin', 'admin@example.com', '$2a$12$R.Sj.7k1.7k1.7k1.7k1.Ou9q8z7x6c5v4b3n2m1l0k9j8h7g6f5', TRUE)
+ON CONFLICT (email) DO NOTHING;

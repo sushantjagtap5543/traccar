@@ -1,0 +1,48 @@
+import { Controller, Get, Query, UseGuards, Req } from '@nestjs/common';
+import { ReportsService } from '../services/reports.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { UserRole } from '../database/entities/user-role.enum';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+
+@ApiTags('Reports')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Controller('reports')
+export class ReportsController {
+  constructor(private readonly reportsService: ReportsService) {}
+
+  @Get('trips')
+  @ApiOperation({ summary: 'Get trip report for a device' })
+  async getTrips(
+    @Req() req,
+    @Query('deviceId') deviceId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    return this.reportsService.getTrips(req.user.userId, deviceId, from, to);
+  }
+
+  @Get('stops')
+  @ApiOperation({ summary: 'Get stop report for a device' })
+  async getStops(
+    @Req() req,
+    @Query('deviceId') deviceId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    return this.reportsService.getStops(req.user.userId, deviceId, from, to);
+  }
+
+  @Get('summary')
+  @ApiOperation({ summary: 'Get summary report for a device' })
+  async getSummary(
+    @Req() req,
+    @Query('deviceId') deviceId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    return this.reportsService.getSummary(req.user.userId, deviceId, from, to);
+  }
+}

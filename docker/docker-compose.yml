@@ -1,0 +1,53 @@
+version: "3.9"
+
+services:
+
+  traccar:
+
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+
+    container_name: traccar-server
+
+    restart: always
+
+    ports:
+      - "8082:8082"
+      - "5000-5150:5000-5150"
+
+    volumes:
+      - ../logs:/opt/traccar/logs
+      - ../data:/opt/traccar/data
+      - ../web:/opt/traccar/web
+
+    environment:
+      - TZ=UTC
+
+    depends_on:
+      - database
+
+
+  database:
+
+    image: postgres:15
+
+    container_name: traccar-db
+
+    restart: always
+
+    environment:
+      POSTGRES_DB: traccar
+      POSTGRES_USER: traccar
+      POSTGRES_PASSWORD: traccar
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ../database/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+
+volumes:
+  dbdata:

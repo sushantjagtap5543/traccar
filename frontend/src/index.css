@@ -1,0 +1,382 @@
+:root {
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+  --bg-dark: #0f172a;
+  --bg-card: #1e293b;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --border: #334155;
+  --accent: #22d3ee;
+  --danger: #f43f5e;
+  --success: #10b981;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main-layout {
+  display: flex;
+  flex: 1;
+}
+
+.content {
+  flex: 1;
+  padding: 2rem;
+  transition: all 0.3s ease;
+}
+
+.content.authenticated {
+  padding-left: 2rem;
+}
+
+/* Glassmorphism effects */
+.glass {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* Common UI Elements */
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1.2rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background-color: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+input {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: white;
+  padding: 0.8rem 1rem;
+  border-radius: 8px;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+/* Specific component styles will be added in their files or here if global */
+
+/* Navbar */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 2rem;
+  height: 64px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.logo-icon {
+  font-size: 1.5rem;
+}
+.nav-brand h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+.nav-icon-btn {
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0.5rem;
+}
+.nav-icon-btn:hover {
+  color: white;
+}
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-main);
+  font-weight: 500;
+}
+.logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(244, 63, 94, 0.1);
+  color: var(--danger);
+  padding: 0.5rem 1rem;
+}
+.logout-btn:hover {
+  background: var(--danger);
+  color: white;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 240px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+}
+.sidebar-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+.sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+}
+.sidebar-item.active {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+/* Auth Pages */
+.auth-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 80vh;
+}
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  padding: 3rem;
+  border-radius: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+.auth-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+.auth-logo {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+.auth-header h2 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+.auth-header p {
+  color: var(--text-muted);
+}
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.input-group {
+  position: relative;
+}
+.input-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}
+.input-group input {
+  padding-left: 3rem;
+}
+.error-msg {
+  background: rgba(244, 63, 94, 0.1);
+  color: var(--danger);
+  padding: 0.75rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  text-align: center;
+}
+.auth-btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem;
+  height: 3rem;
+  font-size: 1rem;
+}
+
+/* Page Header & Badge */
+.page-header { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: flex-end; 
+}
+.header-left { display: flex; flex-direction: column; gap: 0.25rem; }
+
+/* Status Badge */
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+.status-badge.online {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+.status-badge.offline {
+  background: rgba(244, 63, 94, 0.1);
+  color: var(--danger);
+  border: 1px solid rgba(244, 63, 94, 0.2);
+}
+
+/* Dashboard Stats */
+.stats-grid {
+  display: grid; 
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+  gap: 1.5rem; 
+}
+.stat-card { 
+  padding: 1.5rem; 
+  border-radius: 16px; 
+  display: flex; 
+  align-items: center; 
+  gap: 1.25rem; 
+}
+.stat-icon { 
+  padding: 0.75rem; 
+  border-radius: 12px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+}
+.stat-icon.active { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+.stat-icon.alerts { background: rgba(244, 63, 94, 0.1); color: var(--danger); }
+.stat-icon.fleet { background: rgba(99, 102, 241, 0.1); color: var(--primary); }
+.stat-icon.uptime { background: rgba(34, 211, 238, 0.1); color: var(--accent); }
+
+.stat-label { font-size: 0.875rem; color: var(--text-muted); display: block; }
+.stat-value { font-size: 1.5rem; font-weight: 700; color: white; }
+
+/* Devices */
+.devices-page { display: flex; flex-direction: column; gap: 2rem; }
+.devices-grid { 
+  display: grid; 
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
+  gap: 1.5rem; 
+}
+
+/* Device Card */
+.device-card { 
+  padding: 1.5rem; 
+  border-radius: 20px; 
+  transition: all 0.3s ease; 
+  cursor: pointer;
+}
+.device-card:hover { 
+  transform: translateY(-5px); 
+  border-color: var(--primary);
+  box-shadow: 0 10px 30px -10px rgba(99, 102, 241, 0.3);
+}
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
+.device-info { display: flex; align-items: center; gap: 0.75rem; }
+.status-indicator { width: 10px; height: 10px; border-radius: 50%; }
+.device-info h3 { font-size: 1.125rem; font-weight: 600; }
+
+.card-body { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem; }
+.detail-item { display: flex; align-items: center; gap: 0.75rem; color: var(--text-muted); font-size: 0.875rem; }
+
+.card-footer { display: flex; justify-content: space-between; align-items: center; }
+.view-btn { 
+  font-size: 0.75rem; 
+  padding: 0.4rem 0.8rem; 
+  background: rgba(99, 102, 241, 0.1); 
+  color: var(--primary); 
+  font-weight: 700;
+}
+
+/* Map */
+.map-wrapper {
+  height: 600px;
+  width: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  position: relative;
+}
+
+/* Loader */
+.loader-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  width: 100%;
+}
+.spinner {
+  color: var(--primary);
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

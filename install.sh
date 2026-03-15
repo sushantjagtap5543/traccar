@@ -6,9 +6,13 @@
 set -e
 
 # Configuration
-REMOTE_IP="3.108.114.12"
-REMOTE_USER="ubuntu"
-PEM_FILE="11111.pem"
+REMOTE_IP="${1:-$REMOTE_IP}"
+REMOTE_USER="${REMOTE_USER:-ubuntu}"
+PEM_FILE="${PEM_FILE:-11111.pem}"
+
+if [ -z "$REMOTE_IP" ] && [[ "$(hostname)" != *"ip-"* ]]; then
+    read -p "Enter Remote IP for deployment: " REMOTE_IP
+fi
 REPO_URL="https://github.com/sushantjagtap5543/traccar.git"
 
 # Detection

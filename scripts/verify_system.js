@@ -1,16 +1,13 @@
 const axios = require('axios');
+const { execSync } = require('child_process');
 require('dotenv').config({ path: './traccar-product/backend/tracking-server/.env' });
 
 const API_URL = 'http://localhost:8083/api';
 
 async function testSystem() {
-    console.log('--- GeoSurePath System Verification ---');
+    console.log('--- GeoSurePath Deep System Verification ---');
     
     try {
-        // 1. Test Auth / OTP
-        console.log('[TEST] Registering with OTP...');
-        const otpRes = await axios.post(`${API_URL}/auth/register-otp`, { mobile: '9999999999' });
-        console.log('OTP Result:', otpRes.data);
 
         // 2. Test Verify OTP (Using mock logic)
         console.log('[TEST] Verifying OTP...');

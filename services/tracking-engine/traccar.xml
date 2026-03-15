@@ -1,0 +1,41 @@
+<?xml version='1.0' encoding='UTF-8'?>
+
+<!DOCTYPE properties SYSTEM 'http://java.sun.com/dtd/properties.dtd'>
+
+<properties>
+
+    <!-- Database Configuration -->
+    <entry key='database.driver'>org.postgresql.Driver</entry>
+    <entry key='database.url'>jdbc:postgresql://postgres:5432/traccar</entry>
+    <entry key='database.user'>traccar</entry>
+    <entry key='database.password'>traccar_secure_password</entry>
+
+    <!-- Connection Restriction: Only allow registered devices -->
+    <entry key='database.selectDevicesAll'>
+        SELECT * FROM tc_devices WHERE id IN (SELECT traccar_device_id FROM vehicles);
+    </entry>
+    <entry key='deviceManager.unknown'>false</entry>
+
+    <!-- GPS Protocols -->
+    <entry key='osmand.port'>5055</entry>
+    <entry key='gt06.port'>5023</entry>
+    <entry key='tk103.port'>5002</entry>
+    <entry key='h02.port'>5013</entry>
+    <!-- Add more ports as needed -->
+
+    <!-- Web Interface (Internal for backend proxy) -->
+    <entry key='web.port'>8082</entry>
+    <entry key='web.path'>./web</entry>
+    <entry key='web.origin'>http://localhost</entry> <!-- Restrict to production domain -->
+    <entry key='web.cors'>true</entry>
+    <entry key='web.sessionTimeout'>3600</entry>
+
+    <!-- Logging -->
+    <entry key='logger.file'>/opt/traccar/logs/tracker-server.log</entry>
+    <entry key='logger.level'>info</entry>
+
+    <!-- Data Filtering & Optimization -->
+    <entry key='filter.duplicate'>true</entry>
+    <entry key='filter.maxSpeed'>250</entry>
+
+</properties>
