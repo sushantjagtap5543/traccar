@@ -22,9 +22,9 @@ export class Client {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @OneToMany(() => User, (user) => user.client)
-  users: User[];
+  // @OneToMany(() => User, (user) => (user as any).client)
+  // users: User[];
 
-  @OneToMany(() => Device, (device) => device.client)
-  devices: Device[];
+  // @OneToMany(() => Device, (device) => (device as any).client)
+  // devices: Device[];
 }
