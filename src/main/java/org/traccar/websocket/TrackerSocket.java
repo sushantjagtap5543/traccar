@@ -1,6 +1,7 @@
 package org.traccar.websocket;
 
 import jakarta.websocket.*;
+import jakarta.websocket.CloseReason;
 import jakarta.websocket.server.ServerEndpoint;
 import org.traccar.security.TokenManager;
 import java.io.IOException;
