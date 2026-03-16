@@ -21,7 +21,7 @@ export class BillingService {
     const keyId = this.configService.get<string>('RAZORPAY_KEY_ID');
     const keySecret = this.configService.get<string>('RAZORPAY_KEY_SECRET');
 
-    if (!keyId || !keySecret || keyId.includes('placeholder') || keySecret.includes('placeholder')) {
+    if (!keyId || !keySecret) {
       throw new Error('RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET is not correctly defined in environment!');
     }
 

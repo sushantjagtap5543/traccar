@@ -9,4 +9,4 @@ sed -i "s#<DB_USER>#$DB_USER#g" conf/traccar.xml
 sed -i "s#<DB_PASSWORD>#$DB_PASSWORD#g" conf/traccar.xml
 
 # Start backend
-java -jar tracker-server.jar conf/traccar.xml
+/opt/traccar/jre/bin/java -jar tracker-server.jar conf/traccar.xml
