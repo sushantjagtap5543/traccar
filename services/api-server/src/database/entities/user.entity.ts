@@ -39,6 +39,12 @@ export class User {
   @Column({ length: 50, default: 'CLIENT' })
   role: string;
 
+  @Column({ default: false })
+  disabled: boolean;
+
+  @Column({ length: 20, default: 'active' })
+  status: string;
+
   @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;
 
