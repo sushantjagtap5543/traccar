@@ -33,6 +33,9 @@ if [ "$IS_REMOTE" = false ]; then
     fi
 
     # 2. Trigger Remote Deployment
+    echo "🌐 Copying environment configuration..."
+    scp -o StrictHostKeyChecking=no -i $PEM_FILE .env $REMOTE_USER@$REMOTE_IP:/home/ubuntu/traccar/.env
+
     echo "🌐 Initiating Remote Deployment on $REMOTE_IP..."
     ssh -o StrictHostKeyChecking=no -i $PEM_FILE $REMOTE_USER@$REMOTE_IP "
         if [ ! -d traccar ]; then
