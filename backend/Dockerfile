@@ -1,5 +1,6 @@
 # Production stage
 FROM traccar/traccar:latest
+USER root
 WORKDIR /opt/traccar
 
 # Copy custom assets (if they exist in the context)
