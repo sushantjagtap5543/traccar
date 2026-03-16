@@ -9,6 +9,11 @@ async function bootstrap() {
   
   app.setGlobalPrefix('api');
 
+  // WebSocket Scaling (Redis Adapter)
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
+
   
   // Enforce validation globally
   app.useGlobalPipes(new ValidationPipe({
@@ -16,6 +21,12 @@ async function bootstrap() {
     forbidUnknownValues: true,
     transform: true,
   }));
+
+  // Global Exception Filter
+  app.useGlobalFilters(new GlobalExceptionFilter());
+
+  // Global Logger Middleware
+  app.use(new LoggerMiddleware().use);
 
   // CORS
   app.enableCors();

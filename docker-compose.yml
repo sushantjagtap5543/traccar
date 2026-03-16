@@ -12,6 +12,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
+    networks:
+      - traccar-network
 
   backend:
     build: ./backend
@@ -23,6 +25,8 @@ services:
       SERVER_PORT: ${SERVER_PORT}
     depends_on:
       - postgres
+    networks:
+      - traccar-network
     ports:
       - "${SERVER_PORT}:8082"
 
@@ -41,6 +45,8 @@ services:
     depends_on:
       - postgres
       - redis
+    networks:
+      - traccar-network
     ports:
       - "3001:3001"
 
@@ -48,11 +54,15 @@ services:
     image: redis:alpine
     container_name: traccar-redis
     restart: always
+    networks:
+      - traccar-network
 
   frontend:
     build: ./frontend/client-dashboard
     container_name: traccar-frontend
     restart: always
+    networks:
+      - traccar-network
     ports:
       - "3000:80"
 
@@ -60,6 +70,8 @@ services:
     build: ./frontend/admin-dashboard
     container_name: traccar-admin-frontend
     restart: always
+    networks:
+      - traccar-network
     ports:
       - "3002:80"
 
@@ -76,3 +88,10 @@ services:
     depends_on:
       - backend
       - frontend
+      - api
+    networks:
+      - traccar-network
+
+networks:
+  traccar-network:
+    driver: bridge

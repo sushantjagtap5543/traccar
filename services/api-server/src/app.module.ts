@@ -16,6 +16,9 @@ import { StatsModule } from './modules/stats.module';
 import { ReportsModule } from './modules/reports.module';
 import { GeofencesModule } from './modules/geofences.module';
 import { RedisModule } from './modules/redis.module';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
+import { MonitoringModule } from './modules/monitoring.module';
 
 @Module({
   imports: [
@@ -47,8 +50,19 @@ import { RedisModule } from './modules/redis.module';
     ReportsModule,
     GeofencesModule,
     RedisModule,
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 100,
+    }]),
+    MonitoringModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}
