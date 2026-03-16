@@ -5,7 +5,7 @@
 echo "🔍 Checking System Health..."
 
 # Check Docker containers
-services=("traccar-core" "nginx" "postgres" "redis" "backend" "frontend")
+services=("traccar-postgres" "traccar-backend" "traccar-api" "traccar-redis" "traccar-frontend" "traccar-admin-frontend" "traccar-nginx")
 
 for service in "${services[@]}"; do
     STATUS=$(docker inspect -f '{{.State.Status}}' "$service" 2>/dev/null || echo "not found")
@@ -18,7 +18,7 @@ done
 
 # Check API responsiveness
 echo "🌐 Checking API responsiveness..."
-if curl -s --max-time 5 http://localhost:8083/api/health | grep -q "status"; then
+if curl -s --max-time 5 http://localhost:3001/api/health | grep -q "status"; then
     echo "✅ API is RESPONSIVE"
 else
     echo "❌ API is NOT RESPONDING"

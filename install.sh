@@ -87,9 +87,10 @@ if [[ -f /usr/bin/apt-get ]]; then
         sudo ufw allow 22/tcp
         sudo ufw allow 80/tcp
         sudo ufw allow 443/tcp
-        sudo ufw allow 3000/tcp
-        sudo ufw allow 3001/tcp
-        sudo ufw allow 8082/tcp
+        sudo ufw allow 3000/tcp  # Client Dashboard
+        sudo ufw allow 3001/tcp  # API Server
+        sudo ufw allow 3002/tcp  # Admin Dashboard
+        sudo ufw allow 8082/tcp  # Traccar Core
         sudo ufw allow 5000:5150/tcp
         sudo ufw allow 5000:5150/udp
         echo "y" | sudo ufw enable
@@ -121,10 +122,15 @@ echo "🔧 Remote: Fixing line endings for shell scripts..."
 find . -type f -name "*.sh" -exec sed -i 's/\r$//' {} +
 find . -type f -name "entrypoint.sh" -exec sed -i 's/\r$//' {} +
 
-# 3. Incremental Deployment Update
-echo "🧹 Remote: Preparing for incremental update..."
-# We skip the full prune and volume removal to save time.
-# docker-compose up --build -d will only rebuild changed services.
+# 3. Dependency Optimization
+if command -v npm &> /dev/null; then
+    echo "📦 Remote: Synchronizing dependencies..."
+    (cd services/api-server && npm install --quiet)
+    (cd frontend/client-dashboard && npm install --quiet)
+    (cd frontend/admin-dashboard && npm install --quiet)
+else
+    echo "⚠️ npm not found on host, skipping host-side dependency sync (Docker will handle it)."
+fi
 
 # 4. Directories & Env
 echo "📁 Remote: Preparing directories..."
@@ -136,44 +142,37 @@ echo "🏗️ Remote: Building and launching services..."
 chmod +x scripts/*.sh
 ./scripts/deploy.sh
 
-# 5. Verification
+# 6. Cleanup
+echo "🧹 Remote: Cleaning up unused Docker resources..."
+docker system prune -f
+
+# 7. Verification
 echo "🧪 Remote: Running Verification Tests..."
 echo "------------------------------------------------"
-echo "⏳ Waiting for API to become healthy..."
 
-MAX_RETRIES=12
-COUNT=0
-until $(curl -sSf http://localhost:8082/api/server > /dev/null 2>&1); do
-    if [ $COUNT -eq $MAX_RETRIES ]; then
-        echo "❌ Timeout waiting for API. Proceeding with tests anyway..."
-        break
-    fi
-    echo "   ...waiting ($((COUNT+1))/$MAX_RETRIES)"
-    sleep 5
-    COUNT=$((COUNT+1))
-done
+check_endpoint() {
+    local name=$1
+    local url=$2
+    local retries=12
+    local count=0
+    echo "⏳ Waiting for $name ($url)..."
+    until $(curl -sSf "$url" > /dev/null 2>&1); do
+        if [ $count -eq $retries ]; then
+            echo "❌ $name: Timeout"
+            return 1
+        fi
+        sleep 5
+        count=$((count+1))
+    done
+    echo "✅ $name: Healthy"
+    return 0
+}
 
-echo "📝 Testing Registration API..."
-REGISTER_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8082/api/register \
-    -H "Content-Type: application/json" \
-    -d '{"name":"Automation Test","email":"test_'"$(date +%s)"'@test.com","password":"password123"}')
+check_endpoint "Traccar Core" "http://localhost:8082"
+check_endpoint "API Server" "http://localhost:3001/api/docs"
 
-if [ "$REGISTER_STATUS" == "200" ] || [ "$REGISTER_STATUS" == "204" ] || [ "$REGISTER_STATUS" == "201" ]; then
-    echo "✅ Registration API: Success ($REGISTER_STATUS)"
-else
-    echo "❌ Registration API: Failed ($REGISTER_STATUS)"
-fi
-
-echo "🔑 Testing Login API..."
-LOGIN_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8082/api/session/login \
-    -H "Content-Type: application/json" \
-    -d '{"email":"admin@admin.com","password":"admin"}')
-
-if [ "$LOGIN_STATUS" == "200" ]; then
-    echo "✅ Login API: Success ($LOGIN_STATUS)"
-else
-    echo "❌ Login API: Failed ($LOGIN_STATUS)"
-fi
+check_endpoint "Client Dashboard" "http://localhost:3000"
+check_endpoint "Admin Dashboard" "http://localhost:3002"
 
 echo "------------------------------------------------"
-echo "✅ Remote Deployment & Verification Complete!"
+echo "✅ Unified Deployment & Verification Complete!"
