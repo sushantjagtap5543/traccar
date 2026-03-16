@@ -1,25 +1,12 @@
 <?xml version='1.0' encoding='UTF-8'?>
-
 <!DOCTYPE properties SYSTEM 'http://java.sun.com/dtd/properties.dtd'>
-
 <properties>
-
-<entry key='database.driver'>org.postgresql.Driver</entry>
-
-<entry key='database.url'>
-jdbc:postgresql://<DB_HOST>:<DB_PORT>/<DB_NAME>
-</entry>
-
-<entry key='database.user'><DB_USER></entry>
-
-<entry key='database.password'><DB_PASSWORD></entry>
-
-<entry key='web.port'>8082</entry>
-
-<entry key='web.origin'>*</entry>
-
-<entry key='web.cors'>true</entry>
-
-<entry key='logger.level'>info</entry>
-
+    <entry key='database.driver'>org.postgresql.Driver</entry>
+    <entry key='database.url'>jdbc:postgresql://<DB_HOST>:<DB_PORT>/<DB_NAME></entry>
+    <entry key='database.user'><DB_USER></entry>
+    <entry key='database.password'><DB_PASSWORD></entry>
+    <entry key='web.port'>8082</entry>
+    <entry key='web.origin'>*</entry>
+    <entry key='web.cors'>true</entry>
+    <entry key='logger.level'>info</entry>
 </properties>
