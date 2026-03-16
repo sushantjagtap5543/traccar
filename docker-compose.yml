@@ -19,6 +19,7 @@ services:
     build: ./backend
     container_name: traccar-backend
     restart: always
+    env_file: .env
     environment:
       TRACCAR_ADMIN_USER: ${TRACCAR_ADMIN_USER}
       TRACCAR_ADMIN_PASS: ${TRACCAR_ADMIN_PASS}
@@ -39,6 +40,7 @@ services:
     build: ./services/api-server
     container_name: traccar-api
     restart: always
+    env_file: .env
     environment:
       DB_HOST: postgres
       DB_PORT: 5432

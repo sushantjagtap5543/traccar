@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Initialize backend
 
 # Apply environment variables to traccar.xml
