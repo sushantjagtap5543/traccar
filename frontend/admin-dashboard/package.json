@@ -2,6 +2,7 @@
   "name": "traccar-web",
   "version": "1.0.0",
   "private": true,
+  "homepage": "/admin",
   "dependencies": {
     "@mui/material": "latest",
     "@emotion/react": "latest",

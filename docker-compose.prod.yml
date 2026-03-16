@@ -1,39 +1,114 @@
-version: '3'
+version: "3.9"
+
 services:
-  backend:
-    build: ./server
-    env_file:
-      - .env
-    ports:
-      - "8080:8080"
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: traccar-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    networks:
+      - traccar-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:alpine
+    container_name: traccar-redis
     restart: always
     networks:
       - traccar-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: traccar-backend
+    restart: always
+    environment:
+      TRACCAR_ADMIN_USER: ${TRACCAR_ADMIN_USER}
+      TRACCAR_ADMIN_PASS: ${TRACCAR_ADMIN_PASS}
+      SERVER_PORT: ${SERVER_PORT:-8082}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
     depends_on:
-      - db
+      postgres:
+        condition: service_healthy
+    networks:
+      - traccar-network
+    ports:
+      - "5000-5150:5000-5150"
+      - "5000-5150:5000-5150/udp"
+
+  api:
+    build: ./services/api-server
+    container_name: traccar-api
+    restart: always
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET:-super-secret-key}
+      REDIS_HOST: redis
+      TRACCAR_URL: http://backend:8082/api
+      TRACCAR_USER: ${TRACCAR_ADMIN_USER}
+      TRACCAR_PASSWORD: ${TRACCAR_ADMIN_PASS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - traccar-network
 
   frontend:
-    build: ./frontend
-    env_file:
-      - .env
-    ports:
-      - "3000:3000"
+    build: ./frontend/client-dashboard
+    container_name: traccar-frontend
     restart: always
     networks:
       - traccar-network
 
-  db:
-    image: postgres:15
+  admin-frontend:
+    build: ./frontend/admin-dashboard
+    container_name: traccar-admin-frontend
     restart: always
+    networks:
+      - traccar-network
+
+  nginx:
+    image: nginx:latest
+    container_name: traccar-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
     volumes:
-      - traccar-db:/var/lib/postgresql/data
-    environment:
-      POSTGRES_DB: traccar
-      POSTGRES_USER: traccar
-      POSTGRES_PASSWORD: strongpassword
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+      - frontend
+      - admin-frontend
+      - api
+    networks:
+      - traccar-network
 
 networks:
   traccar-network:
-
-volumes:
-  traccar-db:
+    driver: bridge

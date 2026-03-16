@@ -15,10 +15,10 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async register(phone: string): Promise<{ message: string }> {
-    const existingUser = await this.usersService.findOneByPhone(phone);
+  async register(mobile: string): Promise<{ message: string }> {
+    const existingUser = await this.usersService.findOneByMobile(mobile);
     if (existingUser && existingUser.isOtpVerified) {
-      throw new BadRequestException('Phone number already registered and verified');
+      throw new BadRequestException('Mobile number already registered and verified');
     }
 
     // Secure OTP generation
@@ -32,7 +32,7 @@ export class AuthService {
       });
     } else {
       await this.usersService.create({
-        phone,
+        mobile,
         otpCode,
         otpExpiresAt,
         role: 'CLIENT', // Default role matching schema
@@ -40,26 +40,26 @@ export class AuthService {
     }
 
     // Brute-force protection reset on new OTP request
-    this.otpAttempts.delete(phone);
+    this.otpAttempts.delete(mobile);
 
     // TODO: Integrate with SMS Gateway
-    console.log(`[AUTH] OTP for ${phone}: ${otpCode}`);
+    console.log(`[AUTH] OTP for ${mobile}: ${otpCode}`);
 
     return { message: 'OTP sent successfully. Please verify to continue.' };
   }
 
-  async verifyOtp(phone: string, code: string): Promise<{ accessToken: string }> {
+  async verifyOtp(mobile: string, code: string): Promise<{ accessToken: string }> {
     // Brute-force protection check
-    const attempts = this.otpAttempts.get(phone) || { count: 0, lastAttempt: 0 };
+    const attempts = this.otpAttempts.get(mobile) || { count: 0, lastAttempt: 0 };
     if (attempts.count >= 5 && Date.now() - attempts.lastAttempt < 30 * 60 * 1000) {
       throw new UnauthorizedException('Too many attempts. Please try again in 30 minutes.');
     }
 
-    const user = await this.usersService.findOneByPhone(phone);
+    const user = await this.usersService.findOneByMobile(mobile);
     if (!user || user.otpCode !== code || !user.otpExpiresAt || user.otpExpiresAt < new Date()) {
       attempts.count++;
       attempts.lastAttempt = Date.now();
-      this.otpAttempts.set(phone, attempts);
+      this.otpAttempts.set(mobile, attempts);
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
@@ -69,9 +69,9 @@ export class AuthService {
       otpExpiresAt: null,
     });
 
-    this.otpAttempts.delete(phone);
+    this.otpAttempts.delete(mobile);
 
-    const payload = { sub: user.id, phone: user.phone, role: user.role };
+    const payload = { sub: user.id, mobile: user.mobile, role: user.role };
     return {
       accessToken: this.jwtService.sign(payload),
     };
@@ -90,8 +90,8 @@ export class AuthService {
     });
   }
 
-  async login(phone: string, password?: string): Promise<{ accessToken: string }> {
-    const user = await this.usersService.findOneByPhone(phone);
+  async login(mobile: string, password?: string): Promise<{ accessToken: string }> {
+    const user = await this.usersService.findOneByMobile(mobile);
     if (!user || !user.isOtpVerified) {
       throw new UnauthorizedException('User not found or not verified');
     }
@@ -107,7 +107,7 @@ export class AuthService {
       throw new BadRequestException('Profile incomplete. Please use OTP login.');
     }
 
-    const payload = { sub: user.id, phone: user.phone, role: user.role };
+    const payload = { sub: user.id, mobile: user.mobile, role: user.role };
     return {
       accessToken: this.jwtService.sign(payload),
     };

@@ -7,12 +7,12 @@
 <entry key='database.driver'>org.postgresql.Driver</entry>
 
 <entry key='database.url'>
-jdbc:postgresql://postgres:5432/traccar
+jdbc:postgresql://<DB_HOST>:<DB_PORT>/<DB_NAME>
 </entry>
 
-<entry key='database.user'>traccar</entry>
+<entry key='database.user'><DB_USER></entry>
 
-<entry key='database.password'>traccar</entry>
+<entry key='database.password'><DB_PASSWORD></entry>
 
 <entry key='web.port'>8082</entry>
 

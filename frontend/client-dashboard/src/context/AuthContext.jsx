@@ -26,8 +26,8 @@ export const AuthProvider = ({ children }) => {
     return () => socketService.disconnect();
   }, []);
 
-  const loginUser = async (email, password) => {
-    const data = await apiLogin(email, password);
+  const loginUser = async (mobile, password) => {
+    const data = await apiLogin(mobile, password);
     const token = localStorage.getItem("token");
     setUser(data);
     if (token) socketService.connect(token);

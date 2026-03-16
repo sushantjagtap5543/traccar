@@ -10,8 +10,8 @@ export class UsersService {
     private usersRepository: Repository<User>,
   ) {}
 
-  async findOneByPhone(phone: string): Promise<User | undefined> {
-    return this.usersRepository.findOne({ where: { phone } });
+  async findOneByMobile(mobile: string): Promise<User | undefined> {
+    return this.usersRepository.findOne({ where: { mobile } });
   }
 
   async findOneByEmail(email: string): Promise<User | undefined> {

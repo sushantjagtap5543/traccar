@@ -10,14 +10,14 @@ export class AuthController {
 
   @Post('register')
   @ApiOperation({ summary: 'Request OTP for registration' })
-  async register(@Body('phone') phone: string) {
-    return this.authService.register(phone);
+  async register(@Body('mobile') mobile: string) {
+    return this.authService.register(mobile);
   }
 
   @Post('verify')
   @ApiOperation({ summary: 'Verify OTP and get access token' })
-  async verify(@Body('phone') phone: string, @Body('code') code: string) {
-    return this.authService.verifyOtp(phone, code);
+  async verify(@Body('mobile') mobile: string, @Body('code') code: string) {
+    return this.authService.verifyOtp(mobile, code);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -29,8 +29,8 @@ export class AuthController {
   }
 
   @Post('login')
-  @ApiOperation({ summary: 'Login with phone and password' })
-  async login(@Body('phone') phone: string, @Body('password') password?: string) {
-    return this.authService.login(phone, password);
+  @ApiOperation({ summary: 'Login with mobile and password' })
+  async login(@Body('mobile') mobile: string, @Body('password') password?: string) {
+    return this.authService.login(mobile, password);
   }
 }

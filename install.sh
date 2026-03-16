@@ -34,13 +34,21 @@ if [ "$IS_REMOTE" = false ]; then
 
     # 2. Trigger Remote Deployment
     echo "🌐 Initiating Remote Deployment on $REMOTE_IP..."
-    ssh -o StrictHostKeyChecking=no -i $PEM_FILE $REMOTE_USER@$REMOTE_IP "cd traccar && ./install.sh"
+    ssh -o StrictHostKeyChecking=no -i $PEM_FILE $REMOTE_USER@$REMOTE_IP "
+        if [ ! -d traccar ]; then
+            git clone $REPO_URL traccar
+        fi
+        cd traccar && ./install.sh
+    "
     
     echo "✨ Local Process Complete!"
     exit 0
 fi
 
 # -- REMOTE EXECUTION START --
+if [ -z "$REMOTE_IP" ]; then
+    REMOTE_IP=$(hostname -I | awk '{print $1}')
+fi
 echo "☁️ Node: Remote Server ($REMOTE_IP)"
 
 # 1. Prerequisites Installation
@@ -168,11 +176,14 @@ check_endpoint() {
     return 0
 }
 
-check_endpoint "Traccar Core" "http://localhost:8082"
-check_endpoint "API Server" "http://localhost:3001/api/docs"
+check_endpoint "Internal Traccar" "http://localhost:8082"
+check_endpoint "Internal API" "http://localhost:3001/api/docs"
 
-check_endpoint "Client Dashboard" "http://localhost:3000"
-check_endpoint "Admin Dashboard" "http://localhost:3002"
+echo "🌍 Testing via Nginx (Port 80)..."
+check_endpoint "Public Core (/traccar/)" "http://localhost/traccar/api/server"
+check_endpoint "Public API (/api/)" "http://localhost/api/docs"
+check_endpoint "Client Dashboard" "http://localhost"
+check_endpoint "Admin Dashboard" "http://localhost/admin/"
 
 echo "------------------------------------------------"
 echo "✅ Unified Deployment & Verification Complete!"

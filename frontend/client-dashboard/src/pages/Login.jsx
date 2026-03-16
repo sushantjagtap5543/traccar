@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
+import { LogIn, Smartphone, Lock, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function Login() {
   const { loginUser } = useAuth();
-  const [email, setEmail] = useState("");
+  const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -15,9 +15,9 @@ export default function Login() {
     setLoading(true);
     setError("");
     try {
-      await loginUser(email, password);
+      await loginUser(mobile, password);
     } catch (err) {
-      setError("Invalid email or password. Please try again.");
+      setError("Invalid mobile or password. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -29,19 +29,19 @@ export default function Login() {
         <div className="auth-header">
           <div className="auth-logo">📡</div>
           <h2>Welcome Back</h2>
-          <p>Sign in to your Traccar account</p>
+          <p>Sign in to your enterprise tracking account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
           {error && <div className="error-msg">{error}</div>}
           
           <div className="input-group">
-            <Mail className="input-icon" size={20} />
+            <Smartphone className="input-icon" size={20} />
             <input 
-              type="email" 
-              placeholder="Email Address" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="tel" 
+              placeholder="Mobile Number" 
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value)}
               required 
             />
           </div>
