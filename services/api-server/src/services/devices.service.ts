@@ -72,8 +72,8 @@ export class DevicesService {
   }
 
   async findOneByTraccarId(positionId: string): Promise<Device | undefined> {
-    // Note: in the new schema, positionId is a field in devices table
-    return this.deviceRepository.findOne({ where: { positionId } });
+    // Note: positionId is a number in the entity
+    return this.deviceRepository.findOne({ where: { positionId: parseInt(positionId, 10) } });
   }
 
   async findOne(id: string, userId?: string): Promise<Device> {
