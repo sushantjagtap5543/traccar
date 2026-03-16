@@ -1,6 +1,6 @@
 async function loadDevices(){
 
-const devices = await fetch("http://localhost:8082/api/devices")
+const devices = await fetch("/traccar/api/devices")
 .then(r=>r.json());
 
 const table = document.querySelector("#deviceTable tbody");

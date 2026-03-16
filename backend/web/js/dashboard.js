@@ -1,4 +1,4 @@
-const API = "http://localhost:8082/api";
+const API = "/traccar/api";
 
 async function loadDashboard(){
 

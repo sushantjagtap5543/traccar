@@ -8,7 +8,7 @@ maxZoom:19
 
 async function loadPositions(){
 
-const positions = await fetch("http://localhost:8082/api/positions")
+const positions = await fetch("/traccar/api/positions")
 .then(r=>r.json());
 
 positions.forEach(p=>{

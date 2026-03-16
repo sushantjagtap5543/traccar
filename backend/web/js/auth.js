@@ -1,4 +1,4 @@
-const API = "http://localhost:8082/api/session";
+const API = "/traccar/api/session";
 
 document.getElementById("loginForm").addEventListener("submit", async function(e){
 
