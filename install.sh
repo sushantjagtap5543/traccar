@@ -142,8 +142,8 @@ fi
 
 # 4. Directories & Env
 echo "📁 Remote: Preparing directories..."
-mkdir -p traccar/logs traccar/data database/data nginx/ssl
-chmod -R 777 traccar/logs traccar/data database/data || true
+mkdir -p data/postgres traccar/logs traccar/data nginx/ssl
+chmod -R 777 data/postgres traccar/logs traccar/data || true
 
 # 5. Deployment
 echo "🏗️ Remote: Building and launching services..."
