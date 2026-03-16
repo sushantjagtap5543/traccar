@@ -2,6 +2,10 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { LoggerMiddleware } from './common/middleware/logger.middleware';
+import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
+
 
 
 async function bootstrap() {

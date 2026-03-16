@@ -116,6 +116,11 @@ else
     echo "✅ Already up-to-date."
 fi
 
+# 2.5 Fix Line Endings (CRLF to LF)
+echo "🔧 Remote: Fixing line endings for shell scripts..."
+find . -type f -name "*.sh" -exec sed -i 's/\r$//' {} +
+find . -type f -name "entrypoint.sh" -exec sed -i 's/\r$//' {} +
+
 # 3. Incremental Deployment Update
 echo "🧹 Remote: Preparing for incremental update..."
 # We skip the full prune and volume removal to save time.

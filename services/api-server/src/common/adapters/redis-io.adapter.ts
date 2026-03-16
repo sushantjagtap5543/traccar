@@ -3,7 +3,13 @@ import { ServerOptions } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { createClient } from 'redis';
 
+import { INestApplicationContext } from '@nestjs/common';
+
 export class RedisIoAdapter extends IoAdapter {
+  constructor(app: INestApplicationContext) {
+    super(app);
+  }
+
   private adapterConstructor: ReturnType<typeof createAdapter>;
 
   async connectToRedis(): Promise<void> {

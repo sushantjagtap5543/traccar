@@ -5,12 +5,14 @@ import { AlertsService } from '../services/alerts.service';
 import { AlertsController } from '../api/alerts.controller';
 import { PositionsModule } from './positions.module';
 import { GeofencesModule } from './geofences.module';
+import { DevicesModule } from './devices.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Event]),
     forwardRef(() => PositionsModule),
     GeofencesModule,
+    DevicesModule,
   ],
   providers: [AlertsService],
   controllers: [AlertsController],

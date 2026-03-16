@@ -11,7 +11,7 @@ import { UsersModule } from './users.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Device, ApprovedDevice]),
+    TypeOrmModule.forFeature([Device, ApprovedDevice, Permission]),
     TraccarModule,
     SubscriptionsModule,
     UsersModule,
