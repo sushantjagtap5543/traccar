@@ -18,7 +18,7 @@ done
 
 # Check API responsiveness
 echo "🌐 Checking API responsiveness..."
-if curl -s --max-time 5 http://localhost:3001/api/health | grep -q "status"; then
+if curl -s --max-time 5 http://localhost:3001/api/health | grep -q "UP"; then
     echo "✅ API is RESPONSIVE"
 else
     echo "❌ API is NOT RESPONDING"

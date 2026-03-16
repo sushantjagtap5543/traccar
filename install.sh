@@ -6,7 +6,7 @@
 set -e
 
 # Configuration
-REMOTE_IP="${1:-$REMOTE_IP}"
+REMOTE_IP="${1:-3.108.114.12}"
 REMOTE_USER="${REMOTE_USER:-ubuntu}"
 PEM_FILE="${PEM_FILE:-11111.pem}"
 
@@ -32,16 +32,23 @@ if [ "$IS_REMOTE" = false ]; then
         git push origin main || echo "Push failed, continuing with deployment..."
     fi
 
-    # 2. Trigger Remote Deployment
+    echo "🌐 Initiating Remote Deployment on $REMOTE_IP..."
+    ssh -o StrictHostKeyChecking=no -i $PEM_FILE $REMOTE_USER@$REMOTE_IP "
+        mkdir -p traccar
+    "
+
     echo "🌐 Copying environment configuration..."
     scp -o StrictHostKeyChecking=no -i $PEM_FILE .env $REMOTE_USER@$REMOTE_IP:/home/ubuntu/traccar/.env
 
-    echo "🌐 Initiating Remote Deployment on $REMOTE_IP..."
     ssh -o StrictHostKeyChecking=no -i $PEM_FILE $REMOTE_USER@$REMOTE_IP "
-        if [ ! -d traccar ]; then
-            git clone $REPO_URL traccar
+        cd traccar
+        if [ ! -d .git ]; then
+            git clone $REPO_URL . || true
+        else
+            git pull origin main || true
         fi
-        cd traccar && chmod +x install.sh && ./install.sh
+        chmod +x install.sh
+        ./install.sh
     "
     
     echo "✨ Local Process Complete!"
