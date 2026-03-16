@@ -14,12 +14,10 @@ export default function LoginPage() {
 
       const data = await login(email,password);
 
-      localStorage.setItem("token",data.token);
-
       window.location.href="/dashboard";
 
     } catch(err) {
-      alert("Login failed");
+      alert(err.message || "Login failed");
     }
 
   };

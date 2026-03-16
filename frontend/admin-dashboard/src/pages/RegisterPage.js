@@ -6,6 +6,7 @@ export default function RegisterPage(){
   const [user,setUser] = useState({
     name:"",
     email:"",
+    mobile:"",
     password:""
   });
 
@@ -13,11 +14,13 @@ export default function RegisterPage(){
 
     e.preventDefault();
 
-    await register(user);
-
-    alert("Account created");
-
-    window.location="/login";
+    try {
+      await register(user);
+      alert("Account created successfully");
+      window.location="/login";
+    } catch (error) {
+      alert(error.message || "Registration failed");
+    }
 
   };
 
@@ -27,17 +30,28 @@ export default function RegisterPage(){
 
       <input
         placeholder="Name"
+        required
         onChange={e=>setUser({...user,name:e.target.value})}
       />
 
       <input
         placeholder="Email"
+        type="email"
+        required
         onChange={e=>setUser({...user,email:e.target.value})}
+      />
+
+      <input
+        placeholder="Mobile"
+        type="tel"
+        required
+        onChange={e=>setUser({...user,mobile:e.target.value})}
       />
 
       <input
         type="password"
         placeholder="Password"
+        required
         onChange={e=>setUser({...user,password:e.target.value})}
       />
 

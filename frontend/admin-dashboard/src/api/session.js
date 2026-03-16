@@ -1,6 +1,6 @@
 export async function login(email, password) {
 
-  const response = await fetch("/traccar/api/session/login", {
+  const response = await fetch("/api/auth/login", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -11,9 +11,14 @@ export async function login(email, password) {
     })
   });
 
+  const data = await response.json();
+
   if (!response.ok) {
-    throw new Error("Login failed");
+    throw new Error(data.message || "Login failed");
   }
 
-  return response.json();
+  localStorage.setItem("token", data.accessToken);
+  localStorage.setItem("user", JSON.stringify(data.user));
+
+  return data;
 }

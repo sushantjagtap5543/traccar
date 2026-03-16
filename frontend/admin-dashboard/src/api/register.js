@@ -1,6 +1,6 @@
 export async function register(user) {
 
-  const response = await fetch("/traccar/api/register", {
+  const response = await fetch("/api/auth/register", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -8,9 +8,11 @@ export async function register(user) {
     body: JSON.stringify(user)
   });
 
+  const data = await response.json();
+
   if (!response.ok) {
-    throw new Error("Registration failed");
+    throw new Error(data.message || "Registration failed");
   }
 
-  return response.json();
+  return data;
 }
