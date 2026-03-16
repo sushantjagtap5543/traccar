@@ -50,6 +50,8 @@ services:
       TRACCAR_URL: http://backend:8082/api
       TRACCAR_USER: ${TRACCAR_ADMIN_USER}
       TRACCAR_PASSWORD: ${TRACCAR_ADMIN_PASS}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
     depends_on:
       - postgres
       - redis

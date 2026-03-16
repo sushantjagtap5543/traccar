@@ -38,9 +38,8 @@ if [ ! -f nginx/ssl/server.crt ]; then
         -subj "/C=US/ST=State/L=City/O=GeoSurePath/CN=localhost"
 fi
 
-# 5. Build and Start Containers
 echo "🏗️ Building Infrastructure..."
-$DOCKER_COMPOSE_CMD up --build -d
+$DOCKER_COMPOSE_CMD up --build --no-cache -d
 
 # 6. Verify Health
 echo "⏳ Waiting for services to stabilize..."
