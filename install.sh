@@ -38,7 +38,7 @@ if [ "$IS_REMOTE" = false ]; then
         if [ ! -d traccar ]; then
             git clone $REPO_URL traccar
         fi
-        cd traccar && ./install.sh
+        cd traccar && chmod +x install.sh && ./install.sh
     "
     
     echo "✨ Local Process Complete!"
