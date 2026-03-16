@@ -130,8 +130,7 @@ fi
 
 # 2.5 Fix Line Endings (CRLF to LF)
 echo "🔧 Remote: Fixing line endings for shell scripts..."
-find . -maxdepth 3 -type f -name "*.sh" -exec sed -i 's/\r$//' {} + 2>/dev/null || true
-find . -maxdepth 3 -type f -name "entrypoint.sh" -exec sed -i 's/\r$//' {} + 2>/dev/null || true
+sed -i 's/\r$//' *.sh scripts/*.sh backend/*.sh services/api-server/*.sh 2>/dev/null || true
 
 # 3. Dependency Optimization
 if command -v npm &> /dev/null; then
