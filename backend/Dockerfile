@@ -4,7 +4,7 @@ WORKDIR /opt/traccar
 
 # Copy custom assets (if they exist in the context)
 COPY web ./web
-COPY conf ./conf
+COPY conf/traccar.xml ./conf/traccar.xml
 COPY entrypoint.sh .
 
 RUN chmod +x entrypoint.sh
