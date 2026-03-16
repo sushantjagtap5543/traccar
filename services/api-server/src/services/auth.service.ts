@@ -15,7 +15,7 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async register(mobile: string): Promise<{ message: string }> {
+  async register(mobile: string): Promise<{ message: string; otp?: string }> {
     const existingUser = await this.usersService.findOneByMobile(mobile);
     if (existingUser && existingUser.isOtpVerified) {
       throw new BadRequestException('Mobile number already registered and verified');
@@ -45,7 +45,10 @@ export class AuthService {
     // TODO: Integrate with SMS Gateway
     console.log(`[AUTH] OTP for ${mobile}: ${otpCode}`);
 
-    return { message: 'OTP sent successfully. Please verify to continue.' };
+    return { 
+      message: 'OTP sent successfully. Please verify to continue.',
+      otp: otpCode // Temporary for testing
+    };
   }
 
   async verifyOtp(mobile: string, code: string): Promise<{ accessToken: string }> {

@@ -36,7 +36,7 @@ Update the `.env` file with your production credentials:
 ```bash
 # Backend
 TRACCAR_ADMIN_USER=admin
-TRACCAR_ADMIN_PASS=Admin123
+TRACCAR_ADMIN_PASS=admin
 
 # Database
 POSTGRES_DB=traccar
@@ -92,4 +92,28 @@ The integrated billing module handles the entire customer lifecycle:
 - **Uptime**: Built-in health checks and automated backup scripts.
 
 ---
+
+## 🧪 Testing Credentials
+
+For demonstration and feature verification, use the following credentials. Note: Ensure your local database is seeded or these users are registered via the application flow.
+
+### 🏢 Admin Dashboard
+- **URL**: `/admin/`
+- **Mobile Number**: `910000000000`
+- **Password**: `admin123`
+- **Role**: Full Platform Control
+
+### 👤 Client Dashboard
+- **URL**: `/`
+- **Mobile Number**: `919999999999`
+- **Password**: `client123`
+- **Role**: Individual Tracking & Billing
+
+### 🛠 Traccar Engine (Core)
+- **URL**: `/traccar/`
+- **Username**: `admin`
+- **Password**: `admin`
+
+---
+
 © 2026 GeoSurePath | All Rights Reserved.

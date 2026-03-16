@@ -3,50 +3,34 @@ import { Group } from './group.entity';
 
 @Entity('devices')
 export class Device {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
+  @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: 'uuid', name: 'clientId' })
+  clientId: string;
 
   @Column({ length: 128 })
   name: string;
 
-  @Column({ unique: true, length: 128 })
+  @Column({ unique: true, length: 128, name: 'imei' })
   uniqueId: string;
 
-  @Column({ name: 'traccar_device_id', type: 'bigint', nullable: true })
-  traccarDeviceId: string;
+  @Column({ name: 'traccarDeviceId', type: 'integer', nullable: true })
+  traccarDeviceId: number;
 
-  @Column({ type: 'jsonb', nullable: true })
-  attributes: any;
+  @Column({ type: 'uuid', nullable: true, name: 'userId' })
+  userId: string;
 
-  @Column({ length: 32, nullable: true })
+  @Column({ length: 32, default: 'active' })
   status: string;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'lastupdate' })
-  lastUpdate: Date;
-
-  @Column({ type: 'bigint', nullable: true, name: 'positionid' })
-  positionId: string;
-
-  @Column({ type: 'bigint', nullable: true, name: 'groupid' })
-  groupId: string;
-
-  @ManyToOne(() => Group)
-  @JoinColumn({ name: 'groupid' })
-  group: Group;
-
-  @Column({ length: 128, nullable: true })
+  @Column({ length: 128, default: 'unknown' })
   model: string;
 
-  @Column({ length: 128, nullable: true })
-  contact: string;
+  @CreateDateColumn({ name: 'createdAt' })
+  createdAt: Date;
 
-  @Column({ length: 32, nullable: true })
-  phone: string;
-
-  @Column({ length: 32, nullable: true })
-  category: string;
-
-  @Column({ default: false })
-  disabled: boolean;
+  @UpdateDateColumn({ name: 'updatedAt' })
+  updatedAt: Date;
 }
 
