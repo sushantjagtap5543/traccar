@@ -27,6 +27,12 @@ export class Device {
   @Column({ length: 128, default: 'unknown' })
   model: string;
 
+  @Column({ name: 'positionId', type: 'integer', nullable: true })
+  positionId: number;
+
+  @Column({ name: 'lastUpdate', type: 'timestamp', nullable: true })
+  lastUpdate: Date;
+
   @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;
 
