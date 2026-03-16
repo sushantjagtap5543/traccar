@@ -39,7 +39,8 @@ if [ ! -f nginx/ssl/server.crt ]; then
 fi
 
 echo "🏗️ Building Infrastructure..."
-$DOCKER_COMPOSE_CMD up --build --no-cache -d
+$DOCKER_COMPOSE_CMD build --no-cache
+$DOCKER_COMPOSE_CMD up -d
 
 # 6. Verify Health
 echo "⏳ Waiting for services to stabilize..."
