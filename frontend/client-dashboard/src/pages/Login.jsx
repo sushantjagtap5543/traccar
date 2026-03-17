@@ -1,72 +1,116 @@
 import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { LogIn, Smartphone, Lock, Loader2 } from "lucide-react";
-import { Link } from "react-router-dom";
 
 export default function Login() {
-  const { loginUser } = useAuth();
-  const [mobile, setMobile] = useState("");
+  const [whatsappNumber, setWhatsappNumber] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  
+  const { loginUser } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
+
+    // Basic validation
+    if (!/^\d{10,15}$/.test(whatsappNumber)) {
+      setError("Please enter a valid WhatsApp number (at least 10 digits)");
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      await loginUser(mobile, password);
+      await loginUser(whatsappNumber, password);
+      navigate("/dashboard");
     } catch (err) {
-      setError("Invalid mobile or password. Please try again.");
+      setError(
+        err.response?.data?.message || err.message || "Login failed. Please check your credentials."
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="auth-page animate-fade-in">
-      <div className="auth-card glass">
+    <div className="auth-page bg-dark-gradient">
+      <div className="auth-card glass animate-fade-in">
         <div className="auth-header">
-          <div className="auth-logo">📡</div>
+          <div className="auth-logo">🚀</div>
           <h2>Welcome Back</h2>
-          <p>Sign in to your enterprise tracking account</p>
+          <p>Login to your GPS dashboard</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="auth-form">
-          {error && <div className="error-msg">{error}</div>}
-          
+        {error && (
+          <div className="error-msg mb-4">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleLogin} className="auth-form">
+          {/* WhatsApp Number */}
           <div className="input-group">
-            <Smartphone className="input-icon" size={20} />
-            <input 
-              type="tel" 
-              placeholder="Mobile Number" 
-              value={mobile}
-              onChange={(e) => setMobile(e.target.value)}
-              required 
+            <span className="input-icon">📱</span>
+            <input
+              type="text"
+              placeholder="WhatsApp Number (e.g. 91XXXXXXXXXX)"
+              value={whatsappNumber}
+              onChange={(e) => setWhatsappNumber(e.target.value.replace(/\D/g, ''))}
+              required
             />
           </div>
 
+          {/* Password */}
           <div className="input-group">
-            <Lock className="input-icon" size={20} />
-            <input 
-              type="password" 
-              placeholder="Password" 
+            <span className="input-icon">🔒</span>
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Enter password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required 
+              required
+              style={{ paddingRight: '3rem' }}
             />
+            <button 
+              type="button"
+              className="password-toggle"
+              onClick={() => setShowPassword(!showPassword)}
+              tabIndex="-1"
+            >
+              {showPassword ? "👁️" : "🙈"}
+            </button>
           </div>
 
-          <button type="submit" className="btn-primary auth-btn" disabled={loading}>
-            {loading ? <Loader2 className="animate-spin" /> : <><LogIn size={20} /> Sign In</>}
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn-primary auth-btn"
+          >
+            {loading ? (
+              <>
+                <span className="loader-small"></span>
+                Logging in...
+              </>
+            ) : "Login"}
           </button>
         </form>
 
-        <div className="auth-footer">
-          <p>Don't have an account? <Link to="/register">Create one</Link></p>
+        <div className="auth-footer mt-6">
+          <p>
+            New user?{" "}
+            <Link to="/register" className="highlight-link">
+              Register here
+            </Link>
+          </p>
+          <div className="forgot-password-link mt-2">
+            <a href="#" className="muted-link">Forgot Password?</a>
+          </div>
         </div>
       </div>
-
     </div>
   );
 }

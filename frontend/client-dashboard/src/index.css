@@ -99,6 +99,116 @@ input:focus {
   border-color: var(--primary);
 }
 
+/* Dark Gradient Background */
+.bg-dark-gradient {
+  background: radial-gradient(circle at top right, #1e293b 0%, #0f172a 100%);
+  background-attachment: fixed;
+}
+
+/* Password Toggle */
+.password-toggle {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 1.25rem;
+  opacity: 0.6;
+}
+
+.password-toggle:hover {
+  opacity: 1;
+}
+
+/* Auth Footer & Links */
+.auth-footer {
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+.highlight-link {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.highlight-link:hover {
+  text-decoration: underline;
+}
+
+.muted-link {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.muted-link:hover {
+  color: white;
+}
+
+/* Small Loader for Button */
+.loader-small {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.mt-6 { margin-top: 1.5rem; }
+.mt-2 { margin-top: 0.5rem; }
+.mb-4 { margin-bottom: 1rem; }
+/* Steps Indicator */
+.steps-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.step-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: all 0.3s ease;
+}
+
+.step-dot.active {
+  background: var(--primary);
+  box-shadow: 0 0 10px var(--primary);
+}
+
+.step-line {
+  flex: 0 0 30px;
+  height: 2px;
+  background: var(--border);
+  transition: all 0.3s ease;
+}
+
+.step-line.active {
+  background: var(--primary);
+}
+
+.btn-link {
+  background: transparent;
+  color: var(--primary);
+  font-size: 0.875rem;
+  padding: 0;
+  margin-top: 1rem;
+}
+
+.btn-link:hover {
+  text-decoration: underline;
+}
+
 /* Specific component styles will be added in their files or here if global */
 
 /* Navbar */

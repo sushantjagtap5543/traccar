@@ -1,9 +1,9 @@
 import API from "./api";
 
-// login with mobile and password (or OTP if password not set)
+// login with mobile and password
 export const login = async (mobile, password) => {
-  const res = await API.post("/auth/login", {
-    mobile,
+  const res = await API.post("/auth/login-mobile", {
+    whatsapp_number: mobile,
     password,
   });
   if (res.data.accessToken) {
@@ -14,31 +14,32 @@ export const login = async (mobile, password) => {
 
 // request OTP for registration
 export const requestOtp = async (mobile) => {
+  const res = await API.post("/auth/send-otp", {
+    whatsapp_number: mobile,
+  });
+  return res.data;
+};
+
+// verify OTP
+export const verifyOtp = async (mobile, code) => {
+  const res = await API.post("/auth/verify-otp", {
+    whatsapp_number: mobile,
+    otp: code,
+  });
+  return res.data;
+};
+
+// complete profile / register
+export const completeProfile = async (mobile, name, email, password) => {
   const res = await API.post("/auth/register", {
     mobile,
-  });
-  return res.data;
-};
-
-// verify OTP and get token
-export const verifyOtp = async (mobile, code) => {
-  const res = await API.post("/auth/verify", {
-    mobile,
-    code,
-  });
-  if (res.data.accessToken) {
-    localStorage.setItem("token", res.data.accessToken);
-  }
-  return res.data;
-};
-
-// complete profile
-export const completeProfile = async (name, email, password) => {
-  const res = await API.put("/auth/profile", {
     name,
     email,
     password,
   });
+  if (res.data.accessToken) {
+    localStorage.setItem("token", res.data.accessToken);
+  }
   return res.data;
 };
 
