@@ -16,7 +16,7 @@ export class WhatsAppService {
     if (!whatsappToken || !phoneNumberId) {
       this.logger.warn('WhatsApp credentials missing. Logging OTP to console for development:');
       this.logger.log(`[DEV] OTP for ${mobile}: ${otp}`);
-      return { success: true, devMode: true };
+      return { success: true, devMode: true, otp };
     }
 
     try {

@@ -17,8 +17,8 @@ export default function Login() {
     setError("");
 
     // Basic validation
-    if (!/^\d{10,15}$/.test(whatsappNumber)) {
-      setError("Please enter a valid WhatsApp number (at least 10 digits)");
+    if (!/^[6789]\d{9}$/.test(whatsappNumber)) {
+      setError("Please enter a valid 10-digit Indian mobile number (starts with 6-9)");
       return;
     }
 
@@ -57,9 +57,10 @@ export default function Login() {
             <span className="input-icon">📱</span>
             <input
               type="text"
-              placeholder="WhatsApp Number (e.g. 91XXXXXXXXXX)"
+              placeholder="WhatsApp Number (e.g. 9876543210)"
               value={whatsappNumber}
               onChange={(e) => setWhatsappNumber(e.target.value.replace(/\D/g, ''))}
+              maxLength={10}
               required
             />
           </div>
@@ -107,7 +108,7 @@ export default function Login() {
             </Link>
           </p>
           <div className="forgot-password-link mt-2">
-            <a href="#" className="muted-link">Forgot Password?</a>
+            <Link to="/forgot-password" replace className="muted-link">Forgot Password?</Link>
           </div>
         </div>
       </div>

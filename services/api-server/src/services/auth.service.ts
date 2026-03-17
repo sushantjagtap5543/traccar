@@ -16,7 +16,7 @@ export class AuthService {
     private whatsappService: WhatsAppService,
   ) {}
 
-  async requestOTP(mobile: string): Promise<{ success: boolean; message: string }> {
+  async requestOTP(mobile: string): Promise<{ success: boolean; message: string; testingOtp?: string }> {
     const otp = crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
@@ -36,9 +36,13 @@ export class AuthService {
       });
     }
 
-    await this.whatsappService.sendOTP(mobile, otp);
+    const whatsappResult = await this.whatsappService.sendOTP(mobile, otp);
 
-    return { success: true, message: 'OTP sent successfully' };
+    return { 
+      success: true, 
+      message: 'OTP sent successfully',
+      testingOtp: whatsappResult.devMode ? otp : undefined
+    };
   }
 
   async verifyOTP(mobile: string, otp: string): Promise<{ success: boolean; message: string }> {
@@ -134,5 +138,47 @@ export class AuthService {
         role: user.role
       }
     };
+  }
+
+  async requestPasswordReset(mobile: string): Promise<{ success: boolean; message: string; testingOtp?: string }> {
+    const user = await this.usersService.findOneByMobile(mobile);
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+    await this.usersService.update(user.id, {
+      otpCode: otp,
+      otpExpiresAt: expiresAt,
+      isOtpVerified: false,
+    });
+
+    const whatsappResult = await this.whatsappService.sendOTP(mobile, otp);
+
+    return { 
+      success: true, 
+      message: 'Password reset OTP sent successfully',
+      testingOtp: whatsappResult.devMode ? otp : undefined
+    };
+  }
+
+  async resetPassword(mobile: string, otp: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+    const user = await this.usersService.findOneByMobile(mobile);
+    if (!user || user.otpCode !== otp || new Date() > user.otpExpiresAt) {
+      throw new BadRequestException('Invalid or expired OTP');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await this.usersService.update(user.id, {
+      password: hashedPassword,
+      isOtpVerified: true,
+      otpCode: null,
+      otpExpiresAt: null,
+    });
+
+    return { success: true, message: 'Password reset successful' };
   }
 }

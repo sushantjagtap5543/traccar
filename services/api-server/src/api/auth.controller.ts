@@ -37,4 +37,20 @@ export class AuthController {
   async loginMobile(@Body('whatsapp_number') mobile: string, @Body('password') password?: string) {
     return this.authService.loginByMobile(mobile, password);
   }
+
+  @Post('reset-password/request')
+  @ApiOperation({ summary: 'Request a password reset OTP' })
+  async requestPasswordReset(@Body('whatsapp_number') mobile: string) {
+    return this.authService.requestPasswordReset(mobile);
+  }
+
+  @Post('reset-password/confirm')
+  @ApiOperation({ summary: 'Reset password with OTP' })
+  async resetPasswordConfirm(
+    @Body('whatsapp_number') mobile: string, 
+    @Body('otp') otp: string, 
+    @Body('password') password: string
+  ) {
+    return this.authService.resetPassword(mobile, otp, password);
+  }
 }

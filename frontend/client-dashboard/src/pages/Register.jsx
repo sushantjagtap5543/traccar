@@ -7,6 +7,7 @@ export default function Register() {
   const [step, setStep] = useState(1); // 1: Mobile, 2: OTP, 3: Profile
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [otp, setOtp] = useState("");
+  const [testingOtp, setTestingOtp] = useState("");
   const [profile, setProfile] = useState({ name: "", email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -15,14 +16,17 @@ export default function Register() {
     e.preventDefault();
     setError("");
 
-    if (!/^\d{10,15}$/.test(whatsappNumber)) {
-      setError("Please enter a valid WhatsApp number (at least 10 digits)");
+    if (!/^[6789]\d{9}$/.test(whatsappNumber)) {
+      setError("Please enter a valid 10-digit Indian mobile number (starts with 6-9)");
       return;
     }
 
     setLoading(true);
     try {
-      await requestOtp(whatsappNumber);
+      const data = await requestOtp(whatsappNumber);
+      if (data.testingOtp) {
+        setTestingOtp(data.testingOtp);
+      }
       setStep(2);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Failed to send OTP. Please try again.");
@@ -86,15 +90,22 @@ export default function Register() {
           </div>
         )}
 
+        {step === 2 && testingOtp && (
+          <div className="info-msg mb-4" style={{ backgroundColor: 'rgba(52, 211, 153, 0.1)', color: '#34d399', padding: '12px', borderRadius: '8px', border: '1px solid rgba(52, 211, 153, 0.2)', textAlign: 'center' }}>
+            <strong>[TESTING]</strong> Your OTP is: <code style={{ fontSize: '1.2rem', marginLeft: '5px' }}>{testingOtp}</code>
+          </div>
+        )}
+
         {step === 1 && (
           <form onSubmit={handleRequestOtp} className="auth-form">
             <div className="input-group">
               <span className="input-icon">📱</span>
               <input 
                 type="text" 
-                placeholder="WhatsApp Number (e.g. 91XXXXXXXXXX)" 
+                placeholder="WhatsApp Number (e.g. 9876543210)" 
                 value={whatsappNumber}
                 onChange={(e) => setWhatsappNumber(e.target.value.replace(/\D/g, ''))}
+                maxLength={10}
                 required 
               />
             </div>
@@ -131,7 +142,7 @@ export default function Register() {
                 ) : "Verify OTP"}
             </button>
             <div className="text-center mt-4">
-              <button type="button" className="muted-link" onClick={() => setStep(1)}>
+              <button type="button" className="muted-link" onClick={() => { setStep(1); setTestingOtp(""); }}>
                 Change Number
               </button>
             </div>

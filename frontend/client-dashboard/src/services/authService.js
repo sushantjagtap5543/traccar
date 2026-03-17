@@ -51,3 +51,18 @@ export const getAccount = async () => {
   const res = await API.get("/auth/profile"); // Assuming this exists or using a generic me endpoint
   return res.data;
 };
+export const requestPasswordReset = async (mobile) => {
+  const res = await API.post("/auth/reset-password/request", {
+    whatsapp_number: mobile,
+  });
+  return res.data;
+};
+
+export const confirmPasswordReset = async (mobile, code, password) => {
+  const res = await API.post("/auth/reset-password/confirm", {
+    whatsapp_number: mobile,
+    otp: code,
+    password: password,
+  });
+  return res.data;
+};

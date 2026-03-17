@@ -11,11 +11,17 @@ export class UsersService {
   ) {}
 
   async findOneByMobile(mobile: string): Promise<User | undefined> {
-    return this.usersRepository.findOne({ where: { mobile } });
+    return this.usersRepository.createQueryBuilder('user')
+      .addSelect('user.password')
+      .where('user.mobile = :mobile', { mobile })
+      .getOne();
   }
 
   async findOneByEmail(email: string): Promise<User | undefined> {
-    return this.usersRepository.findOne({ where: { email } });
+    return this.usersRepository.createQueryBuilder('user')
+      .addSelect('user.password')
+      .where('user.email = :email', { email })
+      .getOne();
   }
 
   async findOneById(id: string): Promise<User | undefined> {
