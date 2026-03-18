@@ -9,6 +9,24 @@ on:
 jobs:
   test-admin-api:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: traccar
+          POSTGRES_USER: traccar
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node.js
@@ -24,6 +42,13 @@ jobs:
       - name: Run Tests
         env:
           ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY || 'test_key_32chars_minimum_here_must_be_long' }}
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: traccar
+          DB_PASSWORD: password
+          DB_NAME: traccar
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
         run: |
           cd services/api-server
           npm test
@@ -37,7 +62,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: frontend/client-dashboard/package-lock.json
+          cache-dependency-path: frontend/client-dashboard/package.json
       - name: Install dependencies
         run: |
           cd frontend/client-dashboard

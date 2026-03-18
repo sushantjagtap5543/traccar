@@ -54,17 +54,26 @@ jobs:
       - name: Run Migrations
         run: |
           cd services/api-server
-          npx knex migrate:latest
+          npm run migration:run
         env:
-          DATABASE_URL: postgres://traccar:password@localhost:5432/traccar
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: traccar
+          DB_PASSWORD: password
+          DB_NAME: traccar
 
       - name: Run Tests
         run: |
           cd services/api-server
           npm test
         env:
-          DATABASE_URL: postgres://traccar:password@localhost:5432/traccar
-          REDIS_URL: redis://localhost:6379
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: traccar
+          DB_PASSWORD: password
+          DB_NAME: traccar
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
           JWT_SECRET: c62f1c849e79435b863d60c4b18c5e63479b187515e0a0a0a0a0a0a0a0a0a0a0
           JWT_REFRESH_SECRET: c62f1c849e79435b863d60c4b18c5e63479b187515e0a0a0a0a0a0a0a0a0a0a0
           ADMIN_EMAIL: admin@geosurepath.com
