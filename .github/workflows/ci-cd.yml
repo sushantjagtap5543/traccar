@@ -39,28 +39,28 @@ jobs:
         with:
           node-version: 18.x
           cache: 'npm'
-          cache-dependency-path: geosurepath-admin-api/package-lock.json
+          cache-dependency-path: services/api-server/package-lock.json
 
       - name: Install dependencies
         run: |
-          cd geosurepath-admin-api
+          cd services/api-server
           npm ci
 
       - name: Run Linting
         run: |
-          cd geosurepath-admin-api
+          cd services/api-server
           npm run lint || true # Allow failure if not configured yet
 
       - name: Run Migrations
         run: |
-          cd geosurepath-admin-api
+          cd services/api-server
           npx knex migrate:latest
         env:
           DATABASE_URL: postgres://traccar:password@localhost:5432/traccar
 
       - name: Run Tests
         run: |
-          cd geosurepath-admin-api
+          cd services/api-server
           npm test
         env:
           DATABASE_URL: postgres://traccar:password@localhost:5432/traccar
