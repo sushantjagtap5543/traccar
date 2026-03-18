@@ -2,7 +2,6 @@
   "name": "traccar-web",
   "version": "1.0.0",
   "private": true,
-  "homepage": "/admin",
   "dependencies": {
     "@mui/material": "latest",
     "@emotion/react": "latest",
@@ -11,7 +10,10 @@
     "react": "latest",
     "react-dom": "latest",
     "react-scripts": "latest",
-    "react-router-dom": "latest"
+    "react-router-dom": "latest",
+    "lucide-react": "^0.441.0",
+    "leaflet": "^1.9.4",
+    "react-leaflet": "^4.2.1"
   },
   "scripts": {
     "start": "react-scripts start",

@@ -20,6 +20,13 @@ export class StatsController {
     return this.statsService.getAdminStats();
   }
 
+  @Get('health')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get system health metrics' })
+  getSystemHealth() {
+    return this.statsService.getSystemHealth();
+  }
+
   @Get('user')
   @Roles(UserRole.CLIENT)
   @ApiOperation({ summary: 'Get user dashboard stats' })

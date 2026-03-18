@@ -2,7 +2,7 @@ import API from "./api";
 
 // login with mobile and password
 export const login = async (mobile, password) => {
-  const res = await API.post("/auth/login-mobile", {
+  const res = await API.post("/auth/login", {
     whatsapp_number: mobile,
     password,
   });
@@ -32,8 +32,8 @@ export const verifyOtp = async (mobile, code) => {
 // complete profile / register
 export const completeProfile = async (mobile, name, email, password) => {
   const res = await API.post("/auth/register", {
-    mobile,
-    name,
+    whatsapp_number: mobile,
+    full_name: name,
     email,
     password,
   });
@@ -48,9 +48,10 @@ export const logout = () => {
 };
 
 export const getAccount = async () => {
-  const res = await API.get("/auth/profile"); // Assuming this exists or using a generic me endpoint
+  const res = await API.get("/auth/me"); 
   return res.data;
 };
+
 export const requestPasswordReset = async (mobile) => {
   const res = await API.post("/auth/reset-password/request", {
     whatsapp_number: mobile,

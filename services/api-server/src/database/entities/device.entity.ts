@@ -21,6 +21,21 @@ export class Device {
   @Column({ type: 'uuid', nullable: true, name: 'userId' })
   userId: string;
 
+  @Column({ name: 'driverId', type: 'uuid', nullable: true })
+  driverId: string;
+
+  @Column({ length: 32, default: 'sedan' })
+  category: string;
+
+  @Column({ length: 32, default: 'cyan' })
+  color: string;
+
+  @Column({ type: 'float', default: 0 })
+  odometer: number;
+
+  @Column({ type: 'float', nullable: true })
+  fuelLevel: number;
+
   @Column({ length: 32, default: 'active' })
   status: string;
 

@@ -24,18 +24,18 @@ public class DeviceManagementService {
     }
 
     public void updateDevice(Device device) throws Exception {
-        storage.updateObject(device, new Request(new Condition.Equals("id", device.getId())));
+        storage.updateObject(device, new Request(new Columns.All(), new Condition.Equals("id", device.getId())));
     }
 
     public void deleteDevice(long deviceId) throws Exception {
-        storage.removeObject(Device.class, new Request(new Condition.Equals("id", deviceId)));
+        storage.removeObject(Device.class, new Request(new Columns.All(), new Condition.Equals("id", deviceId)));
     }
 
     public Device getDevice(long id) throws Exception {
-        return storage.getObject(Device.class, new Request(new Condition.Equals("id", id)));
+        return storage.getObject(Device.class, new Request(new Columns.All(), new Condition.Equals("id", id)));
     }
 
     public List<Device> getClientDevices(long clientId) throws Exception {
-        return storage.getObjects(Device.class, new Request(new Condition.Equals("userId", clientId)));
+        return storage.getObjects(Device.class, new Request(new Columns.All(), new Condition.Equals("userId", clientId)));
     }
 }

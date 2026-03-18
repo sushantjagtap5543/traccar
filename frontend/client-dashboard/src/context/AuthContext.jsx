@@ -29,7 +29,7 @@ export const AuthProvider = ({ children }) => {
   const loginUser = async (mobile, password) => {
     const data = await apiLogin(mobile, password);
     const token = localStorage.getItem("token");
-    setUser(data);
+    setUser(data.user);
     if (token) socketService.connect(token);
     return data;
   };

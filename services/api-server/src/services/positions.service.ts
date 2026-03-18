@@ -37,7 +37,7 @@ export class PositionsService implements OnModuleInit, OnModuleDestroy {
       const now = Date.now();
       
       for (const pos of positions) {
-        const device = await this.devicesService.findOneByTraccarId(pos.deviceId);
+        const device = await this.devicesService.findByTraccarDeviceId(pos.deviceId);
         if (device) {
           this.lastUpdate.set(device.id, now);
           this.offlineAlertsSent.delete(device.id);

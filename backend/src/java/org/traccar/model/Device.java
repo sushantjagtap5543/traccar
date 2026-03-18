@@ -10,6 +10,8 @@ public class Device {
     private String status;
     private boolean disabled;
     private long userId;
+    private String category;
+    private String icon;
 
     @QueryIgnore
     public long getId() {
@@ -58,5 +60,21 @@ public class Device {
 
     public void setDisabled(boolean disabled) {
         this.disabled = disabled;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
+    }
+
+    public String getIcon() {
+        return icon;
+    }
+
+    public void setIcon(String icon) {
+        this.icon = icon;
     }
 }

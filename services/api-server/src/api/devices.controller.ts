@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Param, UseGuards, Req, Query, BadRequestException } from '@nestjs/common';
 import { DevicesService } from '../services/devices.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
@@ -18,7 +18,10 @@ export class DevicesController {
 
   @Get()
   @ApiOperation({ summary: 'Get all devices for the current user' })
-  async findAll(@Req() req) {
+  async findAll(@Req() req, @Query('all') all?: string) {
+    if (all === 'true' && req.user.role === 'admin') {
+      return this.devicesService.findAll();
+    }
     return this.devicesService.findByUser(req.user.userId);
   }
 
@@ -32,5 +35,19 @@ export class DevicesController {
   @ApiOperation({ summary: 'Remove a device' })
   async remove(@Req() req, @Param('id') id: string) {
     return this.devicesService.remove(id, req.user.userId);
+  }
+
+  @Get('whitelist/all')
+  @ApiOperation({ summary: 'Get all whitelisted prefixes (Admin)' })
+  async getWhitelist(@Req() req) {
+    if (req.user.role !== 'admin' && !req.user.administrator) throw new BadRequestException('Unauthorized');
+    return this.devicesService.getWhitelist();
+  }
+
+  @Post('whitelist')
+  @ApiOperation({ summary: 'Add a whitelisted prefix (Admin)' })
+  async addWhitelist(@Req() req, @Body() data: { imeiPrefix: string, vendor: string }) {
+    if (req.user.role !== 'admin' && !req.user.administrator) throw new BadRequestException('Unauthorized');
+    return this.devicesService.addWhitelist(data);
   }
 }

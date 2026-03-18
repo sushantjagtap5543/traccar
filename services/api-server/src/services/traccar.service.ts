@@ -36,6 +36,28 @@ export class TraccarService {
     }
   }
 
+  async updateDevice(id: number, name: string, uniqueId: string): Promise<any> {
+    try {
+      const response = await axios.put(
+        `${this.baseUrl}/devices/${id}`,
+        { id, name, uniqueId },
+        {
+          headers: {
+            Authorization: `Basic ${this.auth}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Traccar updateDevice error:', error.response?.data || error.message);
+      throw new HttpException(
+        error.response?.data || 'Failed to update device in Traccar',
+        error.response?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   async sendCommand(deviceId: number, type: string, attributes: any = {}): Promise<any> {
     try {
       const response = await axios.post(

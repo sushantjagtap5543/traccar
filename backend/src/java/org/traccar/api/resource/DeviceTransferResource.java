@@ -5,6 +5,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.traccar.storage.Storage;
 import org.traccar.model.Device;
+import org.traccar.storage.query.Columns;
 import org.traccar.storage.query.Condition;
 import org.traccar.storage.query.Request;
 
@@ -23,7 +24,7 @@ public class DeviceTransferResource extends BaseResource {
             @QueryParam("deviceId") long deviceId,
             @QueryParam("newClientId") long newClientId) throws Exception {
 
-        Device device = storage.getObject(Device.class, new Request(new Condition.Equals("id", deviceId)));
+        Device device = storage.getObject(Device.class, new Request(new Columns.All(), new Condition.Equals("id", deviceId)));
 
         if (device == null) {
             return Response.status(Response.Status.NOT_FOUND).build();
@@ -31,7 +32,7 @@ public class DeviceTransferResource extends BaseResource {
 
         device.setUserId(newClientId);
 
-        storage.updateObject(device, new Request(new Condition.Equals("id", deviceId)));
+        storage.updateObject(device, new Request(new Columns.All(), new Condition.Equals("id", deviceId)));
 
         return Response.ok(device).build();
     }

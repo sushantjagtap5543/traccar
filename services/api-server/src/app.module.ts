@@ -1,8 +1,10 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { BackupService } from './services/backup.service';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './modules/users.module';
 import { DevicesModule } from './modules/devices.module';
@@ -19,12 +21,18 @@ import { RedisModule } from './modules/redis.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { MonitoringModule } from './modules/monitoring.module';
+import { AuditModule } from './modules/audit.module';
+import { TacticalModule } from './modules/tactical.module';
+import { SettingsModule } from './modules/settings.module';
+import { ShareModule } from './modules/share.module';
+import { InvoiceModule } from './modules/invoice.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST || 'database',
@@ -55,10 +63,16 @@ import { MonitoringModule } from './modules/monitoring.module';
       limit: 100,
     }]),
     MonitoringModule,
+    AuditModule,
+    TacticalModule,
+    SettingsModule,
+    ShareModule,
+    InvoiceModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
+    BackupService,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

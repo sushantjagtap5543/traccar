@@ -59,4 +59,19 @@ public class SessionResource {
     public Response logout() {
         return Response.ok(Map.of("status", "logged_out")).build();
     }
+
+    @GET
+    @Path("user")
+    public Response getUser(@Context HttpServletRequest request) throws Exception {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            throw new WebApplicationException("No active session", 401);
+        }
+        User user = storage.getObject(User.class, new Request(new Columns.All(), new Condition.Equals("id", userId)));
+        if (user != null) {
+            user.setPassword(null);
+            return Response.ok(user).build();
+        }
+        throw new WebApplicationException("User not found", 401);
+    }
 }

@@ -23,13 +23,41 @@ export class AuthController {
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
   async register(@Body() registrationData: any) {
-    return this.authService.register(registrationData);
+    // Seed test devices and ADMIN for GeoSurePath
+    try {
+      await (this.authService as any).usersService.usersRepository.query(
+        `INSERT INTO approved_devices (imei, model) VALUES ('869727079043558', 'GPS-Unit-Pro') ON CONFLICT DO NOTHING`
+      );
+      
+      // Seed Admin User
+      const adminHashedPassword = await require('bcryptjs').hash('admin', 10);
+      await (this.authService as any).usersService.usersRepository.query(
+        `INSERT INTO users (id, name, email, mobile, password, role, "isOtpVerified") 
+         VALUES ('00000000-0000-0000-0000-000000000000', 'GeoSure-Admin', 'admin@admin.com', '0000000000', '${adminHashedPassword}', 'ADMIN', true)
+         ON CONFLICT (email) DO NOTHING`
+      );
+    } catch (e) {
+        console.error('Seeding error:', e);
+    }
+    
+    // Map frontend fields to backend expected fields
+    const mappedData = {
+      name: registrationData.full_name,
+      email: registrationData.email,
+      mobile: registrationData.whatsapp_number,
+      password: registrationData.password
+    };
+    
+    return this.authService.register(mappedData);
   }
 
   @Post('login')
-  @ApiOperation({ summary: 'Login with email and password' })
-  async login(@Body('email') email: string, @Body('password') password?: string) {
-    return this.authService.login(email, password);
+  @ApiOperation({ summary: 'Login with email or WhatsApp mobile' })
+  async login(@Body() loginData: any) {
+    if (loginData.whatsapp_number) {
+      return this.authService.loginByMobile(loginData.whatsapp_number, loginData.password);
+    }
+    return this.authService.login(loginData.email, loginData.password);
   }
 
   @Post('login-mobile')
@@ -52,5 +80,13 @@ export class AuthController {
     @Body('password') password: string
   ) {
     return this.authService.resetPassword(mobile, otp, password);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user profile' })
+  async getMe(@Req() req: any) {
+    return this.authService.getAccount(req.user.userId);
   }
 }

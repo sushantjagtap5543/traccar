@@ -19,7 +19,46 @@ export class Subscription {
 
   @CreateDateColumn()
   createdAt: Date;
+}
+
+@Entity('subscription_plans')
+export class SubscriptionPlan {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  name: string; // "Monthly", "HalfYearly", "Yearly"
+
+  @Column({ name: 'price', type: 'decimal', precision: 10, scale: 2 })
+  price: number;
+
+  @Column()
+  durationDays: number;
 
   @UpdateDateColumn()
   updatedAt: Date;
+}
+
+@Entity('tactical_payments')
+export class TacticalPayment {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  userId: string;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  amount: number;
+
+  @Column({ default: 'cash' })
+  method: string; // "cash", "razorpay"
+
+  @Column({ default: 'pending' })
+  status: string; // "pending", "verified", "rejected"
+
+  @Column({ type: 'text', nullable: true })
+  notes: string;
+
+  @CreateDateColumn()
+  createdAt: Date;
 }

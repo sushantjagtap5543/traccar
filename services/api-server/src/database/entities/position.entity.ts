@@ -9,7 +9,7 @@ export class Position {
   @Column({ length: 128, nullable: true })
   protocol: string;
 
-  @Column({ type: 'bigint', name: 'deviceid' })
+  @Column({ type: 'uuid', name: 'deviceid' })
   deviceId: string;
 
   @ManyToOne(() => Device)

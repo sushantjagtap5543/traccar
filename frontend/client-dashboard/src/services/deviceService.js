@@ -11,7 +11,7 @@ export const getPositions = async () => {
 };
 
 export const addDevice = async (device) => {
-  const res = await API.post("/devices", device);
+  const res = await API.post("/devices/register", device);
   return res.data;
 };
 
@@ -22,5 +22,10 @@ export const updateDevice = async (id, device) => {
 
 export const deleteDevice = async (id) => {
   const res = await API.delete(`/devices/${id}`);
+  return res.data;
+};
+
+export const sendCommand = async (deviceId, type) => {
+  const res = await API.post(`/commands/${deviceId}/ignition`, { state: type === 'engineResume' });
   return res.data;
 };

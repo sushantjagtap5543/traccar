@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, Logger, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from './users.service';
 import { WhatsAppService } from './whatsapp.service';
@@ -58,7 +58,7 @@ export class AuthService {
     return { success: true, message: 'OTP verified successfully' };
   }
 
-  async register(data: { name: string; email: string; mobile: string; password?: string }): Promise<{ message: string; user: User }> {
+  async register(data: { name: string; email: string; mobile: string; password?: string }): Promise<{ message: string; accessToken: string; user: any }> {
     const user = await this.usersService.findOneByMobile(data.mobile);
     if (!user || !user.isOtpVerified) {
       throw new BadRequestException('Mobile number not verified');
@@ -78,9 +78,18 @@ export class AuthService {
       role: 'CLIENT',
     });
 
+    const payload = { sub: updatedUser.id, email: updatedUser.email, role: updatedUser.role };
+    
     return { 
       message: 'Registration successful',
-      user: updatedUser
+      accessToken: this.jwtService.sign(payload),
+      user: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        mobile: updatedUser.mobile,
+        role: updatedUser.role
+      }
     };
   }
 
@@ -88,6 +97,10 @@ export class AuthService {
     const user = await this.usersService.findOneByEmail(email);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.status === 'suspended' || user.disabled) {
+      throw new ForbiddenException('Account suspended or disabled. Contact high-command support.');
     }
 
     if (password && user.password) {
@@ -116,6 +129,10 @@ export class AuthService {
     const user = await this.usersService.findOneByMobile(mobile);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.status === 'suspended' || user.disabled) {
+      throw new ForbiddenException('Account suspended or disabled. Contact strategic support.');
     }
 
     if (password && user.password) {
@@ -180,5 +197,14 @@ export class AuthService {
     });
 
     return { success: true, message: 'Password reset successful' };
+  }
+
+  async getAccount(id: string): Promise<any> {
+    const user = await this.usersService.findOneById(id);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    const { password, otpCode, otpExpiresAt, ...userProfile } = user;
+    return userProfile;
   }
 }

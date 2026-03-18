@@ -131,6 +131,18 @@ export class AlertsService {
     }
   }
 
+  async createEvent(userId: string, data: { deviceId?: string, type: string, attributes: any }) {
+    const event = await this.eventRepository.save(this.eventRepository.create({
+      type: data.type,
+      deviceId: data.deviceId || 'system',
+      eventTime: new Date(),
+      attributes: data.attributes
+    }));
+
+    this.positionsGateway.broadcastToUser(userId, 'new_event', event);
+    return event;
+  }
+
   private async sendEmail(userId: string, event: any) {
     // Email alert logic
   }

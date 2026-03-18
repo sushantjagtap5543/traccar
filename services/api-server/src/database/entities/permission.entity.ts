@@ -4,14 +4,14 @@ import { Device } from './device.entity';
 
 @Entity('permissions')
 export class Permission {
-  @PrimaryColumn({ type: 'bigint', name: 'user_id' })
+  @PrimaryColumn({ type: 'uuid', name: 'user_id' })
   userId: string;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @PrimaryColumn({ type: 'bigint', name: 'device_id' })
+  @PrimaryColumn({ type: 'uuid', name: 'device_id' })
   deviceId: string;
 
   @ManyToOne(() => Device)
